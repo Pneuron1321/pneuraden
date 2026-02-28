@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PNEURADEN</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   PNEURADEN — Design System v1.0
+   Deep Bright Tech Cozyful
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  /* ── Dark: Neon Relaxation ── */
+  --bg:        #030508;
+  --surface:   #0a0f1e;
+  --surface2:  #0f1628;
+  --surface3:  #151d35;
+  --glass:     rgba(10,15,30,0.88);
+  --border:    rgba(168,85,247,0.15);
+  --border2:   rgba(168,85,247,0.32);
+  --np:  #a855f7; /* neon purple  */
+  --npi: #ec4899; /* neon pink    */
+  --nc:  #22d3ee; /* neon cyan    */
+  --nm:  #34d399; /* neon mint    */
+  --ns:  #38bdf8; /* neon sky     */
+  --nl:  #818cf8; /* neon lavender*/
+  --ng:  #fbbf24; /* neon gold    */
+  --vf:  #34d399; /* verified     */
+  --pnd: #fbbf24; /* pending      */
+  --ag:  #4ade80; /* active green */
+  --cl:  #475569; /* closed       */
+  --dng: #f43f5e; /* danger       */
+  --txt: #e2e8f0;
+  --td:  rgba(226,232,240,0.55);
+  --tm:  rgba(226,232,240,0.28);
+  --r-s: 8px; --r-m: 16px; --r-l: 24px; --r-xl: 32px; --r-p: 9999px;
+  --t-f: 0.15s ease;
+  --t-m: 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+[data-theme="light"] {
+  --bg:        #eef2ff;
+  --surface:   #ffffff;
+  --surface2:  #f0f4ff;
+  --surface3:  #e4ecff;
+  --glass:     rgba(255,255,255,0.92);
+  --border:    rgba(79,70,229,0.14);
+  --border2:   rgba(79,70,229,0.28);
+  --np: #7c3aed; --npi:#db2777; --nc:#0284c7;
+  --nm:#059669; --ns:#0369a1; --nl:#4f46e5; --ng:#d97706;
+  --vf:#059669; --pnd:#d97706; --ag:#16a34a; --cl:#64748b;
+  --dng:#dc2626;
+  --txt:#0f172a; --td:rgba(15,23,42,0.6); --tm:rgba(15,23,42,0.32);
+}
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
+  font-family:'Rajdhani',sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit}
+
+/* ── App shell ── */
+#app{width:100vw;height:100vh;height:100dvh;position:relative;overflow:hidden}
+
+/* ── Background grid+ambient ── */
+.vbg{position:fixed;inset:0;pointer-events:none;z-index:0}
+[data-theme="dark"] .vbg{
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 85%,rgba(168,85,247,0.07) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 35% at 85% 15%,rgba(34,211,238,0.05) 0%,transparent 70%),
+    linear-gradient(rgba(168,85,247,0.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(168,85,247,0.04) 1px,transparent 1px);
+  background-size:auto,auto,48px 48px,48px 48px}
+[data-theme="light"] .vbg{
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 85%,rgba(79,70,229,0.06) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 35% at 85% 15%,rgba(14,165,233,0.04) 0%,transparent 70%),
+    linear-gradient(rgba(79,70,229,0.05) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(79,70,229,0.05) 1px,transparent 1px);
+  background-size:auto,auto,48px 48px,48px 48px}
+
+/* ── Views ── */
+.view{position:absolute;inset:0;display:none;flex-direction:column}
+.view.active{display:flex}
+
+/* ══════════════════════════════════
+   ISLAND — капсула уюта
+   ══════════════════════════════════ */
+.island{
+  background:var(--glass);border:1px solid var(--border2);
+  border-radius:var(--r-l);backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);padding:20px;position:relative;overflow:hidden}
+[data-theme="dark"] .island{
+  box-shadow:0 0 0 1px rgba(168,85,247,0.05),0 4px 24px rgba(0,0,0,0.45),
+    0 0 60px rgba(168,85,247,0.04),inset 0 1px 0 rgba(255,255,255,0.04)}
+[data-theme="light"] .island{
+  box-shadow:0 0 0 1px rgba(79,70,229,0.05),0 4px 24px rgba(79,70,229,0.08),
+    0 1px 3px rgba(0,0,0,0.06),inset 0 1px 0 rgba(255,255,255,0.8)}
+.island::before{content:'';position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(135deg,rgba(255,255,255,0.04) 0%,transparent 50%,rgba(0,0,0,0.02) 100%);
+  pointer-events:none}
+.island-s{padding:12px 16px;border-radius:var(--r-m)}
+.island-l{padding:28px;border-radius:var(--r-xl)}
+
+/* ══════════════════════════════════
+   COMPONENTS
+   ══════════════════════════════════ */
+.label{font-size:.6rem;letter-spacing:.3em;text-transform:uppercase;color:var(--tm);font-weight:700}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:10px 20px;border-radius:var(--r-s);border:1px solid var(--border2);
+  background:var(--surface2);color:var(--txt);font-size:.8rem;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;transition:all var(--t-f);user-select:none}
+.btn:hover{border-color:var(--np);box-shadow:0 0 12px rgba(168,85,247,0.22)}
+.btn:active{transform:scale(0.97)}
+.btn-p{background:var(--np);border-color:var(--np);color:#fff}
+.btn-p:hover{background:var(--npi);border-color:var(--npi);box-shadow:0 0 20px rgba(236,72,153,0.4)}
+.btn-g{background:transparent;border-color:transparent}
+.btn-g:hover{background:var(--surface2);border-color:var(--border)}
+.input{width:100%;padding:10px 14px;border-radius:var(--r-s);border:1px solid var(--border);
+  background:var(--surface2);color:var(--txt);font-size:.9rem;outline:none;
+  transition:border-color var(--t-f),box-shadow var(--t-f)}
+.input:focus{border-color:var(--np);box-shadow:0 0 0 3px rgba(168,85,247,0.1)}
+.input::placeholder{color:var(--tm)}
+select.input{-webkit-appearance:none;cursor:pointer}
+textarea.input{resize:vertical;min-height:72px;line-height:1.5}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;
+  border-radius:var(--r-p);font-size:.58rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.bv{background:rgba(52,211,153,.12);color:var(--vf);border:1px solid rgba(52,211,153,.25)}
+.bp{background:rgba(251,191,36,.12);color:var(--pnd);border:1px solid rgba(251,191,36,.25)}
+.ba{background:rgba(74,222,128,.12);color:var(--ag);border:1px solid rgba(74,222,128,.25)}
+.pdot{width:6px;height:6px;border-radius:50%;background:currentColor;
+  animation:pdotA 1.5s ease-in-out infinite}
+@keyframes pdotA{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+
+/* ══════════════════════════════════
+   NAV BAR
+   ══════════════════════════════════ */
+.nav{position:fixed;bottom:0;left:0;right:0;z-index:100;display:flex;
+  align-items:center;justify-content:space-around;
+  padding:8px 16px max(16px,env(safe-area-inset-bottom));
+  background:var(--glass);border-top:1px solid var(--border);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.ni{display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:6px 16px;border-radius:var(--r-m);cursor:pointer;
+  transition:all var(--t-f);border:1px solid transparent;
+  background:none;color:var(--tm);min-width:54px}
+.ni.active{color:var(--np);border-color:var(--border);background:var(--surface2)}
+.ni:hover:not(.active){color:var(--td)}
+.ni-icon{font-size:1.2rem;line-height:1}
+.ni-lbl{font-size:.5rem;letter-spacing:.15em;text-transform:uppercase;font-weight:700}
+
+/* ══════════════════════════════════
+   TOP BAR
+   ══════════════════════════════════ */
+.topbar{position:relative;z-index:10;display:flex;align-items:center;
+  justify-content:space-between;padding:16px 20px 12px;
+  padding-top:max(16px,env(safe-area-inset-top))}
+.logo{font-family:'Orbitron',monospace;font-size:1rem;font-weight:900;
+  letter-spacing:.2em;background:linear-gradient(135deg,var(--np),var(--npi));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.theme-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border2);
+  background:var(--surface2);display:flex;align-items:center;justify-content:center;
+  font-size:1rem;transition:all var(--t-f)}
+.theme-btn:hover{border-color:var(--np);box-shadow:0 0 12px rgba(168,85,247,0.3)}
+
+/* ══════════════════════════════════
+   VIEW: HOME — RADAR
+   ══════════════════════════════════ */
+#vh{align-items:center;justify-content:space-between}
+.home-main{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;position:relative;z-index:5;gap:20px;padding:0 20px}
+.radar-wrap{position:relative;width:280px;height:280px;cursor:pointer;
+  user-select:none;-webkit-user-select:none}
+.radar-wrap:hover #radar{filter:brightness(1.12) drop-shadow(0 0 20px rgba(0,200,80,.45))}
+#radar{width:280px;height:280px;border-radius:50%;display:block;
+  transition:filter var(--t-f);
+  filter:drop-shadow(0 0 14px rgba(0,180,70,.28))}
+.radar-hint{position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);
+  font-size:.58rem;letter-spacing:.25em;color:var(--tm);text-transform:uppercase;
+  white-space:nowrap;animation:hintA 2.5s ease-in-out infinite}
+@keyframes hintA{0%,100%{opacity:.3}50%{opacity:.9}}
+.zpills{display:flex;gap:6px;margin-top:8px}
+.zpill{width:7px;height:7px;border-radius:50%;border:1px solid var(--border2);
+  background:transparent;cursor:pointer;transition:all var(--t-f)}
+.zpill.active{background:var(--nm);border-color:var(--nm);box-shadow:0 0 6px rgba(52,211,153,.6)}
+.home-title{font-family:'Orbitron',monospace;font-size:clamp(1.3rem,5vw,1.9rem);
+  font-weight:900;letter-spacing:.2em;text-align:center}
+[data-theme="dark"] .home-title{
+  background:linear-gradient(135deg,#a855f7,#ec4899,#38bdf8);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+[data-theme="light"] .home-title{color:var(--nl)}
+.home-coords{font-family:'Orbitron',monospace;font-size:.58rem;letter-spacing:.12em;
+  color:var(--tm);text-align:center;margin-top:4px}
+.stats{display:flex;gap:10px;width:100%;max-width:340px}
+.stat{flex:1;padding:10px 12px;border-radius:var(--r-m);background:var(--surface);
+  border:1px solid var(--border);text-align:center}
+.stat-n{font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;color:var(--nc)}
+.stat-l{font-size:.5rem;letter-spacing:.18em;text-transform:uppercase;color:var(--tm);margin-top:2px}
+
+/* ══════════════════════════════════
+   VIEW: MAP
+   ══════════════════════════════════ */
+#vm{background:#0a0a10}
+#map-container{position:absolute;inset:0;z-index:1}
+.map-top{position:absolute;top:0;left:0;right:0;z-index:500;display:flex;
+  align-items:center;padding:12px 16px;gap:10px;
+  padding-top:max(12px,env(safe-area-inset-top));
+  background:linear-gradient(to bottom,rgba(3,5,8,.95) 0%,transparent 100%)}
+.map-back{width:36px;height:36px;border-radius:50%;border:1px solid var(--border2);
+  background:var(--glass);backdrop-filter:blur(10px);display:flex;
+  align-items:center;justify-content:center;color:var(--txt);font-size:.9rem;
+  flex-shrink:0;transition:all var(--t-f)}
+.map-back:hover{border-color:var(--np)}
+.map-search{flex:1;height:36px;border-radius:var(--r-p);border:1px solid var(--border);
+  background:var(--glass);backdrop-filter:blur(10px);padding:0 14px;
+  color:var(--txt);font-size:.85rem;outline:none}
+.map-layers{position:absolute;top:70px;right:12px;z-index:500;display:flex;flex-direction:column;gap:6px}
+.lbtn{width:36px;height:36px;border-radius:var(--r-s);border:1px solid var(--border2);
+  background:var(--glass);backdrop-filter:blur(10px);display:flex;align-items:center;
+  justify-content:center;cursor:pointer;font-size:.85rem;transition:all var(--t-f);
+  color:var(--td)}
+.lbtn.active{border-color:var(--nm);color:var(--nm)}
+.lbtn:hover:not(.active){color:var(--txt)}
+.map-locate{position:absolute;bottom:80px;left:12px;z-index:500;width:40px;height:40px;
+  border-radius:50%;border:1px solid var(--border2);background:var(--glass);
+  backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:1rem;color:var(--nc);transition:all var(--t-f)}
+.map-locate:hover{border-color:var(--nc);box-shadow:0 0 12px rgba(34,211,238,.3)}
+.map-addbtn{position:absolute;bottom:80px;left:62px;z-index:500;height:40px;
+  padding:0 16px;border-radius:var(--r-p);border:1px solid var(--np);
+  background:var(--glass);backdrop-filter:blur(10px);display:flex;align-items:center;
+  gap:6px;cursor:pointer;font-size:.72rem;font-weight:700;letter-spacing:.1em;
+  color:var(--np);text-transform:uppercase;transition:all var(--t-f)}
+.map-addbtn:hover{background:rgba(168,85,247,.15);box-shadow:0 0 16px rgba(168,85,247,.3)}
+.map-legend{position:absolute;bottom:80px;right:0;z-index:500;width:190px;
+  transform:translateX(100%);transition:transform var(--t-m)}
+.map-legend.open{transform:translateX(0)}
+.leg-tog{position:absolute;left:-38px;top:0;width:38px;height:38px;
+  border-radius:var(--r-s) 0 0 var(--r-s);background:var(--glass);
+  backdrop-filter:blur(10px);border:1px solid var(--border2);border-right:none;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  font-size:.8rem;color:var(--td)}
+.leg-body{background:var(--glass);backdrop-filter:blur(20px);
+  border:1px solid var(--border2);border-radius:var(--r-m) 0 0 var(--r-m);padding:14px}
+.leg-item{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:.7rem;color:var(--td)}
+.ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+/* Leaflet overrides */
+.leaflet-container{font-family:'Rajdhani',sans-serif;background:#0a0a14}
+.leaflet-popup-content-wrapper{background:transparent;border:none;box-shadow:none;padding:0}
+.leaflet-popup-content{margin:0}
+.leaflet-popup-tip{display:none}
+/* Club island popup */
+.club-pop{width:280px;background:var(--glass);border:1px solid var(--border2);
+  border-radius:var(--r-l);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5),0 0 0 1px rgba(168,85,247,.1)}
+.club-hd{padding:16px 18px;background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(236,72,153,.1));
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.club-logo{width:44px;height:44px;border-radius:50%;
+  background:linear-gradient(135deg,var(--np),var(--npi));
+  display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0}
+.club-nm{font-family:'Orbitron',monospace;font-size:.72rem;font-weight:700;letter-spacing:.08em}
+.club-sub{font-size:.62rem;color:var(--tm);margin-top:2px}
+.club-bd{padding:14px 18px}
+.srow{display:flex;justify-content:space-between;align-items:center;
+  padding:6px 0;border-bottom:1px solid var(--border);font-size:.75rem}
+.srow:last-child{border-bottom:none}
+.sday{color:var(--td);letter-spacing:.04em}
+.stime{color:var(--txt);font-weight:700;font-family:'Orbitron',monospace;font-size:.62rem}
+/* Event popup */
+.ev-pop{width:250px;background:var(--glass);border:1px solid var(--border2);
+  border-radius:var(--r-l);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  padding:16px;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.ev-pop-t{font-family:'Orbitron',monospace;font-size:.72rem;font-weight:700;
+  letter-spacing:.06em;margin-bottom:8px}
+.ev-pop-m{font-size:.7rem;color:var(--td);line-height:1.55}
+
+/* ══════════════════════════════════
+   VIEW: EVENTS
+   ══════════════════════════════════ */
+#ve{overflow:hidden}
+.ev-scroll{flex:1;overflow-y:auto;padding:0 16px 80px;display:flex;flex-direction:column;gap:8px}
+.ev-scroll::-webkit-scrollbar{width:3px}
+.ev-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.sec-lbl{display:flex;align-items:center;gap:10px;padding:8px 0 4px}
+.sec-lbl-t{font-size:.6rem;letter-spacing:.28em;text-transform:uppercase;
+  color:var(--tm);font-weight:700;white-space:nowrap}
+.sec-line{flex:1;height:1px;background:var(--border)}
+.ev-card{padding:14px 16px;border-radius:var(--r-m);background:var(--surface);
+  border:1px solid var(--border);transition:all var(--t-f);cursor:pointer}
+.ev-card:hover{border-color:var(--border2);transform:translateY(-1px);
+  box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.ev-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.ev-card-t{font-weight:700;font-size:.88rem;flex:1;margin-right:8px}
+.ev-card-m{display:flex;flex-direction:column;gap:3px;font-size:.68rem;color:var(--td)}
+.ev-card-d{font-size:.76rem;color:var(--td);line-height:1.5;margin-top:5px}
+
+/* ══════════════════════════════════
+   ADD EVENT SHEET
+   ══════════════════════════════════ */
+.sheet{position:fixed;inset:0;z-index:1000;display:none;align-items:flex-end}
+.sheet.open{display:flex}
+.sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+.sheet-box{position:relative;z-index:1;width:100%;background:var(--surface);
+  border-radius:var(--r-xl) var(--r-xl) 0 0;border:1px solid var(--border2);border-bottom:none;
+  padding:20px 20px max(24px,env(safe-area-inset-bottom));max-height:85vh;overflow-y:auto;
+  animation:sheetUp var(--t-m) forwards}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-handle{width:40px;height:4px;border-radius:2px;background:var(--border2);
+  margin:0 auto 20px}
+.fg{margin-bottom:14px}
+.flbl{display:block;font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--tm);margin-bottom:6px;font-weight:700}
+
+/* ══════════════════════════════════
+   VIEW: PROFILE
+   ══════════════════════════════════ */
+#vp{overflow:hidden}
+.prof-scroll{flex:1;overflow-y:auto;padding:0 16px 80px;display:flex;flex-direction:column;gap:14px}
+.prof-scroll::-webkit-scrollbar{width:3px}
+.prof-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.avatar{width:72px;height:72px;border-radius:50%;
+  background:linear-gradient(135deg,var(--np),var(--npi));
+  display:flex;align-items:center;justify-content:center;font-size:2rem;
+  margin:0 auto;box-shadow:0 0 24px rgba(168,85,247,.4)}
+.auth-form{display:flex;flex-direction:column;gap:12px}
+
+/* ══════════════════════════════════
+   VIEW: ADMIN
+   ══════════════════════════════════ */
+#vad{overflow:hidden}
+.adm-scroll{flex:1;overflow-y:auto;padding:0 16px 80px;display:flex;flex-direction:column;gap:10px}
+.adm-scroll::-webkit-scrollbar{width:3px}
+.adm-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.qcard{padding:14px 16px;border-radius:var(--r-m);background:var(--surface);
+  border:1px solid rgba(251,191,36,.4);display:flex;flex-direction:column;gap:8px}
+.adm-acts{display:flex;gap:8px}
+.btn-ok{flex:1;background:rgba(52,211,153,.1);border-color:var(--vf);color:var(--vf);font-size:.7rem}
+.btn-ok:hover{background:rgba(52,211,153,.2);box-shadow:0 0 10px rgba(52,211,153,.3)}
+.btn-no{flex:1;background:rgba(244,63,94,.1);border-color:var(--dng);color:var(--dng);font-size:.7rem}
+.btn-no:hover{background:rgba(244,63,94,.2);box-shadow:0 0 10px rgba(244,63,94,.3)}
+/* Club toggle */
+.status-tog{display:flex;gap:10px;align-items:center;padding:14px 16px;
+  border-radius:var(--r-m);background:var(--surface);border:1px solid var(--border)}
+.tog{position:relative;width:48px;height:26px;flex-shrink:0}
+.tog input{opacity:0;width:0;height:0}
+.tog-sl{position:absolute;inset:0;border-radius:13px;background:var(--surface3);
+  border:1px solid var(--border);cursor:pointer;transition:all var(--t-f)}
+.tog-sl::before{content:'';position:absolute;width:18px;height:18px;border-radius:50%;
+  background:var(--tm);top:3px;left:3px;transition:all var(--t-f)}
+input:checked+.tog-sl{background:rgba(74,222,128,.2);border-color:var(--ag)}
+input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
+  box-shadow:0 0 8px rgba(74,222,128,.5)}
+
+/* ══════════════════════════════════
+   TOAST
+   ══════════════════════════════════ */
+#toasts{position:fixed;top:20px;left:50%;transform:translateX(-50%);
+  z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.toast{padding:10px 20px;border-radius:var(--r-p);background:var(--surface2);
+  border:1px solid var(--border2);font-size:.78rem;letter-spacing:.05em;
+  color:var(--txt);backdrop-filter:blur(10px);
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+  animation:tin .3s ease,tout .3s ease 2.7s forwards}
+@keyframes tin{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tout{from{opacity:1}to{opacity:0}}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+</head>
+<body>
+<div id="app">
+<div class="vbg"></div>
+
+<!-- ═══ HOME ═══ -->
+<div id="vh" class="view active">
+  <div class="topbar">
+    <span class="logo">PNEURADEN</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span id="uid" style="font-size:.6rem;letter-spacing:.15em;color:var(--tm);text-transform:uppercase"></span>
+      <button class="theme-btn" onclick="toggleTheme()">🌓</button>
+    </div>
+  </div>
+  <div class="home-main">
+    <div class="radar-wrap" id="rwrap" onclick="goMap()">
+      <canvas id="radar" width="560" height="560"></canvas>
+      <div class="radar-hint">нажми · открыть карту</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:36px">
+      <div class="home-title">PNEURADEN</div>
+      <div class="home-coords" id="hcoords">45.0811°N · 13.6387°E · ROVINJ</div>
+      <div class="zpills" id="zpills">
+        <div class="zpill" onclick="setZoom(0,event)"></div>
+        <div class="zpill active" onclick="setZoom(1,event)"></div>
+        <div class="zpill" onclick="setZoom(2,event)"></div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-n" id="sv">0</div>
+        <div class="stat-l">Верифицировано</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n" id="sp" style="color:var(--pnd)">0</div>
+        <div class="stat-l">На проверке</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n" id="cs-dot" style="color:var(--ag)">●</div>
+        <div class="stat-l" id="cs-lbl">Открыт</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MAP ═══ -->
+<div id="vm" class="view">
+  <div class="map-top">
+    <button class="map-back" onclick="go('home')">←</button>
+    <input class="map-search" placeholder="Поиск..." type="text">
+  </div>
+  <div id="map-container"></div>
+  <div class="map-layers">
+    <div class="lbtn active" id="lv" onclick="toggleL('v')" title="Верифицированные">🟢</div>
+    <div class="lbtn active" id="lp" onclick="toggleL('p')" title="На проверке">🟡</div>
+    <div class="lbtn active" id="lc" onclick="toggleL('c')" title="Клуб">🥋</div>
+  </div>
+  <div class="map-legend" id="mleg">
+    <div class="leg-tog" onclick="document.getElementById('mleg').classList.toggle('open')">☰</div>
+    <div class="leg-body">
+      <div class="label" style="margin-bottom:10px">Легенда</div>
+      <div class="leg-item"><div class="ldot" style="background:#4ade80;box-shadow:0 0 6px #4ade80"></div>Верифицировано</div>
+      <div class="leg-item"><div class="ldot" style="background:#fbbf24;box-shadow:0 0 6px #fbbf24"></div>На проверке</div>
+      <div class="leg-item"><div class="ldot" style="background:#a855f7;box-shadow:0 0 6px #a855f7"></div>Борцовский клуб</div>
+      <div class="leg-item"><div class="ldot" style="background:#38bdf8;box-shadow:0 0 6px #38bdf8"></div>Ваша позиция</div>
+    </div>
+  </div>
+  <button class="map-locate" onclick="locate()" title="Моя позиция">📍</button>
+  <button class="map-addbtn" onclick="openSheet()">+ добавить ивент</button>
+</div>
+
+<!-- ═══ EVENTS ═══ -->
+<div id="ve" class="view">
+  <div class="topbar">
+    <span class="logo" style="font-size:.85rem">ИВЕНТЫ</span>
+    <button class="btn btn-p" style="font-size:.65rem;padding:6px 14px" onclick="openSheet()">+ Добавить</button>
+  </div>
+  <div class="ev-scroll" id="evlist"></div>
+</div>
+
+<!-- ═══ PROFILE ═══ -->
+<div id="vp" class="view">
+  <div class="topbar">
+    <span class="logo" style="font-size:.85rem">ПРОФИЛЬ</span>
+  </div>
+  <div class="prof-scroll" id="profcont"></div>
+</div>
+
+<!-- ═══ ADMIN ═══ -->
+<div id="vad" class="view">
+  <div class="topbar">
+    <span class="logo" style="font-size:.85rem">⚡ ADMIN</span>
+    <button class="btn btn-g" style="font-size:.65rem;padding:6px 12px" onclick="go('profile')">← Выйти</button>
+  </div>
+  <div class="adm-scroll" id="admcont"></div>
+</div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+  <button class="ni active" data-v="home" onclick="go('home')">
+    <span class="ni-icon">◎</span><span class="ni-lbl">Радар</span>
+  </button>
+  <button class="ni" data-v="map" onclick="go('map')">
+    <span class="ni-icon">🗺</span><span class="ni-lbl">Карта</span>
+  </button>
+  <button class="ni" data-v="events" onclick="go('events')">
+    <span class="ni-icon">⚡</span><span class="ni-lbl">Ивенты</span>
+  </button>
+  <button class="ni" data-v="profile" onclick="go('profile')">
+    <span class="ni-icon">👤</span><span class="ni-lbl">Профиль</span>
+  </button>
+</nav>
+
+<!-- ADD EVENT SHEET -->
+<div class="sheet" id="sheet">
+  <div class="sheet-bg" onclick="closeSheet()"></div>
+  <div class="sheet-box">
+    <div class="sheet-handle"></div>
+    <div style="font-family:'Orbitron',monospace;font-size:.78rem;letter-spacing:.15em;margin-bottom:16px">НОВЫЙ ИВЕНТ</div>
+    <div class="fg"><label class="flbl">Название *</label>
+      <input class="input" id="et" placeholder="Название ивента" type="text"></div>
+    <div class="fg"><label class="flbl">Тип</label>
+      <select class="input" id="ety">
+        <option value="training">🥋 Тренировка</option>
+        <option value="concert">🎸 Концерт</option>
+        <option value="market">🛒 Маркет</option>
+        <option value="meetup">🤝 Встреча</option>
+        <option value="sport">⚽ Спорт</option>
+        <option value="other">⭐ Другое</option>
+      </select></div>
+    <div class="fg"><label class="flbl">Дата и время</label>
+      <input class="input" id="ed" type="datetime-local"></div>
+    <div class="fg"><label class="flbl">Место (адрес)</label>
+      <input class="input" id="eloc" placeholder="Адрес или описание места" type="text"></div>
+    <div class="fg"><label class="flbl">Описание</label>
+      <textarea class="input" id="edesc" placeholder="Описание ивента..."></textarea></div>
+    <div class="fg"><label class="flbl">Сообщение администратору</label>
+      <textarea class="input" id="emsg" placeholder="Дополнительная информация..." style="min-height:58px"></textarea></div>
+    <button class="btn btn-p" style="width:100%" onclick="submitEv()">Отправить на верификацию</button>
+  </div>
+</div>
+
+<div id="toasts"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════
+   PNEURADEN v1.0 — Core
+   ═══════════════════════════════════════════════════════════ */
+const CLUB = {
+  lat:45.0811, lng:13.6387,
+  name:'HK Rovinj Rovigno', sub:'Борцовский клуб · Ровинь',
+  schedule:[
+    {d:'Пн',t:'18:30 — 20:30'},{d:'Ср',t:'18:30 — 20:30'},
+    {d:'Пт',t:'18:30 — 20:30'},{d:'Сб',t:'10:00 — 12:00'}
+  ],
+  contact:'+385 91 xxx xxxx'
+};
+
+const EV_ICONS = {training:'🥋',concert:'🎸',market:'🛒',meetup:'🤝',sport:'⚽',other:'⭐'};
+
+function defaultEvents(){
+  return [
+    {id:'e1',title:'Вечерняя тренировка — борьба',type:'training',
+     date:'2026-03-05T18:30',desc:'Тренировка вольной борьбы. Все уровни.',
+     loc:'Спортзал клуба',lat:45.0811,lng:13.6387,verified:true,addedBy:'admin'},
+    {id:'e2',title:'Музыкальный вечер у порта',type:'concert',
+     date:'2026-03-08T20:00',desc:'Живая музыка на набережной.',
+     loc:'Порт Ровиня',lat:45.0798,lng:13.6370,verified:true,addedBy:'admin'},
+    {id:'e3',title:'Воскресный рынок',type:'market',
+     date:'2026-03-09T09:00',desc:'Свежие продукты и местные товары.',
+     loc:'Стара Баштина',lat:45.0825,lng:13.6395,verified:true,addedBy:'admin'},
+    {id:'e4',title:'Встреча серфингистов',type:'sport',
+     date:'2026-03-07T10:00',desc:'Организационная встреча перед сезоном.',
+     loc:'Пляж',lat:45.0755,lng:13.6310,verified:false,addedBy:'user@test.com'},
+    {id:'e5',title:'Арт-выставка в галерее',type:'other',
+     date:'2026-03-12T17:00',desc:'Открытие выставки местных художников.',
+     loc:'Галерея',lat:45.0815,lng:13.6402,verified:false,addedBy:'user2@test.com'}
+  ];
+}
+
+const S = {
+  view:'home',
+  theme: localStorage.getItem('pnd-t')||'dark',
+  clubActive: JSON.parse(localStorage.getItem('pnd-ca')?? 'true'),
+  user: JSON.parse(localStorage.getItem('pnd-u')||'null'),
+  events: JSON.parse(localStorage.getItem('pnd-ev')||'null') || defaultEvents(),
+  mapInit:false,
+  radarZoom:1,
+  compassAngle:0
+};
+
+document.documentElement.setAttribute('data-theme',S.theme);
+
+/* ── Navigation ─────────────────────────────────────── */
+function go(v){
+  if(v===S.view && v!=='map') return;
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(el=>el.classList.remove('active'));
+  const vEl = document.getElementById('v'+v[0]+(v==='home'?'h':v==='map'?'m':v==='events'?'e':v==='profile'?'p':v==='admin'?'ad':''));
+  // build correct id
+  const ids={home:'vh',map:'vm',events:'ve',profile:'vp',admin:'vad'};
+  const el=document.getElementById(ids[v]);
+  if(el) el.classList.add('active');
+  const ni=document.querySelector(`.ni[data-v="${v}"]`);
+  if(ni) ni.classList.add('active');
+  S.view=v;
+  const nav=document.getElementById('nav');
+  if(v==='map'){nav.style.display='none';initMap();}
+  else nav.style.display='flex';
+  if(v==='events') renderEvents();
+  if(v==='profile') renderProfile();
+  if(v==='admin') renderAdmin();
+}
+function goMap(){go('map');}
+
+/* ── Theme ──────────────────────────────────────────── */
+function toggleTheme(){
+  S.theme=S.theme==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',S.theme);
+  localStorage.setItem('pnd-t',S.theme);
+  if(S.mapInit && window._ml){
+    const u=S.theme==='dark'
+      ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    window._ml.setUrl(u);
+  }
+}
+
+/* ── Helpers ────────────────────────────────────────── */
+function toast(msg){
+  const c=document.getElementById('toasts');
+  const t=document.createElement('div');
+  t.className='toast';t.textContent=msg;
+  c.appendChild(t);setTimeout(()=>t.remove(),3100);
+}
+function saveEv(){
+  localStorage.setItem('pnd-ev',JSON.stringify(S.events));
+  document.getElementById('sv').textContent=S.events.filter(e=>e.verified).length;
+  document.getElementById('sp').textContent=S.events.filter(e=>!e.verified).length;
+}
+function fmtDate(d){
+  if(!d)return'—';
+  return new Date(d).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+function clubStatusUI(){
+  const dot=document.getElementById('cs-dot'),lbl=document.getElementById('cs-lbl');
+  if(S.clubActive){dot.style.color='var(--ag)';lbl.textContent='Тренировка';}
+  else{dot.style.color='var(--cl)';lbl.textContent='Закрыто';}
+}
+function updateUID(){
+  const el=document.getElementById('uid');
+  if(el) el.textContent=S.user?(S.user.role==='admin'?'⚡ admin':S.user.email.split('@')[0]):'';
+}
+
+/* ── Zoom pills ─────────────────────────────────────── */
+function setZoom(i,e){
+  e.stopPropagation();
+  S.radarZoom=i;
+  document.querySelectorAll('.zpill').forEach((p,pi)=>p.classList.toggle('active',pi===i));
+}
+
+/* ── Events render ──────────────────────────────────── */
+function renderEvents(){
+  const c=document.getElementById('evlist');if(!c)return;
+  const vf=S.events.filter(e=>e.verified),pd=S.events.filter(e=>!e.verified);
+  let h=`<div class="sec-lbl"><span class="sec-lbl-t">Верифицированные</span><div class="sec-line"></div></div>`;
+  vf.forEach(e=>h+=evCard(e));
+  h+=`<div class="sec-lbl" style="margin-top:8px"><span class="sec-lbl-t">На проверке</span><div class="sec-line"></div></div>`;
+  if(!pd.length) h+=`<div style="font-size:.75rem;color:var(--tm);padding:12px 0;text-align:center">Нет ивентов на проверке</div>`;
+  pd.forEach(e=>h+=evCard(e));
+  c.innerHTML=h;
+}
+function evCard(ev){
+  const ic=EV_ICONS[ev.type]||'📍';
+  return`<div class="ev-card" onclick="jumpToEv('${ev.id}')">
+    <div class="ev-card-top">
+      <div class="ev-card-t">${ic} ${ev.title}</div>
+      <span class="badge ${ev.verified?'bv':'bp'}">${ev.verified?'✓':'⏳'} ${ev.verified?'Верифицировано':'Ожидание'}</span>
+    </div>
+    <div class="ev-card-m"><span>📅 ${fmtDate(ev.date)}</span><span>👤 ${ev.addedBy}</span>${ev.loc?`<span>📍 ${ev.loc}</span>`:''}</div>
+    ${ev.desc?`<div class="ev-card-d">${ev.desc}</div>`:''}
+  </div>`;
+}
+function jumpToEv(id){
+  const ev=S.events.find(e=>e.id===id);if(!ev)return;
+  go('map');
+  setTimeout(()=>{if(window._map)window._map.setView([ev.lat,ev.lng],16);},600);
+}
+
+/* ── Add Event ──────────────────────────────────────── */
+function openSheet(){
+  if(!S.user){toast('Войдите чтобы добавить ивент');go('profile');return;}
+  const now=new Date();now.setHours(now.getHours()+1,0,0,0);
+  document.getElementById('ed').value=now.toISOString().slice(0,16);
+  document.getElementById('sheet').classList.add('open');
+}
+function closeSheet(){document.getElementById('sheet').classList.remove('open');}
+function submitEv(){
+  const title=document.getElementById('et').value.trim();
+  if(!title){toast('Введите название');return;}
+  const ev={
+    id:'e'+Date.now(),title,type:document.getElementById('ety').value,
+    date:document.getElementById('ed').value,
+    loc:document.getElementById('eloc').value.trim(),
+    desc:document.getElementById('edesc').value.trim(),
+    msg:document.getElementById('emsg').value.trim(),
+    lat:CLUB.lat+(Math.random()-.5)*.012,lng:CLUB.lng+(Math.random()-.5)*.012,
+    verified:false,addedBy:S.user.email
+  };
+  S.events.push(ev);saveEv();closeSheet();renderEvents();
+  toast('Ивент отправлен на верификацию ✓');
+  ['et','eloc','edesc','emsg'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+}
+
+/* ── Map ────────────────────────────────────────────── */
+const LV={v:true,p:true,c:true};
+
+function initMap(){
+  if(S.mapInit)return;S.mapInit=true;
+  const map=L.map('map-container',{center:[CLUB.lat,CLUB.lng],zoom:14,
+    zoomControl:false,attributionControl:false});
+  window._map=map;
+  const turl=S.theme==='dark'
+    ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  window._ml=L.tileLayer(turl,{maxZoom:19,subdomains:'abcd'}).addTo(map);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  L.control.attribution({position:'bottomleft',prefix:false})
+    .addAttribution('© CartoDB · © OSM').addTo(map);
+  addClubMarker(map);
+  addEvMarkers(map);
+  if(navigator.geolocation)
+    navigator.geolocation.getCurrentPosition(p=>addUserMarker(map,p.coords.latitude,p.coords.longitude));
+}
+
+function divIcon(color,sz=11,pulse=false){
+  const ps=pulse?'animation:mp 1.5s ease-in-out infinite;':'';
+  return L.divIcon({className:'',iconSize:[sz+10,sz+10],iconAnchor:[(sz+10)/2,(sz+10)/2],
+    popupAnchor:[0,-(sz+10)/2-4],
+    html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${color};
+      box-shadow:0 0 ${sz}px ${color},0 0 ${sz*2}px ${color}40;
+      border:2px solid rgba(255,255,255,.5);margin:5px;${ps}"></div>
+    <style>@keyframes mp{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.7}}</style>`
+  });
+}
+
+function addClubMarker(map){
+  const c=S.clubActive?'#a855f7':'#64748b';
+  const icon=L.divIcon({className:'',iconSize:[48,48],iconAnchor:[24,24],popupAnchor:[0,-28],
+    html:`<div style="width:48px;height:48px;border-radius:50%;
+      background:radial-gradient(circle,${c},${c}80);border:2px solid ${c};
+      box-shadow:0 0 18px ${c},0 0 36px ${c}40;
+      display:flex;align-items:center;justify-content:center;font-size:1.4rem;
+      ${S.clubActive?'animation:cp 2s ease-in-out infinite;':''}">🥋</div>
+    <style>@keyframes cp{0%,100%{box-shadow:0 0 18px ${c},0 0 36px ${c}40}50%{box-shadow:0 0 28px ${c},0 0 56px ${c}60}}</style>`
+  });
+  const srows=CLUB.schedule.map(s=>`<div class="srow"><span class="sday">${s.d}</span><span class="stime">${s.t}</span></div>`).join('');
+  const pop=`<div class="club-pop">
+    <div class="club-hd">
+      <div class="club-logo">🥋</div>
+      <div>
+        <div class="club-nm">${CLUB.name}</div>
+        <div class="club-sub">${CLUB.sub}</div>
+        <div style="margin-top:6px">${S.clubActive
+          ?'<span class="badge ba"><span class="pdot"></span>Тренировка идёт</span>'
+          :'<span class="badge" style="background:rgba(100,116,139,.1);color:var(--cl);border:1px solid rgba(100,116,139,.3)">⚫ Закрыто</span>'}</div>
+      </div>
+    </div>
+    <div class="club-bd">
+      <div class="label" style="margin-bottom:8px">Расписание</div>
+      ${srows}
+      <div style="margin-top:10px;font-size:.7rem;color:var(--td)">📞 ${CLUB.contact}</div>
+    </div>
+  </div>`;
+  L.marker([CLUB.lat,CLUB.lng],{icon}).addTo(map).bindPopup(pop,{maxWidth:300});
+}
+
+function addEvMarkers(map){
+  (window._ems||[]).forEach(m=>map.removeLayer(m));
+  window._ems=[];
+  S.events.forEach(ev=>{
+    const color=ev.verified?'#4ade80':'#fbbf24';
+    const icon=divIcon(color,10,ev.verified&&ev.type==='training');
+    const pop=`<div class="ev-pop">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div class="ev-pop-t">${EV_ICONS[ev.type]||'📍'} ${ev.title}</div>
+        <span class="badge ${ev.verified?'bv':'bp'}" style="flex-shrink:0;margin-left:8px">${ev.verified?'✓':'⏳'}</span>
+      </div>
+      <div class="ev-pop-m">
+        ${ev.date?`<div>📅 ${fmtDate(ev.date)}</div>`:''}
+        ${ev.loc?`<div>📍 ${ev.loc}</div>`:''}
+        ${ev.desc?`<div style="margin-top:5px">${ev.desc}</div>`:''}
+        <div style="margin-top:5px;color:var(--tm)">👤 ${ev.addedBy}</div>
+      </div>
+    </div>`;
+    const m=L.marker([ev.lat,ev.lng],{icon}).addTo(map).bindPopup(pop,{maxWidth:270});
+    window._ems.push(m);
+  });
+}
+
+function addUserMarker(map,lat,lng){
+  if(window._um) map.removeLayer(window._um);
+  const icon=divIcon('#38bdf8',9,true);
+  window._um=L.marker([lat,lng],{icon}).addTo(map)
+    .bindPopup('<div class="ev-pop"><div class="ev-pop-t">📍 Вы здесь</div></div>');
+  document.getElementById('hcoords').textContent=`${lat.toFixed(4)}°N · ${lng.toFixed(4)}°E`;
+}
+
+function locate(){
+  if(!navigator.geolocation){toast('Геолокация недоступна');return;}
+  navigator.geolocation.getCurrentPosition(
+    p=>{addUserMarker(window._map,p.coords.latitude,p.coords.longitude);
+        window._map.setView([p.coords.latitude,p.coords.longitude],15);toast('Позиция обновлена');},
+    ()=>toast('Не удалось получить позицию'));
+}
+
+function toggleL(l){
+  LV[l]=!LV[l];
+  document.getElementById('l'+l)?.classList.toggle('active',LV[l]);
+  toast(LV[l]?'Слой включён':'Слой выключен');
+}
+
+/* ── Auth ───────────────────────────────────────────── */
+let aMode='login';
+function renderProfile(){
+  const c=document.getElementById('profcont');if(!c)return;
+  if(S.user){
+    const isA=S.user.role==='admin';
+    const myEvs=S.events.filter(e=>e.addedBy===S.user.email);
+    c.innerHTML=`
+    <div style="text-align:center;padding:16px 0">
+      <div class="avatar">${S.user.email[0].toUpperCase()}</div>
+      <div style="margin-top:12px;font-family:'Orbitron',monospace;font-size:.85rem;letter-spacing:.08em">${S.user.email}</div>
+      <div style="margin-top:6px"><span class="badge ${isA?'ba':'bv'}">${isA?'⚡ Администратор':'✓ Пользователь'}</span></div>
+    </div>
+    <div class="island island-s">
+      <div class="label" style="margin-bottom:10px">Мои ивенты (${myEvs.length})</div>
+      ${myEvs.length?myEvs.map(ev=>`<div style="font-size:.8rem;padding:6px 0;border-bottom:1px solid var(--border);color:var(--td);display:flex;justify-content:space-between;align-items:center">
+        <span>${EV_ICONS[ev.type]||'📍'} ${ev.title}</span>
+        <span class="badge ${ev.verified?'bv':'bp'}" style="font-size:.52rem">${ev.verified?'✓':'⏳'}</span>
+      </div>`).join(''):'<div style="font-size:.75rem;color:var(--tm)">Вы ещё не добавляли ивенты</div>'}
+    </div>
+    ${isA?`<button class="btn" style="width:100%" onclick="go('admin')">⚡ Панель администратора</button>`:''}
+    <button class="btn" style="width:100%" onclick="logout()">Выйти из аккаунта</button>`;
+  } else {
+    c.innerHTML=`
+    <div style="text-align:center;padding:16px 0">
+      <div style="font-size:2.5rem">👤</div>
+      <div style="margin-top:8px;font-size:.8rem;color:var(--td)">Войдите чтобы добавлять<br>ивенты и участвовать в сообществе</div>
+    </div>
+    <div class="island">
+      <div class="label" style="margin-bottom:14px" id="aml">ВХОД</div>
+      <div class="auth-form">
+        <div class="fg"><label class="flbl">Email</label>
+          <input class="input" id="ae" type="email" placeholder="your@email.com"></div>
+        <div class="fg"><label class="flbl">Пароль</label>
+          <input class="input" id="apw" type="password" placeholder="••••••••"></div>
+        <div class="fg" id="ang" style="display:none"><label class="flbl">Имя</label>
+          <input class="input" id="an" type="text" placeholder="Ваше имя"></div>
+        <button class="btn btn-p" style="width:100%" onclick="authDo()">Войти</button>
+        <button class="btn btn-g" style="width:100%;font-size:.7rem" onclick="toggleAMode()">Нет аккаунта? Зарегистрироваться</button>
+      </div>
+    </div>
+    <div style="font-size:.62rem;color:var(--tm);text-align:center;padding:8px;line-height:1.7">
+      Демо-вход: <strong style="color:var(--td)">admin@pneuraden.com</strong> / <strong style="color:var(--td)">admin123</strong><br>
+      Или зарегистрируйтесь с любым email
+    </div>`;
+  }
+}
+
+function toggleAMode(){
+  aMode=aMode==='login'?'register':'login';
+  const lbl=document.getElementById('aml');
+  const ang=document.getElementById('ang');
+  const btn=document.querySelector('#vp .btn-p');
+  const tog=document.querySelector('#vp .btn-g');
+  if(lbl) lbl.textContent=aMode==='login'?'ВХОД':'РЕГИСТРАЦИЯ';
+  if(ang) ang.style.display=aMode==='register'?'block':'none';
+  if(btn) btn.textContent=aMode==='login'?'Войти':'Зарегистрироваться';
+  if(tog) tog.textContent=aMode==='login'?'Нет аккаунта? Зарегистрироваться':'Уже есть аккаунт? Войти';
+}
+
+function authDo(){
+  const email=(document.getElementById('ae')?.value||'').trim().toLowerCase();
+  const pw=document.getElementById('apw')?.value||'';
+  if(!email||!pw){toast('Введите email и пароль');return;}
+  const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
+  if(aMode==='login'){
+    if(email==='admin@pneuraden.com'&&pw==='admin123'){
+      S.user={email,role:'admin'};
+    } else if(users[email]&&users[email].pw===btoa(pw)){
+      S.user={email,role:'user',name:users[email].name};
+    } else {toast('Неверный email или пароль');return;}
+  } else {
+    if(pw.length<6){toast('Пароль минимум 6 символов');return;}
+    const name=(document.getElementById('an')?.value||'').trim()||email.split('@')[0];
+    users[email]={pw:btoa(pw),name};
+    localStorage.setItem('pnd-users',JSON.stringify(users));
+    S.user={email,role:'user',name};
+  }
+  localStorage.setItem('pnd-u',JSON.stringify(S.user));
+  updateUID();renderProfile();
+  toast(aMode==='login'?'Добро пожаловать!':'Аккаунт создан ✓');
+}
+
+function logout(){
+  S.user=null;localStorage.removeItem('pnd-u');
+  updateUID();renderProfile();toast('Вы вышли из системы');
+}
+
+/* ── Admin ──────────────────────────────────────────── */
+function renderAdmin(){
+  if(!S.user||S.user.role!=='admin'){go('profile');toast('Доступ запрещён');return;}
+  const c=document.getElementById('admcont');if(!c)return;
+  const pd=S.events.filter(e=>!e.verified),vf=S.events.filter(e=>e.verified);
+  let h=`
+  <div class="island island-s">
+    <div class="label" style="margin-bottom:10px">Статус клуба</div>
+    <div class="status-tog">
+      <label class="tog">
+        <input type="checkbox" ${S.clubActive?'checked':''} onchange="setClub(this.checked)">
+        <span class="tog-sl"></span>
+      </label>
+      <div>
+        <div style="font-size:.88rem;font-weight:700">${S.clubActive?'🟢 Тренировка идёт':'⚫ Закрыто'}</div>
+        <div class="label">HK Rovinj Rovigno</div>
+      </div>
+    </div>
+  </div>
+  <div class="sec-lbl"><span class="sec-lbl-t">Очередь верификации (${pd.length})</span><div class="sec-line"></div></div>`;
+  if(!pd.length){
+    h+=`<div class="island island-s" style="text-align:center">
+      <div style="font-size:1.5rem">✓</div>
+      <div style="font-size:.75rem;color:var(--tm);margin-top:4px">Очередь пуста</div>
+    </div>`;
+  } else {
+    pd.forEach(ev=>{
+      h+=`<div class="qcard">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="font-weight:700;font-size:.88rem">${EV_ICONS[ev.type]||'📍'} ${ev.title}</div>
+          <span class="badge bp">⏳</span>
+        </div>
+        <div style="font-size:.7rem;color:var(--td)">📅 ${fmtDate(ev.date)} · 👤 ${ev.addedBy}${ev.loc?` · 📍 ${ev.loc}`:''}</div>
+        ${ev.desc?`<div style="font-size:.74rem;color:var(--td)">${ev.desc}</div>`:''}
+        ${ev.msg?`<div style="font-size:.7rem;padding:8px;border-radius:8px;background:var(--surface2);color:var(--td)">"${ev.msg}"</div>`:''}
+        <div class="adm-acts">
+          <button class="btn btn-ok" onclick="verEv('${ev.id}')">✓ Верифицировать</button>
+          <button class="btn btn-no" onclick="delEv('${ev.id}')">✕ Отклонить</button>
+        </div>
+      </div>`;
+    });
+  }
+  h+=`<div class="sec-lbl" style="margin-top:8px"><span class="sec-lbl-t">Верифицировано (${vf.length})</span><div class="sec-line"></div></div>`;
+  vf.forEach(ev=>{
+    h+=`<div class="ev-card" style="border-color:rgba(52,211,153,.2)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:.85rem;font-weight:700">${EV_ICONS[ev.type]||'📍'} ${ev.title}</div>
+        <button class="btn" style="font-size:.6rem;padding:4px 8px;color:var(--dng);border-color:rgba(244,63,94,.3)" onclick="delEv('${ev.id}')">✕</button>
+      </div>
+    </div>`;
+  });
+  c.innerHTML=h;
+}
+
+function setClub(v){
+  S.clubActive=v;localStorage.setItem('pnd-ca',JSON.stringify(v));
+  clubStatusUI();renderAdmin();toast(v?'🟢 Тренировка началась!':'⚫ Клуб закрыт');
+  if(S.mapInit){S.mapInit=false;document.getElementById('map-container').innerHTML='';window._map=null;}
+}
+function verEv(id){
+  const ev=S.events.find(e=>e.id===id);
+  if(ev){ev.verified=true;saveEv();renderAdmin();renderEvents();
+    if(S.mapInit&&window._map)addEvMarkers(window._map);
+    toast('Ивент верифицирован ✓');}
+}
+function delEv(id){
+  S.events=S.events.filter(e=>e.id!==id);saveEv();renderAdmin();renderEvents();
+  if(S.mapInit&&window._map)addEvMarkers(window._map);
+  toast('Ивент удалён');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RADAR — GTA 4 Liberty City Style
+   ═══════════════════════════════════════════════════════════ */
+const ZOOM_R=[0.002,0.005,0.011]; // degree radius per zoom
+let RAF=null;
+
+(function initRadar(){
+  const cv=document.getElementById('radar');
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=W/2-6;
+  let angle=0,targetAngle=0,hasGyro=false;
+  let uLat=CLUB.lat,uLng=CLUB.lng;
+
+  // Device orientation
+  if('DeviceOrientationEvent' in window){
+    window.addEventListener('deviceorientation',e=>{
+      if(e.alpha!=null){hasGyro=true;angle=e.alpha;}
+    });
+    // iOS permission
+    if(typeof DeviceOrientationEvent.requestPermission==='function'){
+      document.getElementById('rwrap').addEventListener('click',async(e)=>{
+        e.stopPropagation();
+        try{const p=await DeviceOrientationEvent.requestPermission();
+          if(p==='granted') hasGyro=true;}catch{}
+        goMap();
+      },{once:true});
+    }
+  }
+  // Desktop mouse fallback
+  window.addEventListener('mousemove',e=>{
+    if(!hasGyro){
+      const dx=e.clientX-window.innerWidth/2,dy=e.clientY-window.innerHeight/2;
+      targetAngle=Math.atan2(dx,-dy)*180/Math.PI;
+    }
+  });
+  // User location
+  if(navigator.geolocation)
+    navigator.geolocation.getCurrentPosition(p=>{uLat=p.coords.latitude;uLng=p.coords.longitude;});
+
+  function blipXY(lat,lng){
+    const r=ZOOM_R[S.radarZoom];
+    return{bx:cx+(lng-uLng)/r*R*.85,by:cy-(lat-uLat)/r*R*.85};
+  }
+
+  function frame(){
+    if(!hasGyro) angle+=(targetAngle-angle)*.05;
+    ctx.clearRect(0,0,W,H);
+
+    /* clip */
+    ctx.save();
+    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.clip();
+
+    /* background */
+    const bg=ctx.createRadialGradient(cx,cy,0,cx,cy,R);
+    bg.addColorStop(0,'#1c2030');bg.addColorStop(.55,'#141825');bg.addColorStop(1,'#0c1018');
+    ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+
+    /* scanlines */
+    ctx.strokeStyle='rgba(0,255,80,.03)';ctx.lineWidth=1;
+    for(let i=0;i<H;i+=4){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(W,i);ctx.stroke();}
+
+    /* rings */
+    [.33,.66,1].forEach((s,i)=>{
+      ctx.beginPath();ctx.arc(cx,cy,R*s,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(0,255,80,${.05+i*.04})`;ctx.lineWidth=1;ctx.stroke();
+    });
+
+    /* cross */
+    ctx.strokeStyle='rgba(0,255,80,.07)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(cx,cy-R);ctx.lineTo(cx,cy+R);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.stroke();
+
+    /* rotating compass ring */
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(angle*Math.PI/180);
+    for(let d=0;d<360;d+=5){
+      const r=d*Math.PI/180,ic=d%90===0,is=d%45===0;
+      const tl=ic?16:is?10:5,op=ic?.85:is?.5:.22;
+      const x1=Math.sin(r)*(R-tl),y1=-Math.cos(r)*(R-tl);
+      const x2=Math.sin(r)*R,y2=-Math.cos(r)*R;
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
+      ctx.strokeStyle=`rgba(0,255,80,${op})`;ctx.lineWidth=ic?2.5:1;ctx.stroke();
+    }
+    // Cardinal labels
+    ctx.font=`900 ${W*.07}px Orbitron,monospace`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ['N','E','S','W'].forEach((l,i)=>{
+      const r=i*90*Math.PI/180,x=Math.sin(r)*(R-30),y=-Math.cos(r)*(R-30);
+      ctx.fillStyle=l==='N'?'rgba(255,55,55,.95)':'rgba(0,255,80,.88)';
+      ctx.shadowColor=l==='N'?'rgba(255,50,50,.6)':'rgba(0,255,80,.4)';
+      ctx.shadowBlur=10;ctx.fillText(l,x,y);
+    });
+    ctx.shadowBlur=0;ctx.restore();
+
+    /* event blips */
+    const t=Date.now();
+    S.events.forEach(ev=>{
+      const {bx,by}=blipXY(ev.lat,ev.lng);
+      const dx=bx-cx,dy=by-cy;
+      if(dx*dx+dy*dy>R*R*1.05) return;
+      const col=ev.verified?'#4ade80':'#fbbf24';
+      const g=ctx.createRadialGradient(bx,by,0,bx,by,10);
+      g.addColorStop(0,col+'cc');g.addColorStop(1,col+'00');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(bx,by,10,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(bx,by,4.5,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();
+    });
+
+    /* club blip */
+    const {bx:cbx,by:cby}=blipXY(CLUB.lat,CLUB.lng);
+    const cDx=cbx-cx,cDy=cby-cy;
+    if(cDx*cDx+cDy*cDy<=R*R*1.05){
+      const pulse=.6+.4*Math.sin(t*.003),cr=8*pulse;
+      const cg=ctx.createRadialGradient(cbx,cby,0,cbx,cby,cr*2.5);
+      cg.addColorStop(0,'rgba(168,85,247,.85)');cg.addColorStop(1,'rgba(168,85,247,0)');
+      ctx.fillStyle=cg;ctx.beginPath();ctx.arc(cbx,cby,cr*2.5,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(cbx,cby,cr,0,Math.PI*2);ctx.fillStyle='#a855f7';ctx.fill();
+    }
+
+    /* player dot */
+    const ps=5+1.8*Math.sin(t*.004);
+    const pg=ctx.createRadialGradient(cx,cy,0,cx,cy,ps*2.5);
+    pg.addColorStop(0,'rgba(255,255,255,1)');pg.addColorStop(.35,'rgba(56,189,248,.8)');pg.addColorStop(1,'rgba(56,189,248,0)');
+    ctx.fillStyle=pg;ctx.beginPath();ctx.arc(cx,cy,ps*2.5,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,4.5,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
+
+    /* heading chevron */
+    ctx.save();ctx.translate(cx,cy);
+    ctx.beginPath();ctx.moveTo(0,-14);ctx.lineTo(-5,0);ctx.lineTo(5,0);ctx.closePath();
+    ctx.fillStyle='rgba(255,255,255,.55)';ctx.fill();ctx.restore();
+
+    ctx.restore(); /* end clip */
+
+    /* outer ring */
+    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);
+    ctx.strokeStyle='rgba(0,200,75,.6)';ctx.lineWidth=2.5;ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,R+6,0,Math.PI*2);
+    ctx.strokeStyle='rgba(0,200,75,.12)';ctx.lineWidth=5;ctx.stroke();
+
+    RAF=requestAnimationFrame(frame);
+  }
+  frame();
+
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){cancelAnimationFrame(RAF);}
+    else{frame();}
+  });
+})();
+
+/* ── Init ───────────────────────────────────────────── */
+saveEv();
+clubStatusUI();
+updateUID();
+</script>
+</body>
+</html>
