@@ -256,9 +256,9 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 /* Leaflet */
 .leaflet-container{font-family:'Rajdhani',sans-serif;background:#0a0a14}
-/* Voyager tiles are already bright — slight contrast boost only */
-#radar-minimap .leaflet-tile-pane{filter:contrast(1.1) saturate(1.1)}
-#map-container  .leaflet-tile-pane{filter:contrast(1.05)}
+/* Brighter tiles on radar minimap and full map for readability */
+#radar-minimap .leaflet-tile-pane{filter:brightness(1.6) contrast(1.1)}
+#map-container .leaflet-tile-pane{filter:brightness(1.25) contrast(1.05)}
 .leaflet-popup-content-wrapper{background:transparent;border:none;box-shadow:none;padding:0}
 .leaflet-popup-content{margin:0}
 .leaflet-popup-tip{display:none}
@@ -684,7 +684,9 @@ function toggleTheme(){
   S.theme=S.theme==='dark'?'light':'dark';
   document.documentElement.setAttribute('data-theme',S.theme);
   localStorage.setItem('pnd-t',S.theme);
-  const tileUrl='https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+  const tileUrl=S.theme==='dark'
+    ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
   if(S.mapInit && window._ml) window._ml.setUrl(tileUrl);
   if(window._minimapTL) window._minimapTL.setUrl(tileUrl);
 }
@@ -786,7 +788,9 @@ function initMap(){
   const map=L.map('map-container',{center:[45.0811,13.6387],zoom:4,
     zoomControl:false,attributionControl:false});
   window._map=map;
-  const turl='https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+  const turl=S.theme==='dark'
+    ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
   window._ml=L.tileLayer(turl,{maxZoom:19,subdomains:'abcd'}).addTo(map);
   // invalidateSize so Leaflet loads tiles for the oversized (141.5%) container
   setTimeout(()=>map.invalidateSize(),200);
@@ -1291,7 +1295,7 @@ let _minimap=null;
       doubleClickZoom:false,boxZoom:false,keyboard:false,
       fadeAnimation:false,zoomAnimation:false,tap:false
     });
-    window._minimapTL=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    window._minimapTL=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
       {maxZoom:19,subdomains:'abcd'}).addTo(_minimap);
     setTimeout(()=>_minimap.invalidateSize(),150);
   }
@@ -1357,8 +1361,8 @@ let _minimap=null;
     ctx.save();
     ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.clip();
 
-    /* minimal overlay — just enough for rings to read over bright tiles */
-    ctx.fillStyle='rgba(4,7,16,0.03)';ctx.fillRect(0,0,W,H);
+    /* subtle dark overlay so rings are visible over tiles */
+    ctx.fillStyle='rgba(4,7,16,0.07)';ctx.fillRect(0,0,W,H);
 
     /* rings */
     [.33,.66,1].forEach((s,i)=>{
