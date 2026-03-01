@@ -189,12 +189,8 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 
 /* ── MAP ── */
 #vm{background:#0a0a10}
-#map-container{position:absolute;inset:0;z-index:1}
-.map-compass{position:absolute;top:70px;left:12px;z-index:500;width:40px;height:40px;
-  border-radius:50%;border:1px solid var(--border2);background:var(--glass);
-  backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;
-  cursor:default;transition:all var(--t-f)}
-.map-compass svg{transition:transform .25s ease}
+#map-container{position:absolute;inset:0;z-index:1;
+  transform-origin:center center;transition:transform .08s linear}
 .map-top{position:absolute;top:0;left:0;right:0;z-index:500;display:flex;
   align-items:center;padding:12px 16px;gap:10px;
   padding-top:max(12px,env(safe-area-inset-top));
@@ -427,14 +423,6 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
       <div class="leg-item"><div class="ldot" style="background:#a855f7;box-shadow:0 0 6px #a855f7"></div>Борцовский клуб</div>
       <div class="leg-item"><div class="ldot" style="background:#ef4444;box-shadow:0 0 6px #ef4444;animation:pdotA 1.5s ease-in-out infinite"></div>Пользователи</div>
     </div>
-  </div>
-  <div class="map-compass" id="map-compass" title="Компас">
-    <svg id="compass-arrow" width="22" height="22" viewBox="0 0 22 22" fill="none">
-      <circle cx="11" cy="11" r="10" stroke="rgba(168,85,247,0.4)" stroke-width="1"/>
-      <polygon points="11,3 9,11 11,9 13,11" fill="#ef4444"/>
-      <polygon points="11,19 9,11 11,13 13,11" fill="rgba(200,200,200,0.6)"/>
-      <circle cx="11" cy="11" r="2" fill="white" opacity="0.8"/>
-    </svg>
   </div>
   <button class="map-locate" onclick="locate()" title="Моя позиция">📍</button>
   <button class="map-addbtn" onclick="openSheet()">+ добавить ивент</button>
@@ -703,21 +691,13 @@ function renderEvents(){
 }
 function evCard(ev){
   const ic=EV_ICONS[ev.type]||'📍';
-  const cnt=goingCount(ev.id);
-  const going=isGoing(ev.id);
-  return`<div class="ev-card">
-    <div onclick="jumpToEv('${ev.id}')">
-      <div class="ev-card-top">
-        <div class="ev-card-t">${ic} ${ev.title}</div>
-        <span class="badge ${ev.verified?'bv':'bp'}">${ev.verified?'✓':'⏳'} ${ev.verified?'Верифицировано':'Ожидание'}</span>
-      </div>
-      <div class="ev-card-m"><span>📅 ${fmtDate(ev.date)}</span><span>👤 ${ev.addedBy}</span>${ev.loc?`<span>📍 ${ev.loc}</span>`:''}</div>
-      ${ev.desc?`<div class="ev-card-d">${ev.desc}</div>`:''}
+  return`<div class="ev-card" onclick="jumpToEv('${ev.id}')">
+    <div class="ev-card-top">
+      <div class="ev-card-t">${ic} ${ev.title}</div>
+      <span class="badge ${ev.verified?'bv':'bp'}">${ev.verified?'✓':'⏳'} ${ev.verified?'Верифицировано':'Ожидание'}</span>
     </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-      ${cnt?`<span style="font-size:.68rem;color:#4ade80;font-weight:700">🚶 ${cnt} ${cnt===1?'идёт':'идут'}</span>`:'<span></span>'}
-      <button onclick="toggleGoingTo('${ev.id}')" style="padding:4px 12px;border-radius:6px;border:1px solid ${going?'#ef4444':'#4ade80'};background:${going?'rgba(239,68,68,.1)':'rgba(74,222,128,.1)'};color:${going?'#ef4444':'#4ade80'};font-family:Rajdhani,sans-serif;font-size:.65rem;font-weight:700;letter-spacing:.08em;cursor:pointer">${going?'✕ Отменить':'🚶 Иду'}</button>
-    </div>
+    <div class="ev-card-m"><span>📅 ${fmtDate(ev.date)}</span><span>👤 ${ev.addedBy}</span>${ev.loc?`<span>📍 ${ev.loc}</span>`:''}</div>
+    ${ev.desc?`<div class="ev-card-d">${ev.desc}</div>`:''}
   </div>`;
 }
 function jumpToEv(id){
@@ -753,55 +733,7 @@ function submitEv(){
 
 /* ── Map ────────────────────────────────────────────────── */
 const LV={v:true,p:true,c:true};
-let _geoWatchId=null;
-
-/* Haversine distance in meters */
-function haversine(lat1,lng1,lat2,lng2){
-  const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
-  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
-
-/* Going-there helpers */
-function getGoingTo(){return JSON.parse(localStorage.getItem('pnd-going')||'{}');}
-function goingCount(evId){return Object.values(getGoingTo()).filter(a=>a.includes(evId)).length;}
-function isGoing(evId){if(!S.user)return false;return(getGoingTo()[S.user.email]||[]).includes(evId);}
-function toggleGoingTo(evId){
-  if(!S.user){toast('Войдите чтобы отметить участие');go('profile');return;}
-  const gt=getGoingTo(),key=S.user.email;
-  if(!gt[key])gt[key]=[];
-  const idx=gt[key].indexOf(evId);
-  if(idx>=0)gt[key].splice(idx,1);else gt[key].push(evId);
-  localStorage.setItem('pnd-going',JSON.stringify(gt));
-  if(S.mapInit&&window._map)addEvMarkers(window._map);
-  renderEvents();
-  toast(idx>=0?'Отменено':'🚶 Вы идёте!');
-}
-
-/* Cluster detection — idea 1 */
-function detectClusters(map){
-  const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
-  const cutoff=Date.now()-7200000;
-  const pts=Object.values(users).filter(u=>u.lat&&u.lng&&u.lastSeen>cutoff).map(u=>[u.lat,u.lng]);
-  if(pts.length<2)return;
-  const used=new Set(),clusters=[];
-  pts.forEach((p,i)=>{
-    if(used.has(i))return;
-    const grp=[i];
-    pts.forEach((q,j)=>{if(j!==i&&!used.has(j)&&haversine(p[0],p[1],q[0],q[1])<300){grp.push(j);used.add(j);}});
-    used.add(i);
-    if(grp.length>=2)clusters.push(grp.map(k=>pts[k]));
-  });
-  clusters.forEach(grp=>{
-    const lat=grp.reduce((s,p)=>s+p[0],0)/grp.length;
-    const lng=grp.reduce((s,p)=>s+p[1],0)/grp.length;
-    L.circle([lat,lng],{radius:180,color:'#fbbf24',fillColor:'#fbbf24',
-      fillOpacity:.06,weight:1.5,dashArray:'5,7',opacity:.45})
-      .addTo(map)
-      .bindPopup(`<div class="ev-pop"><div class="ev-pop-t">⚡ Активность</div>
-        <div class="ev-pop-m">${grp.length} чел. в зоне · возможно ивент</div></div>`);
-  });
-}
+let _mapAngle=0;
 
 function initMap(){
   if(S.mapInit)return;S.mapInit=true;
@@ -817,36 +749,31 @@ function initMap(){
     .addAttribution('© CartoDB · © OSM').addTo(map);
   addClubMarker(map);
   addEvMarkers(map);
-  showOtherUsers(map);
-  detectClusters(map);
-
-  // Accurate continuous geolocation
-  if(navigator.geolocation){
-    if(_geoWatchId!=null)navigator.geolocation.clearWatch(_geoWatchId);
-    _geoWatchId=navigator.geolocation.watchPosition(
-      p=>{
-        window._uLat=p.coords.latitude;window._uLng=p.coords.longitude;
-        addUserMarker(map,p.coords.latitude,p.coords.longitude);
-      },
-      ()=>toast('Геолокация недоступна'),
-      {enableHighAccuracy:true,maximumAge:4000,timeout:10000}
+  if(navigator.geolocation)
+    navigator.geolocation.getCurrentPosition(
+      p=>addUserMarker(map,p.coords.latitude,p.coords.longitude),
+      ()=>{}
     );
-  }
 
-  // Compass indicator (map stays north-up, just show heading arrow)
+  // Map rotation via deviceorientation
   if('DeviceOrientationEvent' in window){
-    const updateArrow=e=>{
-      const h=e.webkitCompassHeading!=null?e.webkitCompassHeading:(e.alpha||0);
-      window._compassHeading=h;
-      const arrow=document.getElementById('compass-arrow');
-      if(arrow) arrow.style.transform=`rotate(${h}deg)`;
+    const onOrient = e=>{
+      if(e.alpha==null) return;
+      _mapAngle = e.alpha;
+      const container=document.getElementById('map-container');
+      if(container) container.style.transform=`rotate(${-_mapAngle}deg)`;
+      // Counter-rotate compass markers so they always point north
+      document.querySelectorAll('.cmarker-inner').forEach(el=>{
+        el.style.transform=`rotate(${_mapAngle}deg)`;
+      });
     };
     if(typeof DeviceOrientationEvent.requestPermission==='function'){
+      // iOS 13+
       DeviceOrientationEvent.requestPermission().then(r=>{
-        if(r==='granted')window.addEventListener('deviceorientation',updateArrow);
+        if(r==='granted') window.addEventListener('deviceorientation',onOrient);
       }).catch(()=>{});
     } else {
-      window.addEventListener('deviceorientation',updateArrow);
+      window.addEventListener('deviceorientation',onOrient);
     }
   }
 }
@@ -894,8 +821,6 @@ function addUserMarker(map,lat,lng){
   }
   window._um=L.marker([lat,lng],{icon,zIndexOffset:1000}).addTo(map)
     .bindPopup(popHtml,{maxWidth:240});
-  // Sync to radar
-  window._uLat=lat;window._uLng=lng;
   document.getElementById('hcoords').textContent=`${lat.toFixed(4)}°N · ${lng.toFixed(4)}°E`;
 }
 
@@ -970,11 +895,7 @@ function addEvMarkers(map){
   window._ems=[];
   S.events.forEach(ev=>{
     const color=ev.verified?'#4ade80':'#fbbf24';
-    const cnt=goingCount(ev.id);
-    const going=isGoing(ev.id);
-    // Blip size grows if people are going
-    const sz=10+Math.min(cnt*2,8);
-    const icon=divIcon(color,sz,ev.verified&&ev.type==='training');
+    const icon=divIcon(color,10,ev.verified&&ev.type==='training');
     const pop=`<div class="ev-pop">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
         <div class="ev-pop-t">${EV_ICONS[ev.type]||'📍'} ${ev.title}</div>
@@ -985,11 +906,7 @@ function addEvMarkers(map){
         ${ev.loc?`<div>📍 ${ev.loc}</div>`:''}
         ${ev.desc?`<div style="margin-top:5px">${ev.desc}</div>`:''}
         <div style="margin-top:5px;color:var(--tm)">👤 ${ev.addedBy}</div>
-        ${cnt?`<div style="margin-top:5px;color:#4ade80;font-weight:700">🚶 ${cnt} ${cnt===1?'идёт':'идут'}</div>`:''}
       </div>
-      <button onclick="toggleGoingTo('${ev.id}')" style="margin-top:10px;width:100%;padding:7px;border-radius:8px;border:1px solid ${going?'#ef4444':'#4ade80'};background:${going?'rgba(239,68,68,.1)':'rgba(74,222,128,.1)'};color:${going?'#ef4444':'#4ade80'};font-family:Rajdhani,sans-serif;font-size:.75rem;font-weight:700;letter-spacing:.1em;cursor:pointer">
-        ${going?'✕ Отменить':'🚶 Иду туда'}
-      </button>
     </div>`;
     const m=L.marker([ev.lat,ev.lng],{icon}).addTo(map).bindPopup(pop,{maxWidth:270});
     window._ems.push(m);
@@ -1275,7 +1192,7 @@ let _minimap=null;
   const cv=document.getElementById('radar');
   const ctx=cv.getContext('2d');
   const W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=W/2-6;
-  let angle=0,targetHeading=0,hasGyro=false;
+  let angle=0,targetAngle=0,hasGyro=false;
   let uLat=CLUB.lat,uLng=CLUB.lng;
 
   // Leaflet minimap behind canvas
@@ -1294,29 +1211,19 @@ let _minimap=null;
   }
   initMinimap(uLat,uLng);
 
-  // Device orientation — use webkitCompassHeading (iOS true north) or alpha
+  // Device orientation
   if('DeviceOrientationEvent' in window){
     const onOrient=e=>{
-      // webkitCompassHeading: iOS true compass (0=N, clockwise)
-      // alpha absolute: Android absolute compass
-      // alpha: fallback (arbitrary start)
-      const h = e.webkitCompassHeading!=null
-        ? e.webkitCompassHeading
-        : (e.absolute&&e.alpha!=null ? (360-e.alpha)%360 : null);
-      if(h!=null){hasGyro=true;targetHeading=h;}
+      if(e.alpha!=null){hasGyro=true;angle=e.alpha;}
     };
     if(typeof DeviceOrientationEvent.requestPermission==='function'){
-      document.getElementById('rwrap').addEventListener('click',async(ev)=>{
-        ev.stopPropagation();
+      document.getElementById('rwrap').addEventListener('click',async(e)=>{
+        e.stopPropagation();
         try{const p=await DeviceOrientationEvent.requestPermission();
           if(p==='granted') window.addEventListener('deviceorientation',onOrient);}catch{}
         goMap();
       },{once:true});
     } else {
-      // Try absolute first (Android)
-      window.addEventListener('deviceorientationabsolute',e=>{
-        if(e.alpha!=null){hasGyro=true;targetHeading=(360-e.alpha)%360;}
-      });
       window.addEventListener('deviceorientation',onOrient);
     }
   }
@@ -1325,23 +1232,17 @@ let _minimap=null;
   window.addEventListener('mousemove',e=>{
     if(!hasGyro){
       const dx=e.clientX-window.innerWidth/2,dy=e.clientY-window.innerHeight/2;
-      targetHeading=Math.atan2(dx,-dy)*180/Math.PI;
+      targetAngle=Math.atan2(dx,-dy)*180/Math.PI;
     }
   });
 
-  // Geolocation — sync with shared window._uLat/_uLng set by map watchPosition
-  function syncGeo(){
-    if(window._uLat!=null){uLat=window._uLat;uLng=window._uLng;}
-  }
-
-  // Initial position
+  // User location
   if(navigator.geolocation)
     navigator.geolocation.getCurrentPosition(p=>{
       uLat=p.coords.latitude;uLng=p.coords.longitude;
-      window._uLat=uLat;window._uLng=uLng;
       if(_minimap) _minimap.setView([uLat,uLng],ZOOM_MAP[S.radarZoom],{animate:false});
       else initMinimap(uLat,uLng);
-    },{},{enableHighAccuracy:true});
+    });
 
   function blipXY(lat,lng){
     const r=ZOOM_R[S.radarZoom];
@@ -1349,13 +1250,8 @@ let _minimap=null;
   }
 
   function frame(){
-    // Smooth angle interpolation (handles gyro and mouse fallback)
-    let da=((targetHeading-angle)%360+540)%360-180; // shortest arc
-    angle=(angle+da*.08+360)%360;
+    if(!hasGyro) angle+=(targetAngle-angle)*.05;
     ctx.clearRect(0,0,W,H);
-
-    // Sync position from shared window state (map watchPosition keeps it fresh)
-    syncGeo();
 
     // Rotate minimap opposite to compass
     if(_minimap){
@@ -1415,35 +1311,13 @@ let _minimap=null;
       ctx.beginPath();ctx.arc(bx,by,4.5,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();
     });
 
-    /* club blip + beacon (idea 5) */
+    /* club blip */
     const {bx:cbx,by:cby}=blipXY(CLUB.lat,CLUB.lng);
     const cDx=cbx-cx,cDy=cby-cy;
     if(cDx*cDx+cDy*cDy<=R*R*1.05){
-      // Beacon rings when club is active — strength based on distance
-      if(S.clubActive){
-        const distM=haversine(uLat,uLng,CLUB.lat,CLUB.lng);
-        const strength=Math.max(0,1-distM/5000); // 5km max range
-        for(let r=0;r<3;r++){
-          const phase=((t*.0008+r/3)%1);
-          const rr=phase*55*(0.4+strength*.6);
-          const alpha=(1-phase)*0.7*Math.max(0.15,strength);
-          ctx.beginPath();ctx.arc(cbx,cby,rr,0,Math.PI*2);
-          ctx.strokeStyle=`rgba(168,85,247,${alpha})`;ctx.lineWidth=1.5;ctx.stroke();
-        }
-        // Distance label if within 2km
-        if(distM<2000){
-          const dlbl=distM<1000?`${Math.round(distM)}м`:`${(distM/1000).toFixed(1)}км`;
-          ctx.font=`700 ${W*.042}px Rajdhani,sans-serif`;
-          ctx.textAlign='center';ctx.textBaseline='middle';
-          ctx.fillStyle=`rgba(168,85,247,${0.6+strength*.35})`;
-          ctx.shadowColor='rgba(168,85,247,.5)';ctx.shadowBlur=6;
-          ctx.fillText(dlbl,cbx,cby+22);
-          ctx.shadowBlur=0;
-        }
-      }
       const pulse=.6+.4*Math.sin(t*.003),cr=8*pulse;
       const cg=ctx.createRadialGradient(cbx,cby,0,cbx,cby,cr*2.5);
-      cg.addColorStop(0,'rgba(168,85,247,.95)');cg.addColorStop(1,'rgba(168,85,247,0)');
+      cg.addColorStop(0,'rgba(168,85,247,.9)');cg.addColorStop(1,'rgba(168,85,247,0)');
       ctx.fillStyle=cg;ctx.beginPath();ctx.arc(cbx,cby,cr*2.5,0,Math.PI*2);ctx.fill();
       ctx.beginPath();ctx.arc(cbx,cby,cr,0,Math.PI*2);ctx.fillStyle='#a855f7';ctx.fill();
     }
