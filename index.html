@@ -8,11 +8,10 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 /* ═══════════════════════════════════════════════════════════
-   PNEURADEN — Design System v1.0
+   PNEURADEN — Design System v1.1
    Deep Bright Tech Cozyful
    ═══════════════════════════════════════════════════════════ */
 :root {
-  /* ── Dark: Neon Relaxation ── */
   --bg:        #030508;
   --surface:   #0a0f1e;
   --surface2:  #0f1628;
@@ -20,18 +19,18 @@
   --glass:     rgba(10,15,30,0.88);
   --border:    rgba(168,85,247,0.15);
   --border2:   rgba(168,85,247,0.32);
-  --np:  #a855f7; /* neon purple  */
-  --npi: #ec4899; /* neon pink    */
-  --nc:  #22d3ee; /* neon cyan    */
-  --nm:  #34d399; /* neon mint    */
-  --ns:  #38bdf8; /* neon sky     */
-  --nl:  #818cf8; /* neon lavender*/
-  --ng:  #fbbf24; /* neon gold    */
-  --vf:  #34d399; /* verified     */
-  --pnd: #fbbf24; /* pending      */
-  --ag:  #4ade80; /* active green */
-  --cl:  #475569; /* closed       */
-  --dng: #f43f5e; /* danger       */
+  --np:  #a855f7;
+  --npi: #ec4899;
+  --nc:  #22d3ee;
+  --nm:  #34d399;
+  --ns:  #38bdf8;
+  --nl:  #818cf8;
+  --ng:  #fbbf24;
+  --vf:  #34d399;
+  --pnd: #fbbf24;
+  --ag:  #4ade80;
+  --cl:  #475569;
+  --dng: #f43f5e;
   --txt: #e2e8f0;
   --td:  rgba(226,232,240,0.55);
   --tm:  rgba(226,232,240,0.28);
@@ -60,10 +59,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
 button{font-family:inherit;cursor:pointer}
 input,select,textarea{font-family:inherit}
 
-/* ── App shell ── */
 #app{width:100vw;height:100vh;height:100dvh;position:relative;overflow:hidden}
 
-/* ── Background grid+ambient ── */
 .vbg{position:fixed;inset:0;pointer-events:none;z-index:0}
 [data-theme="dark"] .vbg{
   background:
@@ -80,13 +77,10 @@ input,select,textarea{font-family:inherit}
     linear-gradient(90deg,rgba(79,70,229,0.05) 1px,transparent 1px);
   background-size:auto,auto,48px 48px,48px 48px}
 
-/* ── Views ── */
 .view{position:absolute;inset:0;display:none;flex-direction:column}
 .view.active{display:flex}
 
-/* ══════════════════════════════════
-   ISLAND — капсула уюта
-   ══════════════════════════════════ */
+/* ── Island ── */
 .island{
   background:var(--glass);border:1px solid var(--border2);
   border-radius:var(--r-l);backdrop-filter:blur(20px);
@@ -103,9 +97,7 @@ input,select,textarea{font-family:inherit}
 .island-s{padding:12px 16px;border-radius:var(--r-m)}
 .island-l{padding:28px;border-radius:var(--r-xl)}
 
-/* ══════════════════════════════════
-   COMPONENTS
-   ══════════════════════════════════ */
+/* ── Components ── */
 .label{font-size:.6rem;letter-spacing:.3em;text-transform:uppercase;color:var(--tm);font-weight:700}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
   padding:10px 20px;border-radius:var(--r-s);border:1px solid var(--border2);
@@ -133,9 +125,7 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   animation:pdotA 1.5s ease-in-out infinite}
 @keyframes pdotA{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
 
-/* ══════════════════════════════════
-   NAV BAR
-   ══════════════════════════════════ */
+/* ── Nav Bar ── */
 .nav{position:fixed;bottom:0;left:0;right:0;z-index:100;display:flex;
   align-items:center;justify-content:space-around;
   padding:8px 16px max(16px,env(safe-area-inset-bottom));
@@ -150,9 +140,7 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .ni-icon{font-size:1.2rem;line-height:1}
 .ni-lbl{font-size:.5rem;letter-spacing:.15em;text-transform:uppercase;font-weight:700}
 
-/* ══════════════════════════════════
-   TOP BAR
-   ══════════════════════════════════ */
+/* ── Top Bar ── */
 .topbar{position:relative;z-index:10;display:flex;align-items:center;
   justify-content:space-between;padding:16px 20px 12px;
   padding-top:max(16px,env(safe-area-inset-top))}
@@ -164,21 +152,19 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   font-size:1rem;transition:all var(--t-f)}
 .theme-btn:hover{border-color:var(--np);box-shadow:0 0 12px rgba(168,85,247,0.3)}
 
-/* ══════════════════════════════════
-   VIEW: HOME — RADAR
-   ══════════════════════════════════ */
+/* ── HOME / RADAR ── */
 #vh{align-items:center;justify-content:space-between}
 .home-main{flex:1;display:flex;flex-direction:column;align-items:center;
   justify-content:center;position:relative;z-index:5;gap:20px;padding:0 20px}
 .radar-wrap{position:relative;width:280px;height:280px;cursor:pointer;
   user-select:none;-webkit-user-select:none}
-.radar-wrap:hover #radar{filter:brightness(1.12) drop-shadow(0 0 20px rgba(0,200,80,.45))}
+.radar-wrap:hover #radar{filter:brightness(1.15) drop-shadow(0 0 22px rgba(0,200,80,.55))}
 #radar-minimap{position:absolute;top:0;left:0;width:280px;height:280px;
   border-radius:50%;overflow:hidden;z-index:0}
 #radar{position:absolute;top:0;left:0;width:280px;height:280px;border-radius:50%;
   display:block;z-index:1;pointer-events:none;
   transition:filter var(--t-f);
-  filter:drop-shadow(0 0 14px rgba(0,180,70,.28))}
+  filter:drop-shadow(0 0 14px rgba(0,180,70,.35))}
 .radar-hint{position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);
   font-size:.58rem;letter-spacing:.25em;color:var(--tm);text-transform:uppercase;
   white-space:nowrap;animation:hintA 2.5s ease-in-out infinite}
@@ -201,11 +187,10 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .stat-n{font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;color:var(--nc)}
 .stat-l{font-size:.5rem;letter-spacing:.18em;text-transform:uppercase;color:var(--tm);margin-top:2px}
 
-/* ══════════════════════════════════
-   VIEW: MAP
-   ══════════════════════════════════ */
+/* ── MAP ── */
 #vm{background:#0a0a10}
-#map-container{position:absolute;inset:0;z-index:1}
+#map-container{position:absolute;inset:0;z-index:1;
+  transform-origin:center center;transition:transform .08s linear}
 .map-top{position:absolute;top:0;left:0;right:0;z-index:500;display:flex;
   align-items:center;padding:12px 16px;gap:10px;
   padding-top:max(12px,env(safe-area-inset-top));
@@ -248,20 +233,21 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   border:1px solid var(--border2);border-radius:var(--r-m) 0 0 var(--r-m);padding:14px}
 .leg-item{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:.7rem;color:var(--td)}
 .ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-/* Leaflet overrides */
+/* Leaflet */
 .leaflet-container{font-family:'Rajdhani',sans-serif;background:#0a0a14}
 .leaflet-popup-content-wrapper{background:transparent;border:none;box-shadow:none;padding:0}
 .leaflet-popup-content{margin:0}
 .leaflet-popup-tip{display:none}
-/* Club island popup */
+/* Club popup */
 .club-pop{width:280px;background:var(--glass);border:1px solid var(--border2);
   border-radius:var(--r-l);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
   overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5),0 0 0 1px rgba(168,85,247,.1)}
 .club-hd{padding:16px 18px;background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(236,72,153,.1));
   border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
-.club-logo{width:44px;height:44px;border-radius:50%;
-  background:linear-gradient(135deg,var(--np),var(--npi));
-  display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0}
+.club-logo{width:48px;height:48px;border-radius:50%;
+  background:linear-gradient(135deg,rgba(168,85,247,.2),rgba(236,72,153,.15));
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  border:1px solid rgba(168,85,247,.4)}
 .club-nm{font-family:'Orbitron',monospace;font-size:.72rem;font-weight:700;letter-spacing:.08em}
 .club-sub{font-size:.62rem;color:var(--tm);margin-top:2px}
 .club-bd{padding:14px 18px}
@@ -277,10 +263,12 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .ev-pop-t{font-family:'Orbitron',monospace;font-size:.72rem;font-weight:700;
   letter-spacing:.06em;margin-bottom:8px}
 .ev-pop-m{font-size:.7rem;color:var(--td);line-height:1.55}
+/* User popup */
+.user-pop{width:220px;background:var(--glass);border:1px solid var(--border2);
+  border-radius:var(--r-l);backdrop-filter:blur(24px);
+  padding:14px;box-shadow:0 8px 32px rgba(0,0,0,.4)}
 
-/* ══════════════════════════════════
-   VIEW: EVENTS
-   ══════════════════════════════════ */
+/* ── EVENTS ── */
 #ve{overflow:hidden}
 .ev-scroll{flex:1;overflow-y:auto;padding:0 16px 80px;display:flex;flex-direction:column;gap:8px}
 .ev-scroll::-webkit-scrollbar{width:3px}
@@ -298,9 +286,7 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .ev-card-m{display:flex;flex-direction:column;gap:3px;font-size:.68rem;color:var(--td)}
 .ev-card-d{font-size:.76rem;color:var(--td);line-height:1.5;margin-top:5px}
 
-/* ══════════════════════════════════
-   ADD EVENT SHEET
-   ══════════════════════════════════ */
+/* ── ADD EVENT SHEET ── */
 .sheet{position:fixed;inset:0;z-index:1000;display:none;align-items:flex-end}
 .sheet.open{display:flex}
 .sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
@@ -315,9 +301,7 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .flbl{display:block;font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;
   color:var(--tm);margin-bottom:6px;font-weight:700}
 
-/* ══════════════════════════════════
-   VIEW: PROFILE
-   ══════════════════════════════════ */
+/* ── PROFILE ── */
 #vp{overflow:hidden}
 .prof-scroll{flex:1;overflow-y:auto;padding:0 16px 80px;display:flex;flex-direction:column;gap:14px}
 .prof-scroll::-webkit-scrollbar{width:3px}
@@ -327,10 +311,13 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   display:flex;align-items:center;justify-content:center;font-size:2rem;
   margin:0 auto;box-shadow:0 0 24px rgba(168,85,247,.4)}
 .auth-form{display:flex;flex-direction:column;gap:12px}
+/* Color swatches */
+.color-swatches{display:flex;gap:8px;flex-wrap:wrap;padding:6px 0}
+.cswatch{width:30px;height:30px;border-radius:50%;cursor:pointer;
+  transition:all .15s;border:2px solid transparent}
+.cswatch.selected{transform:scale(1.25);border-color:white}
 
-/* ══════════════════════════════════
-   VIEW: ADMIN
-   ══════════════════════════════════ */
+/* ── ADMIN ── */
 #vad{overflow:hidden}
 .adm-scroll{flex:1;overflow-y:auto;padding:0 16px 80px;display:flex;flex-direction:column;gap:10px}
 .adm-scroll::-webkit-scrollbar{width:3px}
@@ -342,7 +329,6 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .btn-ok:hover{background:rgba(52,211,153,.2);box-shadow:0 0 10px rgba(52,211,153,.3)}
 .btn-no{flex:1;background:rgba(244,63,94,.1);border-color:var(--dng);color:var(--dng);font-size:.7rem}
 .btn-no:hover{background:rgba(244,63,94,.2);box-shadow:0 0 10px rgba(244,63,94,.3)}
-/* Club toggle */
 .status-tog{display:flex;gap:10px;align-items:center;padding:14px 16px;
   border-radius:var(--r-m);background:var(--surface);border:1px solid var(--border)}
 .tog{position:relative;width:48px;height:26px;flex-shrink:0}
@@ -355,9 +341,7 @@ input:checked+.tog-sl{background:rgba(74,222,128,.2);border-color:var(--ag)}
 input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
   box-shadow:0 0 8px rgba(74,222,128,.5)}
 
-/* ══════════════════════════════════
-   TOAST
-   ══════════════════════════════════ */
+/* ── TOAST ── */
 #toasts{position:fixed;top:20px;left:50%;transform:translateX(-50%);
   z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
 .toast{padding:10px 20px;border-radius:var(--r-p);background:var(--surface2);
@@ -411,7 +395,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
         <div class="stat-l">На проверке</div>
       </div>
       <div class="stat">
-        <div class="stat-n" id="cs-dot" style="color:var(--ag)">●</div>
+        <div id="cs-dot" style="font-size:1.1rem;color:var(--ag)">●</div>
         <div class="stat-l" id="cs-lbl">Открыт</div>
       </div>
     </div>
@@ -428,7 +412,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
   <div class="map-layers">
     <div class="lbtn active" id="lv" onclick="toggleL('v')" title="Верифицированные">🟢</div>
     <div class="lbtn active" id="lp" onclick="toggleL('p')" title="На проверке">🟡</div>
-    <div class="lbtn active" id="lc" onclick="toggleL('c')" title="Клуб">🥋</div>
+    <div class="lbtn active" id="lc" onclick="toggleL('c')" title="Клуб">⭕</div>
   </div>
   <div class="map-legend" id="mleg">
     <div class="leg-tog" onclick="document.getElementById('mleg').classList.toggle('open')">☰</div>
@@ -437,7 +421,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
       <div class="leg-item"><div class="ldot" style="background:#4ade80;box-shadow:0 0 6px #4ade80"></div>Верифицировано</div>
       <div class="leg-item"><div class="ldot" style="background:#fbbf24;box-shadow:0 0 6px #fbbf24"></div>На проверке</div>
       <div class="leg-item"><div class="ldot" style="background:#a855f7;box-shadow:0 0 6px #a855f7"></div>Борцовский клуб</div>
-      <div class="leg-item"><div class="ldot" style="background:#38bdf8;box-shadow:0 0 6px #38bdf8"></div>Ваша позиция</div>
+      <div class="leg-item"><div class="ldot" style="background:#ef4444;box-shadow:0 0 6px #ef4444;animation:pdotA 1.5s ease-in-out infinite"></div>Пользователи</div>
     </div>
   </div>
   <button class="map-locate" onclick="locate()" title="Моя позиция">📍</button>
@@ -521,10 +505,20 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════
-   PNEURADEN v1.0 — Core
+   PNEURADEN v1.1 — Core
    ═══════════════════════════════════════════════════════════ */
+
+// One-time migration: clear fake default events from v1.0
+if(!localStorage.getItem('pnd-v2')){
+  localStorage.removeItem('pnd-ev');
+  localStorage.setItem('pnd-v2','1');
+}
+
+/* ── Constants ─────────────────────────────────────────── */
+const _sc = JSON.parse(localStorage.getItem('pnd-club')||'null');
 const CLUB = {
-  lat:45.0811, lng:13.6387,
+  get lat(){ return JSON.parse(localStorage.getItem('pnd-club')||'null')?.lat ?? 45.0811; },
+  get lng(){ return JSON.parse(localStorage.getItem('pnd-club')||'null')?.lng ?? 13.6387; },
   name:'HK Rovinj Rovigno', sub:'Борцовский клуб · Ровинь',
   schedule:[
     {d:'Пн',t:'18:30 — 20:30'},{d:'Ср',t:'18:30 — 20:30'},
@@ -535,15 +529,18 @@ const CLUB = {
 
 const EV_ICONS = {training:'🥋',concert:'🎸',market:'🛒',meetup:'🤝',sport:'⚽',other:'⭐'};
 
-function defaultEvents(){
-  return [];
-}
+const USER_COLORS = [
+  {id:'cyan',   o:'#22d3ee', i:'#0891b2'},
+  {id:'mint',   o:'#34d399', i:'#059669'},
+  {id:'sky',    o:'#38bdf8', i:'#0369a1'},
+  {id:'amber',  o:'#fbbf24', i:'#b45309'},
+  {id:'rose',   o:'#fb7185', i:'#e11d48'},
+  {id:'violet', o:'#818cf8', i:'#4338ca'},
+  {id:'orange', o:'#fb923c', i:'#c2410c'},
+  {id:'lime',   o:'#a3e635', i:'#4d7c0f'},
+];
 
-// One-time migration: clear fake default events from v1.0
-if(!localStorage.getItem('pnd-v2')){
-  localStorage.removeItem('pnd-ev');
-  localStorage.setItem('pnd-v2','1');
-}
+function defaultEvents(){ return []; }
 
 const S = {
   view:'home',
@@ -558,13 +555,68 @@ const S = {
 
 document.documentElement.setAttribute('data-theme',S.theme);
 
-/* ── Navigation ─────────────────────────────────────── */
+/* ── SVG Generators ─────────────────────────────────────── */
+function clubSVG(color, size=32){
+  // Wrestling mat — top-down view with passive zone and competition halves
+  return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="24" cy="24" r="22" fill="#12082a" stroke="${color}" stroke-width="2.5"/>
+    <circle cx="24" cy="24" r="14.5" fill="none" stroke="#c8922a" stroke-width="2" opacity="0.9"/>
+    <path d="M 9.5 24 A 14.5 14.5 0 0 1 38.5 24 Z" fill="#2563eb" opacity="0.55"/>
+    <path d="M 9.5 24 A 14.5 14.5 0 0 0 38.5 24 Z" fill="#dc2626" opacity="0.55"/>
+    <circle cx="24" cy="24" r="4.5" fill="${color}" opacity="0.95"/>
+    <circle cx="24" cy="24" r="4.5" stroke="rgba(255,255,255,0.6)" stroke-width="1" fill="none"/>
+    <line x1="9.5" y1="24" x2="38.5" y2="24" stroke="${color}" stroke-width="1" opacity="0.4"/>
+  </svg>`;
+}
+
+function compassSVG(outer, inner, size=40, isAdmin=false){
+  // Compass with north arrow always pointing up
+  const gold = '#fbbf24';
+  const ro = isAdmin ? gold : outer;
+  const ri = isAdmin ? '#ef4444' : inner;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="24" cy="24" r="22" fill="${ro}18" stroke="${ro}" stroke-width="2.5"/>
+    <circle cx="24" cy="24" r="14" fill="#080c1a" stroke="${ro}60" stroke-width="1"/>
+    <polygon points="24,11 20.5,24 24,21 27.5,24" fill="#ef4444"/>
+    <polygon points="24,37 20.5,24 24,27 27.5,24" fill="${ri}"/>
+    <circle cx="24" cy="24" r="2.8" fill="white" opacity="0.9"/>
+    <text x="24" y="9" text-anchor="middle" fill="#ef4444" font-size="5.5" font-weight="900" font-family="Orbitron,monospace">N</text>
+  </svg>`;
+}
+
+function guestBlipSVG(size=24){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="10" fill="#ef444430" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="12" cy="12" r="4" fill="#ef4444" opacity="0.8"/>
+  </svg>`;
+}
+
+/* ── User color helpers ─────────────────────────────────── */
+function getUserColorObj(){
+  if(!S.user) return {o:'#ef4444',i:'#b91c1c'};
+  if(S.user.role==='admin') return {o:'#fbbf24',i:'#ef4444'};
+  const cid = S.user.colorId || 'cyan';
+  return USER_COLORS.find(c=>c.id===cid) || USER_COLORS[0];
+}
+
+function saveUserLocation(lat,lng){
+  if(!S.user || S.user.role==='admin') return;
+  const users = JSON.parse(localStorage.getItem('pnd-users')||'{}');
+  if(users[S.user.email]){
+    users[S.user.email].lat = lat;
+    users[S.user.email].lng = lng;
+    users[S.user.email].lastSeen = Date.now();
+    users[S.user.email].statusMsg = S.user.statusMsg || '';
+    users[S.user.email].colorId = S.user.colorId || 'cyan';
+    localStorage.setItem('pnd-users',JSON.stringify(users));
+  }
+}
+
+/* ── Navigation ─────────────────────────────────────────── */
 function go(v){
   if(v===S.view && v!=='map') return;
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(el=>el.classList.remove('active'));
-  const vEl = document.getElementById('v'+v[0]+(v==='home'?'h':v==='map'?'m':v==='events'?'e':v==='profile'?'p':v==='admin'?'ad':''));
-  // build correct id
   const ids={home:'vh',map:'vm',events:'ve',profile:'vp',admin:'vad'};
   const el=document.getElementById(ids[v]);
   if(el) el.classList.add('active');
@@ -580,7 +632,7 @@ function go(v){
 }
 function goMap(){go('map');}
 
-/* ── Theme ──────────────────────────────────────────── */
+/* ── Theme ──────────────────────────────────────────────── */
 function toggleTheme(){
   S.theme=S.theme==='dark'?'light':'dark';
   document.documentElement.setAttribute('data-theme',S.theme);
@@ -592,7 +644,7 @@ function toggleTheme(){
   if(window._minimapTL) window._minimapTL.setUrl(tileUrl);
 }
 
-/* ── Helpers ────────────────────────────────────────── */
+/* ── Helpers ────────────────────────────────────────────── */
 function toast(msg){
   const c=document.getElementById('toasts');
   const t=document.createElement('div');
@@ -618,18 +670,19 @@ function updateUID(){
   if(el) el.textContent=S.user?(S.user.role==='admin'?'⚡ admin':S.user.email.split('@')[0]):'';
 }
 
-/* ── Zoom pills ─────────────────────────────────────── */
+/* ── Zoom pills ─────────────────────────────────────────── */
 function setZoom(i,e){
   e.stopPropagation();
   S.radarZoom=i;
   document.querySelectorAll('.zpill').forEach((p,pi)=>p.classList.toggle('active',pi===i));
 }
 
-/* ── Events render ──────────────────────────────────── */
+/* ── Events render ──────────────────────────────────────── */
 function renderEvents(){
   const c=document.getElementById('evlist');if(!c)return;
   const vf=S.events.filter(e=>e.verified),pd=S.events.filter(e=>!e.verified);
   let h=`<div class="sec-lbl"><span class="sec-lbl-t">Верифицированные</span><div class="sec-line"></div></div>`;
+  if(!vf.length) h+=`<div style="font-size:.75rem;color:var(--tm);padding:12px 0;text-align:center">Нет верифицированных ивентов</div>`;
   vf.forEach(e=>h+=evCard(e));
   h+=`<div class="sec-lbl" style="margin-top:8px"><span class="sec-lbl-t">На проверке</span><div class="sec-line"></div></div>`;
   if(!pd.length) h+=`<div style="font-size:.75rem;color:var(--tm);padding:12px 0;text-align:center">Нет ивентов на проверке</div>`;
@@ -653,7 +706,7 @@ function jumpToEv(id){
   setTimeout(()=>{if(window._map)window._map.setView([ev.lat,ev.lng],16);},600);
 }
 
-/* ── Add Event ──────────────────────────────────────── */
+/* ── Add Event ──────────────────────────────────────────── */
 function openSheet(){
   if(!S.user){toast('Войдите чтобы добавить ивент');go('profile');return;}
   const now=new Date();now.setHours(now.getHours()+1,0,0,0);
@@ -678,8 +731,9 @@ function submitEv(){
   ['et','eloc','edesc','emsg'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
 }
 
-/* ── Map ────────────────────────────────────────────── */
+/* ── Map ────────────────────────────────────────────────── */
 const LV={v:true,p:true,c:true};
+let _mapAngle=0;
 
 function initMap(){
   if(S.mapInit)return;S.mapInit=true;
@@ -696,7 +750,100 @@ function initMap(){
   addClubMarker(map);
   addEvMarkers(map);
   if(navigator.geolocation)
-    navigator.geolocation.getCurrentPosition(p=>addUserMarker(map,p.coords.latitude,p.coords.longitude));
+    navigator.geolocation.getCurrentPosition(
+      p=>addUserMarker(map,p.coords.latitude,p.coords.longitude),
+      ()=>{}
+    );
+
+  // Map rotation via deviceorientation
+  if('DeviceOrientationEvent' in window){
+    const onOrient = e=>{
+      if(e.alpha==null) return;
+      _mapAngle = e.alpha;
+      const container=document.getElementById('map-container');
+      if(container) container.style.transform=`rotate(${-_mapAngle}deg)`;
+      // Counter-rotate compass markers so they always point north
+      document.querySelectorAll('.cmarker-inner').forEach(el=>{
+        el.style.transform=`rotate(${_mapAngle}deg)`;
+      });
+    };
+    if(typeof DeviceOrientationEvent.requestPermission==='function'){
+      // iOS 13+
+      DeviceOrientationEvent.requestPermission().then(r=>{
+        if(r==='granted') window.addEventListener('deviceorientation',onOrient);
+      }).catch(()=>{});
+    } else {
+      window.addEventListener('deviceorientation',onOrient);
+    }
+  }
+}
+
+function makeCompassMarker(outerColor, innerColor, size, isAdmin, label){
+  const html=`<div class="cmarker-inner" style="width:${size}px;height:${size}px">
+    ${compassSVG(outerColor,innerColor,size,isAdmin)}
+  </div>
+  <style>
+    @keyframes cpulse{0%,100%{filter:drop-shadow(0 0 5px ${outerColor})}50%{filter:drop-shadow(0 0 14px ${outerColor})}}
+    .cmarker-inner{animation:cpulse 2s ease-in-out infinite}
+  </style>`;
+  return L.divIcon({className:'',iconSize:[size,size],iconAnchor:[size/2,size/2],
+    popupAnchor:[0,-size/2-4],html});
+}
+
+function addUserMarker(map,lat,lng){
+  if(window._um) map.removeLayer(window._um);
+  let icon,popHtml;
+  if(S.user){
+    const {o,i}=getUserColorObj();
+    const isAdmin=S.user.role==='admin';
+    icon=makeCompassMarker(o,i,40,isAdmin);
+    const name=S.user.name||S.user.email.split('@')[0];
+    const msg=S.user.statusMsg||'';
+    popHtml=`<div class="user-pop">
+      <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:6px">${isAdmin?'⚡ ':''} ${name}</div>
+      ${msg?`<div style="font-size:.72rem;color:var(--td);font-style:italic">"${msg}"</div>`:''}
+      ${isAdmin?'<div style="font-size:.6rem;color:var(--ng);margin-top:6px;letter-spacing:.1em">ADMIN</div>':''}
+    </div>`;
+    saveUserLocation(lat,lng);
+  } else {
+    // Guest: pulsing red dot, no compass
+    icon=L.divIcon({className:'',iconSize:[24,24],iconAnchor:[12,12],popupAnchor:[0,-16],
+      html:`<div style="width:24px;height:24px;position:relative">
+        <div style="position:absolute;inset:0;border-radius:50%;background:#ef444440;animation:gp 1.5s ease-in-out infinite"></div>
+        <div style="position:absolute;inset:6px;border-radius:50%;background:#ef4444"></div>
+      </div>
+      <style>@keyframes gp{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.6);opacity:.2}}</style>`
+    });
+    popHtml=`<div class="user-pop">
+      <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:8px">👤 Гость</div>
+      <div style="font-size:.68rem;color:var(--pnd);line-height:1.5">Зарегистрируйтесь — получите уникальный компас и возможность скрывать метки других пользователей</div>
+    </div>`;
+  }
+  window._um=L.marker([lat,lng],{icon,zIndexOffset:1000}).addTo(map)
+    .bindPopup(popHtml,{maxWidth:240});
+  document.getElementById('hcoords').textContent=`${lat.toFixed(4)}°N · ${lng.toFixed(4)}°E`;
+}
+
+function showOtherUsers(map){
+  if(window._ouMarkers){window._ouMarkers.forEach(m=>map.removeLayer(m));window._ouMarkers=[];}
+  else window._ouMarkers=[];
+  if(!S.user) return; // only registered users see others
+  const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
+  const cutoff=Date.now()-3600000*2; // 2 hours
+  Object.entries(users).forEach(([email,u])=>{
+    if(!u.lat||!u.lng) return;
+    if(u.lastSeen<cutoff) return;
+    if(S.user&&email===S.user.email) return;
+    const c=USER_COLORS.find(x=>x.id===u.colorId)||USER_COLORS[0];
+    const icon=makeCompassMarker(c.o,c.i,34,false);
+    const name=u.name||email.split('@')[0];
+    const pop=`<div class="user-pop">
+      <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:6px">${name}</div>
+      ${u.statusMsg?`<div style="font-size:.72rem;color:var(--td);font-style:italic">"${u.statusMsg}"</div>`:''}
+    </div>`;
+    const m=L.marker([u.lat,u.lng],{icon}).addTo(map).bindPopup(pop,{maxWidth:220});
+    window._ouMarkers.push(m);
+  });
 }
 
 function divIcon(color,sz=11,pulse=false){
@@ -710,30 +857,21 @@ function divIcon(color,sz=11,pulse=false){
   });
 }
 
-function clubSVG(color,size=32){
-  return`<svg width="${size}" height="${size}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="24" cy="24" r="21" stroke="${color}" stroke-width="3"/>
-    <circle cx="24" cy="24" r="13" stroke="${color}" stroke-width="2" opacity="0.75"/>
-    <circle cx="24" cy="24" r="5" fill="${color}" opacity="0.9"/>
-    <line x1="3" y1="24" x2="45" y2="24" stroke="${color}" stroke-width="1.5" opacity="0.55"/>
-  </svg>`;
-}
-
 function addClubMarker(map){
   const c=S.clubActive?'#a855f7':'#64748b';
-  const icon=L.divIcon({className:'',iconSize:[48,48],iconAnchor:[24,24],popupAnchor:[0,-28],
-    html:`<div style="width:48px;height:48px;border-radius:50%;
-      background:radial-gradient(circle,${c}33,${c}11);border:2px solid ${c};
+  const icon=L.divIcon({className:'',iconSize:[52,52],iconAnchor:[26,26],popupAnchor:[0,-32],
+    html:`<div style="width:52px;height:52px;border-radius:50%;
+      background:radial-gradient(circle,${c}28,${c}08);border:2px solid ${c};
       box-shadow:0 0 18px ${c},0 0 36px ${c}40;
       display:flex;align-items:center;justify-content:center;
       ${S.clubActive?'animation:cp 2s ease-in-out infinite;':''}">
-      ${clubSVG(c,30)}</div>
+      ${clubSVG(c,34)}</div>
     <style>@keyframes cp{0%,100%{box-shadow:0 0 18px ${c},0 0 36px ${c}40}50%{box-shadow:0 0 28px ${c},0 0 56px ${c}60}}</style>`
   });
   const srows=CLUB.schedule.map(s=>`<div class="srow"><span class="sday">${s.d}</span><span class="stime">${s.t}</span></div>`).join('');
   const pop=`<div class="club-pop">
     <div class="club-hd">
-      <div class="club-logo">${clubSVG(c,36)}</div>
+      <div class="club-logo">${clubSVG(c,32)}</div>
       <div>
         <div class="club-nm">${CLUB.name}</div>
         <div class="club-sub">${CLUB.sub}</div>
@@ -748,7 +886,8 @@ function addClubMarker(map){
       <div style="margin-top:10px;font-size:.7rem;color:var(--td)">📞 ${CLUB.contact}</div>
     </div>
   </div>`;
-  L.marker([CLUB.lat,CLUB.lng],{icon}).addTo(map).bindPopup(pop,{maxWidth:300});
+  const m=L.marker([CLUB.lat,CLUB.lng],{icon}).addTo(map).bindPopup(pop,{maxWidth:300});
+  window._clubMarker=m;
 }
 
 function addEvMarkers(map){
@@ -774,14 +913,6 @@ function addEvMarkers(map){
   });
 }
 
-function addUserMarker(map,lat,lng){
-  if(window._um) map.removeLayer(window._um);
-  const icon=divIcon('#38bdf8',9,true);
-  window._um=L.marker([lat,lng],{icon}).addTo(map)
-    .bindPopup('<div class="ev-pop"><div class="ev-pop-t">📍 Вы здесь</div></div>');
-  document.getElementById('hcoords').textContent=`${lat.toFixed(4)}°N · ${lng.toFixed(4)}°E`;
-}
-
 function locate(){
   if(!navigator.geolocation){toast('Геолокация недоступна');return;}
   navigator.geolocation.getCurrentPosition(
@@ -796,18 +927,32 @@ function toggleL(l){
   toast(LV[l]?'Слой включён':'Слой выключен');
 }
 
-/* ── Auth ───────────────────────────────────────────── */
+/* ── Auth ───────────────────────────────────────────────── */
 let aMode='login';
+let _selColor='cyan';
+
 function renderProfile(){
   const c=document.getElementById('profcont');if(!c)return;
   if(S.user){
     const isA=S.user.role==='admin';
     const myEvs=S.events.filter(e=>e.addedBy===S.user.email);
+    const {o,i}=getUserColorObj();
+    const msg=S.user.statusMsg||'';
     c.innerHTML=`
     <div style="text-align:center;padding:16px 0">
-      <div class="avatar">${S.user.email[0].toUpperCase()}</div>
-      <div style="margin-top:12px;font-family:'Orbitron',monospace;font-size:.85rem;letter-spacing:.08em">${S.user.email}</div>
+      <div style="width:72px;height:72px;border-radius:50%;margin:0 auto;
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:0 0 24px ${o}60;border:2px solid ${o}80">
+        ${isA?compassSVG(o,i,64,true):compassSVG(o,i,64,false)}
+      </div>
+      <div style="margin-top:12px;font-family:'Orbitron',monospace;font-size:.85rem;letter-spacing:.08em">${S.user.name||S.user.email.split('@')[0]}</div>
+      <div style="font-size:.65rem;color:var(--tm);margin-top:2px">${S.user.email}</div>
       <div style="margin-top:6px"><span class="badge ${isA?'ba':'bv'}">${isA?'⚡ Администратор':'✓ Пользователь'}</span></div>
+    </div>
+    <div class="island island-s">
+      <div class="label" style="margin-bottom:8px">Статусное сообщение</div>
+      <textarea class="input" id="pmsg" placeholder="Напишите что-нибудь о себе..." style="min-height:60px">${msg}</textarea>
+      <button class="btn btn-p" style="width:100%;margin-top:8px;font-size:.7rem" onclick="saveUserMsg()">Сохранить сообщение</button>
     </div>
     <div class="island island-s">
       <div class="label" style="margin-bottom:10px">Мои ивенты (${myEvs.length})</div>
@@ -819,6 +964,16 @@ function renderProfile(){
     ${isA?`<button class="btn" style="width:100%" onclick="go('admin')">⚡ Панель администратора</button>`:''}
     <button class="btn" style="width:100%" onclick="logout()">Выйти из аккаунта</button>`;
   } else {
+    const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
+    const takenColors=Object.values(users).map(u=>u.colorId).filter(Boolean);
+    const swatches=USER_COLORS.map(col=>{
+      const taken=takenColors.includes(col.id);
+      return `<div class="cswatch${_selColor===col.id?' selected':''}"
+        onclick="selectColor('${col.id}',this)"
+        style="background:${col.o};box-shadow:0 0 8px ${col.o}80;${taken?'opacity:.4':''};"
+        title="${col.id}${taken?' (занят)':''}"></div>`;
+    }).join('');
+
     c.innerHTML=`
     <div style="text-align:center;padding:16px 0">
       <div style="font-size:2.5rem">👤</div>
@@ -833,6 +988,10 @@ function renderProfile(){
           <input class="input" id="apw" type="password" placeholder="••••••••"></div>
         <div class="fg" id="ang" style="display:none"><label class="flbl">Имя</label>
           <input class="input" id="an" type="text" placeholder="Ваше имя"></div>
+        <div class="fg" id="aclr" style="display:none">
+          <label class="flbl">Цвет вашего компаса</label>
+          <div class="color-swatches" id="cswatches">${swatches}</div>
+        </div>
         <button class="btn btn-p" style="width:100%" onclick="authDo()">Войти</button>
         <button class="btn btn-g" style="width:100%;font-size:.7rem" onclick="toggleAMode()">Нет аккаунта? Зарегистрироваться</button>
       </div>
@@ -844,16 +1003,42 @@ function renderProfile(){
   }
 }
 
+function selectColor(id,el){
+  _selColor=id;
+  document.querySelectorAll('#cswatches .cswatch').forEach(s=>s.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
 function toggleAMode(){
   aMode=aMode==='login'?'register':'login';
   const lbl=document.getElementById('aml');
   const ang=document.getElementById('ang');
+  const aclr=document.getElementById('aclr');
   const btn=document.querySelector('#vp .btn-p');
   const tog=document.querySelector('#vp .btn-g');
   if(lbl) lbl.textContent=aMode==='login'?'ВХОД':'РЕГИСТРАЦИЯ';
   if(ang) ang.style.display=aMode==='register'?'block':'none';
+  if(aclr) aclr.style.display=aMode==='register'?'block':'none';
   if(btn) btn.textContent=aMode==='login'?'Войти':'Зарегистрироваться';
   if(tog) tog.textContent=aMode==='login'?'Нет аккаунта? Зарегистрироваться':'Уже есть аккаунт? Войти';
+}
+
+function saveUserMsg(){
+  const msg=(document.getElementById('pmsg')?.value||'').trim();
+  S.user.statusMsg=msg;
+  localStorage.setItem('pnd-u',JSON.stringify(S.user));
+  // Update in users store
+  const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
+  if(users[S.user.email]){
+    users[S.user.email].statusMsg=msg;
+    localStorage.setItem('pnd-users',JSON.stringify(users));
+  }
+  // Update marker popup if map is open
+  if(window._um) window._um.setPopupContent(`<div class="user-pop">
+    <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:6px">${S.user.name||S.user.email.split('@')[0]}</div>
+    ${msg?`<div style="font-size:.72rem;color:var(--td);font-style:italic">"${msg}"</div>`:''}
+  </div>`);
+  toast('Сообщение сохранено ✓');
 }
 
 function authDo(){
@@ -865,14 +1050,14 @@ function authDo(){
     if(email==='admin@pneuraden.com'&&pw==='admin123'){
       S.user={email,role:'admin'};
     } else if(users[email]&&users[email].pw===btoa(pw)){
-      S.user={email,role:'user',name:users[email].name};
+      S.user={email,role:'user',name:users[email].name,colorId:users[email].colorId||'cyan',statusMsg:users[email].statusMsg||''};
     } else {toast('Неверный email или пароль');return;}
   } else {
     if(pw.length<6){toast('Пароль минимум 6 символов');return;}
     const name=(document.getElementById('an')?.value||'').trim()||email.split('@')[0];
-    users[email]={pw:btoa(pw),name};
+    users[email]={pw:btoa(pw),name,colorId:_selColor,statusMsg:''};
     localStorage.setItem('pnd-users',JSON.stringify(users));
-    S.user={email,role:'user',name};
+    S.user={email,role:'user',name,colorId:_selColor,statusMsg:''};
   }
   localStorage.setItem('pnd-u',JSON.stringify(S.user));
   updateUID();renderProfile();
@@ -884,7 +1069,7 @@ function logout(){
   updateUID();renderProfile();toast('Вы вышли из системы');
 }
 
-/* ── Admin ──────────────────────────────────────────── */
+/* ── Admin ──────────────────────────────────────────────── */
 function renderAdmin(){
   if(!S.user||S.user.role!=='admin'){go('profile');toast('Доступ запрещён');return;}
   const c=document.getElementById('admcont');if(!c)return;
@@ -901,6 +1086,20 @@ function renderAdmin(){
         <div style="font-size:.88rem;font-weight:700">${S.clubActive?'🟢 Тренировка идёт':'⚫ Закрыто'}</div>
         <div class="label">HK Rovinj Rovigno</div>
       </div>
+    </div>
+  </div>
+  <div class="island island-s">
+    <div class="label" style="margin-bottom:10px">Локация клуба</div>
+    <div style="display:flex;gap:8px">
+      <input class="input" id="clat" type="number" step="0.00001" placeholder="Широта" value="${CLUB.lat.toFixed(5)}" style="flex:1;font-size:.8rem">
+      <input class="input" id="clng" type="number" step="0.00001" placeholder="Долгота" value="${CLUB.lng.toFixed(5)}" style="flex:1;font-size:.8rem">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn" style="flex:1;font-size:.65rem" onclick="setClubLocGeo()">📍 Моя геолокация</button>
+      <button class="btn btn-p" style="flex:1;font-size:.65rem" onclick="saveClubLoc()">Сохранить</button>
+    </div>
+    <div style="font-size:.6rem;color:var(--tm);margin-top:6px;line-height:1.5">
+      Координаты: ${CLUB.lat.toFixed(5)}°N · ${CLUB.lng.toFixed(5)}°E
     </div>
   </div>
   <div class="sec-lbl"><span class="sec-lbl-t">Очередь верификации (${pd.length})</span><div class="sec-line"></div></div>`;
@@ -941,8 +1140,34 @@ function renderAdmin(){
 function setClub(v){
   S.clubActive=v;localStorage.setItem('pnd-ca',JSON.stringify(v));
   clubStatusUI();renderAdmin();toast(v?'🟢 Тренировка началась!':'⚫ Клуб закрыт');
-  if(S.mapInit){S.mapInit=false;document.getElementById('map-container').innerHTML='';window._map=null;}
+  if(S.mapInit){S.mapInit=false;document.getElementById('map-container').innerHTML='';
+    window._map=null;_minimap=null;}
 }
+
+function saveClubLoc(){
+  const lat=parseFloat(document.getElementById('clat')?.value);
+  const lng=parseFloat(document.getElementById('clng')?.value);
+  if(isNaN(lat)||isNaN(lng)||lat<-90||lat>90||lng<-180||lng>180){
+    toast('Некорректные координаты');return;
+  }
+  localStorage.setItem('pnd-club',JSON.stringify({lat,lng}));
+  if(S.mapInit){S.mapInit=false;document.getElementById('map-container').innerHTML='';
+    window._map=null;_minimap=null;}
+  renderAdmin();
+  toast(`Локация клуба сохранена ✓ ${lat.toFixed(5)}°N`);
+}
+
+function setClubLocGeo(){
+  if(!navigator.geolocation){toast('Геолокация недоступна');return;}
+  navigator.geolocation.getCurrentPosition(p=>{
+    const lat=p.coords.latitude,lng=p.coords.longitude;
+    const el1=document.getElementById('clat'),el2=document.getElementById('clng');
+    if(el1) el1.value=lat.toFixed(5);
+    if(el2) el2.value=lng.toFixed(5);
+    toast('Координаты получены — нажмите «Сохранить»');
+  },()=>toast('Не удалось получить геолокацию'));
+}
+
 function verEv(id){
   const ev=S.events.find(e=>e.id===id);
   if(ev){ev.verified=true;saveEv();renderAdmin();renderEvents();
@@ -956,10 +1181,10 @@ function delEv(id){
 }
 
 /* ═══════════════════════════════════════════════════════════
-   RADAR — GTA 4 Liberty City Style
+   RADAR — GTA 4 Liberty City Style + Real Map
    ═══════════════════════════════════════════════════════════ */
-const ZOOM_R=[0.002,0.005,0.011]; // degree radius per zoom
-const ZOOM_MAP=[17,16,15]; // corresponding Leaflet zoom levels
+const ZOOM_R=[0.002,0.005,0.011];
+const ZOOM_MAP=[17,16,15];
 let RAF=null;
 let _minimap=null;
 
@@ -970,7 +1195,7 @@ let _minimap=null;
   let angle=0,targetAngle=0,hasGyro=false;
   let uLat=CLUB.lat,uLng=CLUB.lng;
 
-  // Minimap behind canvas
+  // Leaflet minimap behind canvas
   function initMinimap(lat,lng){
     if(_minimap) return;
     _minimap=L.map('radar-minimap',{
@@ -988,19 +1213,21 @@ let _minimap=null;
 
   // Device orientation
   if('DeviceOrientationEvent' in window){
-    window.addEventListener('deviceorientation',e=>{
+    const onOrient=e=>{
       if(e.alpha!=null){hasGyro=true;angle=e.alpha;}
-    });
-    // iOS permission
+    };
     if(typeof DeviceOrientationEvent.requestPermission==='function'){
       document.getElementById('rwrap').addEventListener('click',async(e)=>{
         e.stopPropagation();
         try{const p=await DeviceOrientationEvent.requestPermission();
-          if(p==='granted') hasGyro=true;}catch{}
+          if(p==='granted') window.addEventListener('deviceorientation',onOrient);}catch{}
         goMap();
       },{once:true});
+    } else {
+      window.addEventListener('deviceorientation',onOrient);
     }
   }
+
   // Desktop mouse fallback
   window.addEventListener('mousemove',e=>{
     if(!hasGyro){
@@ -1008,6 +1235,7 @@ let _minimap=null;
       targetAngle=Math.atan2(dx,-dy)*180/Math.PI;
     }
   });
+
   // User location
   if(navigator.geolocation)
     navigator.geolocation.getCurrentPosition(p=>{
@@ -1025,9 +1253,10 @@ let _minimap=null;
     if(!hasGyro) angle+=(targetAngle-angle)*.05;
     ctx.clearRect(0,0,W,H);
 
-    /* rotate minimap opposite to compass */
+    // Rotate minimap opposite to compass
     if(_minimap){
-      document.getElementById('radar-minimap').style.transform=`rotate(${-angle}deg)`;
+      const el=document.getElementById('radar-minimap');
+      if(el) el.style.transform=`rotate(${-angle}deg)`;
       _minimap.setView([uLat,uLng],ZOOM_MAP[S.radarZoom],{animate:false});
     }
 
@@ -1035,21 +1264,17 @@ let _minimap=null;
     ctx.save();
     ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.clip();
 
-    /* dark overlay so rings/blips are visible over map */
-    ctx.fillStyle='rgba(5,8,18,0.38)';ctx.fillRect(0,0,W,H);
-
-    /* scanlines */
-    ctx.strokeStyle='rgba(0,255,80,.03)';ctx.lineWidth=1;
-    for(let i=0;i<H;i+=4){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(W,i);ctx.stroke();}
+    /* subtle dark overlay so rings are visible over tiles */
+    ctx.fillStyle='rgba(4,7,16,0.22)';ctx.fillRect(0,0,W,H);
 
     /* rings */
     [.33,.66,1].forEach((s,i)=>{
       ctx.beginPath();ctx.arc(cx,cy,R*s,0,Math.PI*2);
-      ctx.strokeStyle=`rgba(0,255,80,${.05+i*.04})`;ctx.lineWidth=1;ctx.stroke();
+      ctx.strokeStyle=`rgba(0,255,80,${.08+i*.05})`;ctx.lineWidth=1;ctx.stroke();
     });
 
     /* cross */
-    ctx.strokeStyle='rgba(0,255,80,.07)';ctx.lineWidth=1;
+    ctx.strokeStyle='rgba(0,255,80,.09)';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(cx,cy-R);ctx.lineTo(cx,cy+R);ctx.stroke();
     ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.stroke();
 
@@ -1057,20 +1282,19 @@ let _minimap=null;
     ctx.save();ctx.translate(cx,cy);ctx.rotate(angle*Math.PI/180);
     for(let d=0;d<360;d+=5){
       const r=d*Math.PI/180,ic=d%90===0,is=d%45===0;
-      const tl=ic?16:is?10:5,op=ic?.85:is?.5:.22;
+      const tl=ic?16:is?10:5,op=ic?.9:is?.55:.25;
       const x1=Math.sin(r)*(R-tl),y1=-Math.cos(r)*(R-tl);
       const x2=Math.sin(r)*R,y2=-Math.cos(r)*R;
       ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
       ctx.strokeStyle=`rgba(0,255,80,${op})`;ctx.lineWidth=ic?2.5:1;ctx.stroke();
     }
-    // Cardinal labels
     ctx.font=`900 ${W*.07}px Orbitron,monospace`;
     ctx.textAlign='center';ctx.textBaseline='middle';
     ['N','E','S','W'].forEach((l,i)=>{
       const r=i*90*Math.PI/180,x=Math.sin(r)*(R-30),y=-Math.cos(r)*(R-30);
-      ctx.fillStyle=l==='N'?'rgba(255,55,55,.95)':'rgba(0,255,80,.88)';
-      ctx.shadowColor=l==='N'?'rgba(255,50,50,.6)':'rgba(0,255,80,.4)';
-      ctx.shadowBlur=10;ctx.fillText(l,x,y);
+      ctx.fillStyle=l==='N'?'rgba(255,55,55,.98)':'rgba(0,255,80,.92)';
+      ctx.shadowColor=l==='N'?'rgba(255,50,50,.7)':'rgba(0,255,80,.5)';
+      ctx.shadowBlur=12;ctx.fillText(l,x,y);
     });
     ctx.shadowBlur=0;ctx.restore();
 
@@ -1093,30 +1317,34 @@ let _minimap=null;
     if(cDx*cDx+cDy*cDy<=R*R*1.05){
       const pulse=.6+.4*Math.sin(t*.003),cr=8*pulse;
       const cg=ctx.createRadialGradient(cbx,cby,0,cbx,cby,cr*2.5);
-      cg.addColorStop(0,'rgba(168,85,247,.85)');cg.addColorStop(1,'rgba(168,85,247,0)');
+      cg.addColorStop(0,'rgba(168,85,247,.9)');cg.addColorStop(1,'rgba(168,85,247,0)');
       ctx.fillStyle=cg;ctx.beginPath();ctx.arc(cbx,cby,cr*2.5,0,Math.PI*2);ctx.fill();
       ctx.beginPath();ctx.arc(cbx,cby,cr,0,Math.PI*2);ctx.fillStyle='#a855f7';ctx.fill();
     }
 
-    /* player dot */
+    /* player dot — compass style */
     const ps=5+1.8*Math.sin(t*.004);
-    const pg=ctx.createRadialGradient(cx,cy,0,cx,cy,ps*2.5);
-    pg.addColorStop(0,'rgba(255,255,255,1)');pg.addColorStop(.35,'rgba(56,189,248,.8)');pg.addColorStop(1,'rgba(56,189,248,0)');
-    ctx.fillStyle=pg;ctx.beginPath();ctx.arc(cx,cy,ps*2.5,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.arc(cx,cy,4.5,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
+    const {o:uo}=getUserColorObj();
+    const userCol=S.user?(S.user.role==='admin'?'#fbbf24':uo):'#ef4444';
+    const pg=ctx.createRadialGradient(cx,cy,0,cx,cy,ps*3);
+    pg.addColorStop(0,'rgba(255,255,255,1)');
+    pg.addColorStop(.3,userCol+'cc');
+    pg.addColorStop(1,userCol+'00');
+    ctx.fillStyle=pg;ctx.beginPath();ctx.arc(cx,cy,ps*3,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
 
     /* heading chevron */
     ctx.save();ctx.translate(cx,cy);
-    ctx.beginPath();ctx.moveTo(0,-14);ctx.lineTo(-5,0);ctx.lineTo(5,0);ctx.closePath();
-    ctx.fillStyle='rgba(255,255,255,.55)';ctx.fill();ctx.restore();
+    ctx.beginPath();ctx.moveTo(0,-16);ctx.lineTo(-6,0);ctx.lineTo(6,0);ctx.closePath();
+    ctx.fillStyle='rgba(255,255,255,.6)';ctx.fill();ctx.restore();
 
     ctx.restore(); /* end clip */
 
     /* outer ring */
     ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);
-    ctx.strokeStyle='rgba(0,200,75,.6)';ctx.lineWidth=2.5;ctx.stroke();
+    ctx.strokeStyle='rgba(0,200,75,.7)';ctx.lineWidth=2.5;ctx.stroke();
     ctx.beginPath();ctx.arc(cx,cy,R+6,0,Math.PI*2);
-    ctx.strokeStyle='rgba(0,200,75,.12)';ctx.lineWidth=5;ctx.stroke();
+    ctx.strokeStyle='rgba(0,200,75,.14)';ctx.lineWidth=5;ctx.stroke();
 
     RAF=requestAnimationFrame(frame);
   }
@@ -1128,7 +1356,7 @@ let _minimap=null;
   });
 })();
 
-/* ── Init ───────────────────────────────────────────── */
+/* ── Init ───────────────────────────────────────────────── */
 saveEv();
 clubStatusUI();
 updateUID();
