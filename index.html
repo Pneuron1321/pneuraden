@@ -256,9 +256,9 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 /* Leaflet */
 .leaflet-container{font-family:'Rajdhani',sans-serif;background:#0a0a14}
-/* Brighter tiles on radar minimap and full map for readability */
-#radar-minimap .leaflet-tile-pane{filter:brightness(1.6) contrast(1.1)}
-#map-container .leaflet-tile-pane{filter:brightness(1.25) contrast(1.05)}
+/* Lift dark_all tiles so roads and details are clearly visible */
+#radar-minimap .leaflet-tile-pane{filter:brightness(3.2) contrast(1.3)}
+#map-container  .leaflet-tile-pane{filter:brightness(2.2) contrast(1.2)}
 .leaflet-popup-content-wrapper{background:transparent;border:none;box-shadow:none;padding:0}
 .leaflet-popup-content{margin:0}
 .leaflet-popup-tip{display:none}
