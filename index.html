@@ -190,7 +190,7 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 /* ── MAP ── */
 #vm{background:#0a0a10}
 #map-container{position:absolute;inset:0;z-index:1;
-  transform-origin:center center;transition:transform .08s linear}
+  transform-origin:center center}
 .map-top{position:absolute;top:0;left:0;right:0;z-index:500;display:flex;
   align-items:center;padding:12px 16px;gap:10px;
   padding-top:max(12px,env(safe-area-inset-top));
@@ -773,17 +773,20 @@ function initMap(){
   // Map rotation via deviceorientation
   if('DeviceOrientationEvent' in window){
     const onOrient = e=>{
-      if(e.alpha==null) return;
-      _mapAngle = e.alpha;
+      // webkitCompassHeading (iOS) = 0..360 CW from North — reliable
+      // e.alpha (Android) = device rotation CCW; convert to CW heading
+      const head = e.webkitCompassHeading != null
+        ? e.webkitCompassHeading
+        : (e.alpha != null ? (360 - e.alpha) % 360 : null);
+      if(head == null) return;
       const container=document.getElementById('map-container');
-      if(container) container.style.transform=`rotate(${-_mapAngle}deg)`;
-      // Counter-rotate compass markers so they always point north
+      if(container) container.style.transform=`rotate(${-head}deg)`;
+      // Counter-rotate compass markers so they always point true north
       document.querySelectorAll('.cmarker-inner').forEach(el=>{
-        el.style.transform=`rotate(${_mapAngle}deg)`;
+        el.style.transform=`rotate(${head}deg)`;
       });
     };
     if(typeof DeviceOrientationEvent.requestPermission==='function'){
-      // iOS 13+
       DeviceOrientationEvent.requestPermission().then(r=>{
         if(r==='granted') window.addEventListener('deviceorientation',onOrient);
       }).catch(()=>{});
@@ -1227,9 +1230,14 @@ let _minimap=null;
   initMinimap(uLat,uLng);
 
   // Device orientation
+  // webkitCompassHeading (iOS): 0..360 CW from magnetic North — use directly
+  // e.alpha (Android): device rotation CCW (positive=CCW), convert to CW heading
   if('DeviceOrientationEvent' in window){
     const onOrient=e=>{
-      if(e.alpha!=null){hasGyro=true;angle=e.alpha;}
+      const head=e.webkitCompassHeading!=null
+        ?e.webkitCompassHeading
+        :(e.alpha!=null?(360-e.alpha)%360:null);
+      if(head!=null){hasGyro=true;angle=head;}
     };
     if(typeof DeviceOrientationEvent.requestPermission==='function'){
       document.getElementById('rwrap').addEventListener('click',async(e)=>{
@@ -1270,11 +1278,11 @@ let _minimap=null;
     if(!hasGyro) angle+=(targetAngle-angle)*.05;
     ctx.clearRect(0,0,W,H);
 
-    // Rotate minimap opposite to compass
+    // Rotate minimap to keep North up relative to canvas (angle is CW heading)
     if(_minimap){
       const el=document.getElementById('radar-minimap');
       if(el) el.style.transform=`rotate(${-angle}deg)`;
-      _minimap.setView([uLat,uLng],ZOOM_MAP[S.radarZoom],{animate:false});
+      // setView is called by watchPosition only — not here (would be 60fps Leaflet ops)
     }
 
     /* clip */
@@ -1295,8 +1303,8 @@ let _minimap=null;
     ctx.beginPath();ctx.moveTo(cx,cy-R);ctx.lineTo(cx,cy+R);ctx.stroke();
     ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.stroke();
 
-    /* rotating compass ring */
-    ctx.save();ctx.translate(cx,cy);ctx.rotate(angle*Math.PI/180);
+    /* rotating compass ring — angle is CW heading, so ring rotates CCW by heading */
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(-angle*Math.PI/180);
     for(let d=0;d<360;d+=5){
       const r=d*Math.PI/180,ic=d%90===0,is=d%45===0;
       const tl=ic?16:is?10:5,op=ic?.9:is?.55:.25;
