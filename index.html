@@ -1295,7 +1295,6 @@ let _minimap=null;
   initMinimap(uLat,uLng);
 
   // Device orientation — use webkitCompassHeading (iOS true north) or alpha
-  let targetHeading=0;
   if('DeviceOrientationEvent' in window){
     const onOrient=e=>{
       // webkitCompassHeading: iOS true compass (0=N, clockwise)
