@@ -259,9 +259,9 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 /* Dark theme: high brightness lifts dark tiles; low contrast avoids clipping */
 [data-theme="dark"] #radar-minimap .leaflet-tile-pane{filter:brightness(4.5) contrast(1.15)}
 [data-theme="dark"] #map-container  .leaflet-tile-pane{filter:brightness(3.8) contrast(1.1)}
-/* Light theme: lower brightness creates room, higher contrast sharpens dark details */
-[data-theme="light"] #radar-minimap .leaflet-tile-pane{filter:brightness(0.78) contrast(1.9) saturate(1.5)}
-[data-theme="light"] #map-container  .leaflet-tile-pane{filter:brightness(0.82) contrast(1.7) saturate(1.4)}
+/* Light theme: SVG convolution sharpen → thin dark outlines on every feature edge */
+[data-theme="light"] #radar-minimap .leaflet-tile-pane{filter:url(#tile-sharpen) brightness(0.8) contrast(1.65) saturate(1.45)}
+[data-theme="light"] #map-container  .leaflet-tile-pane{filter:url(#tile-sharpen) brightness(0.84) contrast(1.5)  saturate(1.35)}
 .leaflet-popup-content-wrapper{background:transparent;border:none;box-shadow:none;padding:0}
 .leaflet-popup-content{margin:0}
 .leaflet-popup-tip{display:none}
@@ -385,6 +385,17 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
 </style>
 </head>
 <body>
+<!-- SVG filter: sharpening convolution matrix for crisp dark outlines on map tiles -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="tile-sharpen" color-interpolation-filters="sRGB" x="0%" y="0%" width="100%" height="100%">
+      <!-- Unsharp mask kernel: amplifies edges between light bg and dark features -->
+      <feConvolveMatrix order="3"
+        kernelMatrix="-1 -1 -1  -1 9 -1  -1 -1 -1"
+        preserveAlpha="true" edgeMode="duplicate"/>
+    </filter>
+  </defs>
+</svg>
 <div id="app">
 <div class="vbg"></div>
 
