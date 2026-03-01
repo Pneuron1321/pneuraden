@@ -188,8 +188,13 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .stat-l{font-size:.5rem;letter-spacing:.18em;text-transform:uppercase;color:var(--tm);margin-top:2px}
 
 /* ── MAP ── */
-#vm{background:#0a0a10}
-#map-container{position:absolute;inset:0;z-index:1;
+#vm{background:#0a0a10;overflow:hidden}
+#map-container{
+  position:absolute;
+  /* √2≈1.414 → 141.5% ensures corners always cover screen at any rotation */
+  width:141.5%;height:141.5%;
+  top:-20.75%;left:-20.75%;
+  z-index:1;
   transform-origin:center center}
 .map-top{position:absolute;top:0;left:0;right:0;z-index:500;display:flex;
   align-items:center;padding:12px 16px;gap:10px;
@@ -745,6 +750,8 @@ function initMap(){
     ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
     :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
   window._ml=L.tileLayer(turl,{maxZoom:19,subdomains:'abcd'}).addTo(map);
+  // invalidateSize so Leaflet loads tiles for the oversized (141.5%) container
+  setTimeout(()=>map.invalidateSize(),200);
   L.control.zoom({position:'bottomright'}).addTo(map);
   L.control.attribution({position:'bottomleft',prefix:false})
     .addAttribution('© CartoDB · © OSM').addTo(map);
