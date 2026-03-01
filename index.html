@@ -256,12 +256,12 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 /* Leaflet */
 .leaflet-container{font-family:'Rajdhani',sans-serif;background:#0a0a14}
-/* Dark theme: high brightness lifts dark tiles; low contrast avoids clipping */
-[data-theme="dark"] #radar-minimap .leaflet-tile-pane{filter:brightness(4.5) contrast(1.15)}
-[data-theme="dark"] #map-container  .leaflet-tile-pane{filter:brightness(3.8) contrast(1.1)}
-/* Light theme: +35% expressiveness on all detail parameters */
-[data-theme="light"] #radar-minimap .leaflet-tile-pane{filter:url(#tile-sharpen) brightness(0.77) contrast(2.3) saturate(3.8)}
-[data-theme="light"] #map-container  .leaflet-tile-pane{filter:url(#tile-sharpen) brightness(0.81) contrast(2.1) saturate(3.2)}
+/* Radar minimap: always dark_all tiles — theme-independent filter */
+#radar-minimap .leaflet-tile-pane{filter:brightness(4.5) contrast(1.15)}
+/* Full map — dark theme */
+[data-theme="dark"] #map-container .leaflet-tile-pane{filter:brightness(3.8) contrast(1.1)}
+/* Full map — light theme: CSS-only (no SVG ref), expressive details */
+[data-theme="light"] #map-container .leaflet-tile-pane{filter:brightness(0.82) contrast(1.85) saturate(2.6)}
 .leaflet-popup-content-wrapper{background:transparent;border:none;box-shadow:none;padding:0}
 .leaflet-popup-content{margin:0}
 .leaflet-popup-tip{display:none}
@@ -704,7 +704,7 @@ function toggleTheme(){
     ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
     :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
   if(S.mapInit && window._ml) window._ml.setUrl(tileUrl);
-  if(window._minimapTL) window._minimapTL.setUrl(tileUrl);
+  // Radar minimap always stays dark_all — its CSS filter is theme-independent
 }
 
 /* ── Helpers ────────────────────────────────────────────── */
