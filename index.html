@@ -55,7 +55,8 @@
 
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
-  font-family:'Rajdhani',sans-serif;-webkit-font-smoothing:antialiased}
+  font-family:'Rajdhani',sans-serif;-webkit-font-smoothing:antialiased;
+  overscroll-behavior:none}
 button{font-family:inherit;cursor:pointer}
 input,select,textarea{font-family:inherit}
 
@@ -191,9 +192,11 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 #vm{background:#0a0a10;overflow:hidden}
 #map-container{
   position:absolute;
-  /* √2≈1.414 → 141.5% ensures corners always cover screen at any rotation */
-  width:141.5%;height:141.5%;
-  top:-20.75%;left:-20.75%;
+  /* Must cover screen diagonal at any angle. Proof: diagonal=√(vw²+vh²) ≤ √2·vmax
+     So 142vmax×142vmax guaranteed to cover any screen shape at any rotation */
+  width:142vmax;height:142vmax;
+  top:50%;left:50%;
+  margin-top:-71vmax;margin-left:-71vmax;
   z-index:1;
   transform-origin:center center}
 .map-top{position:absolute;top:0;left:0;right:0;z-index:500;display:flex;
