@@ -1360,16 +1360,6 @@ let _minimap=null;
       ctx.beginPath();ctx.arc(bx,by,4.5,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();
     });
 
-    /* club blip */
-    const {bx:cbx,by:cby}=blipXY(CLUB.lat,CLUB.lng);
-    const cDx=cbx-cx,cDy=cby-cy;
-    if(cDx*cDx+cDy*cDy<=R*R*1.05){
-      const pulse=.6+.4*Math.sin(t*.003),cr=8*pulse;
-      const cg=ctx.createRadialGradient(cbx,cby,0,cbx,cby,cr*2.5);
-      cg.addColorStop(0,'rgba(168,85,247,.9)');cg.addColorStop(1,'rgba(168,85,247,0)');
-      ctx.fillStyle=cg;ctx.beginPath();ctx.arc(cbx,cby,cr*2.5,0,Math.PI*2);ctx.fill();
-      ctx.beginPath();ctx.arc(cbx,cby,cr,0,Math.PI*2);ctx.fillStyle='#a855f7';ctx.fill();
-    }
 
     /* player dot — compass style */
     const ps=5+1.8*Math.sin(t*.004);
