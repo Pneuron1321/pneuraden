@@ -737,6 +737,7 @@ let _mapAngle=0;
 
 function initMap(){
   if(S.mapInit)return;S.mapInit=true;
+  // Start on club; will pan to user as soon as GPS fix arrives
   const map=L.map('map-container',{center:[CLUB.lat,CLUB.lng],zoom:14,
     zoomControl:false,attributionControl:false});
   window._map=map;
@@ -749,11 +750,26 @@ function initMap(){
     .addAttribution('© CartoDB · © OSM').addTo(map);
   addClubMarker(map);
   addEvMarkers(map);
-  if(navigator.geolocation)
-    navigator.geolocation.getCurrentPosition(
-      p=>addUserMarker(map,p.coords.latitude,p.coords.longitude),
-      ()=>{}
+  if(navigator.geolocation){
+    // watchPosition + enableHighAccuracy = continuous GPS-grade updates
+    let firstFix=true;
+    if(window._geoWatch!=null) navigator.geolocation.clearWatch(window._geoWatch);
+    window._geoWatch=navigator.geolocation.watchPosition(
+      p=>{
+        const lat=p.coords.latitude,lng=p.coords.longitude;
+        addUserMarker(map,lat,lng);
+        if(firstFix){
+          firstFix=false;
+          map.setView([lat,lng],16); // centre on user, zoom in
+        }
+      },
+      e=>{
+        // Fall back to rough position on error
+        if(e.code===e.PERMISSION_DENIED) toast('Разрешите геолокацию для точного отображения');
+      },
+      {enableHighAccuracy:true, timeout:15000, maximumAge:0}
     );
+  }
 
   // Map rotation via deviceorientation
   if('DeviceOrientationEvent' in window){
@@ -1236,13 +1252,15 @@ let _minimap=null;
     }
   });
 
-  // User location
-  if(navigator.geolocation)
-    navigator.geolocation.getCurrentPosition(p=>{
+  // User location — watchPosition for continuous GPS-grade accuracy
+  if(navigator.geolocation){
+    if(window._radarGeoWatch!=null) navigator.geolocation.clearWatch(window._radarGeoWatch);
+    window._radarGeoWatch=navigator.geolocation.watchPosition(p=>{
       uLat=p.coords.latitude;uLng=p.coords.longitude;
       if(_minimap) _minimap.setView([uLat,uLng],ZOOM_MAP[S.radarZoom],{animate:false});
       else initMinimap(uLat,uLng);
-    });
+    }, ()=>{}, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+  }
 
   function blipXY(lat,lng){
     const r=ZOOM_R[S.radarZoom];
