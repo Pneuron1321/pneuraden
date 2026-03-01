@@ -737,8 +737,8 @@ let _mapAngle=0;
 
 function initMap(){
   if(S.mapInit)return;S.mapInit=true;
-  // Start on club; will pan to user as soon as GPS fix arrives
-  const map=L.map('map-container',{center:[CLUB.lat,CLUB.lng],zoom:14,
+  // Start with neutral view; pans to user on first GPS fix
+  const map=L.map('map-container',{center:[45.0811,13.6387],zoom:4,
     zoomControl:false,attributionControl:false});
   window._map=map;
   const turl=S.theme==='dark'
@@ -748,7 +748,6 @@ function initMap(){
   L.control.zoom({position:'bottomright'}).addTo(map);
   L.control.attribution({position:'bottomleft',prefix:false})
     .addAttribution('© CartoDB · © OSM').addTo(map);
-  addClubMarker(map);
   addEvMarkers(map);
   if(navigator.geolocation){
     // watchPosition + enableHighAccuracy = continuous GPS-grade updates
