@@ -256,9 +256,12 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 /* Leaflet */
 .leaflet-container{font-family:'Rajdhani',sans-serif;background:#0a0a14}
-/* High brightness lifts buildings into visible range; low contrast avoids clipping */
-#radar-minimap .leaflet-tile-pane{filter:brightness(4.5) contrast(1.15)}
-#map-container  .leaflet-tile-pane{filter:brightness(3.8) contrast(1.1)}
+/* Dark theme: high brightness lifts dark tiles; low contrast avoids clipping */
+[data-theme="dark"] #radar-minimap .leaflet-tile-pane{filter:brightness(4.5) contrast(1.15)}
+[data-theme="dark"] #map-container  .leaflet-tile-pane{filter:brightness(3.8) contrast(1.1)}
+/* Light theme: tiles already bright — just a touch of contrast */
+[data-theme="light"] #radar-minimap .leaflet-tile-pane{filter:contrast(1.05)}
+[data-theme="light"] #map-container  .leaflet-tile-pane{filter:contrast(1.05)}
 .leaflet-popup-content-wrapper{background:transparent;border:none;box-shadow:none;padding:0}
 .leaflet-popup-content{margin:0}
 .leaflet-popup-tip{display:none}
