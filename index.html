@@ -173,7 +173,10 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .radar-wrap{position:relative;width:280px;height:280px;cursor:pointer;
   user-select:none;-webkit-user-select:none}
 .radar-wrap:hover #radar{filter:brightness(1.12) drop-shadow(0 0 20px rgba(0,200,80,.45))}
-#radar{width:280px;height:280px;border-radius:50%;display:block;
+#radar-minimap{position:absolute;top:0;left:0;width:280px;height:280px;
+  border-radius:50%;overflow:hidden;z-index:0}
+#radar{position:absolute;top:0;left:0;width:280px;height:280px;border-radius:50%;
+  display:block;z-index:1;pointer-events:none;
   transition:filter var(--t-f);
   filter:drop-shadow(0 0 14px rgba(0,180,70,.28))}
 .radar-hint{position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);
@@ -385,6 +388,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
   </div>
   <div class="home-main">
     <div class="radar-wrap" id="rwrap" onclick="goMap()">
+      <div id="radar-minimap"></div>
       <canvas id="radar" width="560" height="560"></canvas>
       <div class="radar-hint">нажми · открыть карту</div>
     </div>
@@ -532,23 +536,13 @@ const CLUB = {
 const EV_ICONS = {training:'🥋',concert:'🎸',market:'🛒',meetup:'🤝',sport:'⚽',other:'⭐'};
 
 function defaultEvents(){
-  return [
-    {id:'e1',title:'Вечерняя тренировка — борьба',type:'training',
-     date:'2026-03-05T18:30',desc:'Тренировка вольной борьбы. Все уровни.',
-     loc:'Спортзал клуба',lat:45.0811,lng:13.6387,verified:true,addedBy:'admin'},
-    {id:'e2',title:'Музыкальный вечер у порта',type:'concert',
-     date:'2026-03-08T20:00',desc:'Живая музыка на набережной.',
-     loc:'Порт Ровиня',lat:45.0798,lng:13.6370,verified:true,addedBy:'admin'},
-    {id:'e3',title:'Воскресный рынок',type:'market',
-     date:'2026-03-09T09:00',desc:'Свежие продукты и местные товары.',
-     loc:'Стара Баштина',lat:45.0825,lng:13.6395,verified:true,addedBy:'admin'},
-    {id:'e4',title:'Встреча серфингистов',type:'sport',
-     date:'2026-03-07T10:00',desc:'Организационная встреча перед сезоном.',
-     loc:'Пляж',lat:45.0755,lng:13.6310,verified:false,addedBy:'user@test.com'},
-    {id:'e5',title:'Арт-выставка в галерее',type:'other',
-     date:'2026-03-12T17:00',desc:'Открытие выставки местных художников.',
-     loc:'Галерея',lat:45.0815,lng:13.6402,verified:false,addedBy:'user2@test.com'}
-  ];
+  return [];
+}
+
+// One-time migration: clear fake default events from v1.0
+if(!localStorage.getItem('pnd-v2')){
+  localStorage.removeItem('pnd-ev');
+  localStorage.setItem('pnd-v2','1');
 }
 
 const S = {
@@ -591,12 +585,11 @@ function toggleTheme(){
   S.theme=S.theme==='dark'?'light':'dark';
   document.documentElement.setAttribute('data-theme',S.theme);
   localStorage.setItem('pnd-t',S.theme);
-  if(S.mapInit && window._ml){
-    const u=S.theme==='dark'
-      ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-    window._ml.setUrl(u);
-  }
+  const tileUrl=S.theme==='dark'
+    ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  if(S.mapInit && window._ml) window._ml.setUrl(tileUrl);
+  if(window._minimapTL) window._minimapTL.setUrl(tileUrl);
 }
 
 /* ── Helpers ────────────────────────────────────────── */
@@ -717,20 +710,30 @@ function divIcon(color,sz=11,pulse=false){
   });
 }
 
+function clubSVG(color,size=32){
+  return`<svg width="${size}" height="${size}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="24" cy="24" r="21" stroke="${color}" stroke-width="3"/>
+    <circle cx="24" cy="24" r="13" stroke="${color}" stroke-width="2" opacity="0.75"/>
+    <circle cx="24" cy="24" r="5" fill="${color}" opacity="0.9"/>
+    <line x1="3" y1="24" x2="45" y2="24" stroke="${color}" stroke-width="1.5" opacity="0.55"/>
+  </svg>`;
+}
+
 function addClubMarker(map){
   const c=S.clubActive?'#a855f7':'#64748b';
   const icon=L.divIcon({className:'',iconSize:[48,48],iconAnchor:[24,24],popupAnchor:[0,-28],
     html:`<div style="width:48px;height:48px;border-radius:50%;
-      background:radial-gradient(circle,${c},${c}80);border:2px solid ${c};
+      background:radial-gradient(circle,${c}33,${c}11);border:2px solid ${c};
       box-shadow:0 0 18px ${c},0 0 36px ${c}40;
-      display:flex;align-items:center;justify-content:center;font-size:1.4rem;
-      ${S.clubActive?'animation:cp 2s ease-in-out infinite;':''}">🥋</div>
+      display:flex;align-items:center;justify-content:center;
+      ${S.clubActive?'animation:cp 2s ease-in-out infinite;':''}">
+      ${clubSVG(c,30)}</div>
     <style>@keyframes cp{0%,100%{box-shadow:0 0 18px ${c},0 0 36px ${c}40}50%{box-shadow:0 0 28px ${c},0 0 56px ${c}60}}</style>`
   });
   const srows=CLUB.schedule.map(s=>`<div class="srow"><span class="sday">${s.d}</span><span class="stime">${s.t}</span></div>`).join('');
   const pop=`<div class="club-pop">
     <div class="club-hd">
-      <div class="club-logo">🥋</div>
+      <div class="club-logo">${clubSVG(c,36)}</div>
       <div>
         <div class="club-nm">${CLUB.name}</div>
         <div class="club-sub">${CLUB.sub}</div>
@@ -956,7 +959,9 @@ function delEv(id){
    RADAR — GTA 4 Liberty City Style
    ═══════════════════════════════════════════════════════════ */
 const ZOOM_R=[0.002,0.005,0.011]; // degree radius per zoom
+const ZOOM_MAP=[17,16,15]; // corresponding Leaflet zoom levels
 let RAF=null;
+let _minimap=null;
 
 (function initRadar(){
   const cv=document.getElementById('radar');
@@ -964,6 +969,22 @@ let RAF=null;
   const W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=W/2-6;
   let angle=0,targetAngle=0,hasGyro=false;
   let uLat=CLUB.lat,uLng=CLUB.lng;
+
+  // Minimap behind canvas
+  function initMinimap(lat,lng){
+    if(_minimap) return;
+    _minimap=L.map('radar-minimap',{
+      center:[lat,lng],zoom:ZOOM_MAP[S.radarZoom],
+      zoomControl:false,attributionControl:false,
+      dragging:false,touchZoom:false,scrollWheelZoom:false,
+      doubleClickZoom:false,boxZoom:false,keyboard:false,
+      fadeAnimation:false,zoomAnimation:false,tap:false
+    });
+    window._minimapTL=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      {maxZoom:19,subdomains:'abcd'}).addTo(_minimap);
+    setTimeout(()=>_minimap.invalidateSize(),150);
+  }
+  initMinimap(uLat,uLng);
 
   // Device orientation
   if('DeviceOrientationEvent' in window){
@@ -989,7 +1010,11 @@ let RAF=null;
   });
   // User location
   if(navigator.geolocation)
-    navigator.geolocation.getCurrentPosition(p=>{uLat=p.coords.latitude;uLng=p.coords.longitude;});
+    navigator.geolocation.getCurrentPosition(p=>{
+      uLat=p.coords.latitude;uLng=p.coords.longitude;
+      if(_minimap) _minimap.setView([uLat,uLng],ZOOM_MAP[S.radarZoom],{animate:false});
+      else initMinimap(uLat,uLng);
+    });
 
   function blipXY(lat,lng){
     const r=ZOOM_R[S.radarZoom];
@@ -1000,14 +1025,18 @@ let RAF=null;
     if(!hasGyro) angle+=(targetAngle-angle)*.05;
     ctx.clearRect(0,0,W,H);
 
+    /* rotate minimap opposite to compass */
+    if(_minimap){
+      document.getElementById('radar-minimap').style.transform=`rotate(${-angle}deg)`;
+      _minimap.setView([uLat,uLng],ZOOM_MAP[S.radarZoom],{animate:false});
+    }
+
     /* clip */
     ctx.save();
     ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.clip();
 
-    /* background */
-    const bg=ctx.createRadialGradient(cx,cy,0,cx,cy,R);
-    bg.addColorStop(0,'#1c2030');bg.addColorStop(.55,'#141825');bg.addColorStop(1,'#0c1018');
-    ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+    /* dark overlay so rings/blips are visible over map */
+    ctx.fillStyle='rgba(5,8,18,0.38)';ctx.fillRect(0,0,W,H);
 
     /* scanlines */
     ctx.strokeStyle='rgba(0,255,80,.03)';ctx.lineWidth=1;
