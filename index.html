@@ -456,6 +456,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
     <span class="logo">PNEURADEN</span>
     <div style="display:flex;gap:8px;align-items:center">
       <span id="uid" style="font-size:.6rem;letter-spacing:.15em;color:var(--tm);text-transform:uppercase"></span>
+      <button id="schumann-btn" class="theme-btn" onclick="toggleSchumann()" title="Schumann 7.83Hz" style="opacity:0.28"><svg viewBox="0 0 26 14" width="20" height="11" style="display:block"><path d="M0,7 L3,7 L5.5,1 L8,13 L10.5,7 L13,7 L15.5,1 L18,13 L20.5,7 L23,7 L26,7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="theme-btn" onclick="toggleTheme()">🌓</button>
     </div>
   </div>
@@ -683,6 +684,7 @@ function triggerSeismicWave(lat,lng,type){
 let _gpsAccuracy=null;
 let _schumannBase=0.8;  // planetary storm activity 0.6..1.0 (updates 1/min)
 let _sPulse=0;          // current Schumann pulse value -1..1
+let _schumannOn=false;  // Schumann 7.83Hz display: off by default
 function moonPhase(date){
   const d=(date-new Date(2000,0,6))/(864e5);
   return((d%29.53058867)+29.53058867)%29.53058867; // days since new moon
@@ -741,6 +743,30 @@ function nightPolygon(d){
   // Close polygon around the night-side pole
   const pole=dec>=0?-90:90;
   return[[pole,-180],...pts,[pole,180]];
+}
+// Real subsolar point — where the Sun is directly overhead right now
+function subsolarPoint(d){
+  const days=(d.getTime()-946728000000)/86400000;
+  const g=(357.529+0.98560028*days)*Math.PI/180;
+  const Lsun=(280.459+0.98564736*days+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
+  const dec=Math.asin(Math.max(-1,Math.min(1,Math.sin(0.40928)*Math.sin(Lsun))));
+  const h=d.getUTCHours()+d.getUTCMinutes()/60+d.getUTCSeconds()/3600;
+  return{lat:dec*180/Math.PI,lng:((12-h)*15+540)%360-180};
+}
+// Real sublunar point — where the Moon is directly overhead right now (simplified Meeus)
+function sublunarPoint(d){
+  const days=(d.getTime()-946728000000)/86400000;
+  const L=(218.316+13.176396*days)*Math.PI/180;
+  const M=(134.963+13.064993*days)*Math.PI/180;
+  const F=(93.272+13.229350*days)*Math.PI/180;
+  const lam=L+(6.289*Math.sin(M)+1.274*Math.sin(2*L-M)+0.658*Math.sin(2*L)-0.214*Math.sin(2*M))*Math.PI/180;
+  const beta=5.128*Math.sin(F)*Math.PI/180;
+  const eps=23.4397*Math.PI/180;
+  const dec=Math.asin(Math.max(-1,Math.min(1,Math.sin(beta)*Math.cos(eps)+Math.cos(beta)*Math.sin(eps)*Math.sin(lam))));
+  const ra=Math.atan2(Math.sin(lam)*Math.cos(eps)-Math.tan(beta)*Math.sin(eps),Math.cos(lam));
+  const GMST=((280.46061837+360.98564736629*days)%360)*Math.PI/180;
+  let lng=(ra-GMST)*180/Math.PI;while(lng>180)lng-=360;while(lng<-180)lng+=360;
+  return{lat:dec*180/Math.PI,lng};
 }
 function moonPos(date,lat,lng){
   lat=lat||45.08;lng=lng||13.64;
@@ -884,6 +910,11 @@ function toggleTheme(){
     :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
   if(S.mapInit && window._ml) window._ml.setUrl(tileUrl);
   // Radar minimap always stays dark_all — its CSS filter is theme-independent
+}
+function toggleSchumann(){
+  _schumannOn=!_schumannOn;
+  const btn=document.getElementById('schumann-btn');
+  if(btn){btn.style.opacity=_schumannOn?'1':'0.28';btn.style.boxShadow=_schumannOn?'0 0 8px rgba(0,255,80,0.4)':'';}
 }
 
 /* ── Helpers ────────────────────────────────────────────── */
@@ -1062,6 +1093,43 @@ function initMap(){
     _termLine.setStyle({opacity:_lineOp(z)});
   });
   setInterval(_updateNight,120000);
+
+  // === COSMIC LAYER — Sun & Moon at real geographic positions (global zoom only) ===
+  // Subsolar point = where Sun is directly overhead. Sublunar = same for Moon.
+  // Both are 100% real computed positions — no approximation, no decoration.
+  function _mkSunIcon(){
+    return L.divIcon({className:'',iconSize:[52,52],iconAnchor:[26,26],html:
+      '<div style="width:52px;height:52px;position:relative;pointer-events:none">'+
+      '<div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(255,230,80,0.88)0%,rgba(255,160,0,0.38)42%,transparent 70%);"></div>'+
+      '<div style="position:absolute;top:50%;left:50%;width:20px;height:20px;margin:-10px;border-radius:50%;background:rgba(255,248,120,1);box-shadow:0 0 16px 8px rgba(255,210,0,0.60);"></div>'+
+      '</div>'});
+  }
+  function _mkMoonIcon(){
+    const ph=moonPhase(new Date())/29.53;
+    const ofs=ph<0.5?((-42+42*ph*2).toFixed(1)+'px'):((42-42*(ph-0.5)*2).toFixed(1)+'px');
+    return L.divIcon({className:'',iconSize:[38,38],iconAnchor:[19,19],html:
+      '<div style="width:38px;height:38px;overflow:hidden;border-radius:50%;position:relative;pointer-events:none;box-shadow:0 0 10px 5px rgba(180,200,240,0.30)">'+
+      '<div style="position:absolute;inset:0;border-radius:50%;background:rgba(210,220,245,0.75);"></div>'+
+      '<div style="position:absolute;top:0;left:'+ofs+';width:38px;height:38px;border-radius:50%;background:rgba(4,7,16,0.97);"></div>'+
+      '</div>'});
+  }
+  const _spI=subsolarPoint(new Date()),_slI=sublunarPoint(new Date());
+  const _sunMk=L.marker([_spI.lat,_spI.lng],{icon:_mkSunIcon(),interactive:false,zIndexOffset:9000}).addTo(map);
+  const _moonMk=L.marker([_slI.lat,_slI.lng],{icon:_mkMoonIcon(),interactive:false,zIndexOffset:8900}).addTo(map);
+  function _cosmicOp(z){return z<=4?1:0;}
+  _sunMk.setOpacity(_cosmicOp(map.getZoom()));
+  _moonMk.setOpacity(_cosmicOp(map.getZoom()));
+  function _updateCosmic(){
+    const z=map.getZoom(),op=_cosmicOp(z);
+    _sunMk.setOpacity(op);_moonMk.setOpacity(op);
+    if(op>0){
+      const sp=subsolarPoint(new Date()),sl=sublunarPoint(new Date());
+      _sunMk.setLatLng([sp.lat,sp.lng]).setIcon(_mkSunIcon());
+      _moonMk.setLatLng([sl.lat,sl.lng]).setIcon(_mkMoonIcon());
+    }
+  }
+  map.on('zoomend',_updateCosmic);
+  setInterval(()=>{if(_cosmicOp(map.getZoom())>0)_updateCosmic();},300000);
 }
 
 function makeCompassMarker(outerColor, innerColor, size, isAdmin, label){
@@ -1602,10 +1670,10 @@ let _minimap=null;
     /* subtle dark overlay so rings are visible over tiles */
     ctx.fillStyle='rgba(4,7,16,0.07)';ctx.fillRect(0,0,W,H);
 
-    /* rings — breathe with Schumann pulse at 7.83 Hz (variant 2: real amplitude) */
+    /* rings — Schumann pulse at 7.83 Hz when enabled via toggle */
     [.33,.66,1].forEach((s,i)=>{
-      const pf=_sPulse*(0.18+i*0.10);      // 0→0.36 swing — crosses perceptual threshold
-      const pr=_sPulse*(1.5+i*1.5);        // all rings radial: inner±1.5 mid±3 outer±4.5px
+      const pf=_schumannOn?_sPulse*(0.18+i*0.10):0;
+      const pr=_schumannOn?_sPulse*(1.5+i*1.5):0;
       ctx.beginPath();ctx.arc(cx,cy,R*s+pr,0,Math.PI*2);
       ctx.strokeStyle=`rgba(0,255,80,${Math.max(.03,.10+i*.06+pf).toFixed(3)})`;ctx.lineWidth=1;ctx.stroke();
     });
@@ -1786,7 +1854,7 @@ let _minimap=null;
     ctx.restore(); /* end clip */
 
     /* Schumann arc — NW indicator, planetary pulse phase, outside clip */
-    {const sx=cx-R*.65,sy=cy-R*.65,sr=9;
+    if(_schumannOn){const sx=cx-R*.65,sy=cy-R*.65,sr=9;
     const aS=-2.2,aE=1.0,aP=aS+((_sPulse+1)*.5)*(aE-aS);
     ctx.beginPath();ctx.arc(sx,sy,sr,aS,aE,false);
     ctx.strokeStyle='rgba(0,255,80,0.1)';ctx.lineWidth=1;ctx.stroke();
