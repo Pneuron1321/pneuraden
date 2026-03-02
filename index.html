@@ -1342,9 +1342,11 @@ let _minimap=null;
     }
   }
 
-  // Desktop mouse fallback
+  // Desktop mouse fallback — suppressed 500ms after any touch (prevents mobile interference)
+  let _lastTouch=0;
+  window.addEventListener('touchstart',()=>_lastTouch=Date.now(),{passive:true});
   window.addEventListener('mousemove',e=>{
-    if(!hasGyro){
+    if(!hasGyro && Date.now()-_lastTouch>500){
       const dx=e.clientX-window.innerWidth/2,dy=e.clientY-window.innerHeight/2;
       targetAngle=Math.atan2(dx,-dy)*180/Math.PI;
     }
