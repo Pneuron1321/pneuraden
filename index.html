@@ -731,10 +731,11 @@ function nightPolygon(d){
   const h=d.getUTCHours()+d.getUTCMinutes()/60+d.getUTCSeconds()/3600;
   const lngSub=((12-h)*15+540)%360-180;
   // Terminator: latitude where solar elevation=0° for each longitude
+  // Must use atan (not atan2) — atan2 gives wrong quadrant when tan(dec)<0
   const pts=[];
   for(let lng=-180;lng<=180;lng+=2){
     const ha=(lng-lngSub)*Math.PI/180;
-    const lat=Math.atan2(-Math.cos(ha),Math.tan(dec))*180/Math.PI;
+    const lat=Math.atan(-Math.cos(ha)/Math.tan(dec))*180/Math.PI;
     pts.push([lat,lng]);
   }
   // Close polygon around the night-side pole
