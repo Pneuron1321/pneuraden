@@ -1342,13 +1342,16 @@ let _minimap=null;
     }
   }
 
-  // Desktop mouse fallback
-  window.addEventListener('mousemove',e=>{
-    if(!hasGyro){
-      const dx=e.clientX-window.innerWidth/2,dy=e.clientY-window.innerHeight/2;
-      targetAngle=Math.atan2(dx,-dy)*180/Math.PI;
-    }
-  });
+  // Desktop mouse fallback — disabled on touch devices (they use gyroscope instead)
+  const _isTouchDevice=navigator.maxTouchPoints>0||('ontouchstart' in window);
+  if(!_isTouchDevice){
+    window.addEventListener('mousemove',e=>{
+      if(!hasGyro){
+        const dx=e.clientX-window.innerWidth/2,dy=e.clientY-window.innerHeight/2;
+        targetAngle=Math.atan2(dx,-dy)*180/Math.PI;
+      }
+    });
+  }
 
   // User location — watchPosition for continuous GPS-grade accuracy
   if(navigator.geolocation){
