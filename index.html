@@ -687,13 +687,47 @@ function moonPhase(date){
 }
 function solarElevation(date,lat,lng){
   lat=lat||45.08; lng=lng||13.64;
-  const d=(date.getTime()-946728000000)/86400000;  // days since J2000
+  const d=(date.getTime()-946728000000)/86400000;
   const g=(357.529+0.98560028*d)*Math.PI/180;
   const L=(280.459+0.98564736*d+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
-  const sD=Math.sin(0.40928)*Math.sin(L); // sin(declination), e=23.44°
+  const sD=Math.sin(0.40928)*Math.sin(L);
   const ha=((date.getUTCHours()+date.getUTCMinutes()/60+lng/15-12)*15)*Math.PI/180;
   const lR=lat*Math.PI/180;
   return Math.asin(Math.sin(lR)*sD+Math.cos(lR)*Math.sqrt(1-sD*sD)*Math.cos(ha))*180/Math.PI;
+}
+function solarPosition(date,lat,lng){
+  lat=lat||45.08;lng=lng||13.64;
+  const d=(date.getTime()-946728000000)/86400000;
+  const g=(357.529+0.98560028*d)*Math.PI/180;
+  const L=(280.459+0.98564736*d+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
+  const sD=Math.sin(0.40928)*Math.sin(L);const cD=Math.sqrt(1-sD*sD);
+  const ha=((date.getUTCHours()+date.getUTCMinutes()/60+lng/15-12)*15)*Math.PI/180;
+  const lR=lat*Math.PI/180;
+  const sinAlt=Math.sin(lR)*sD+Math.cos(lR)*cD*Math.cos(ha);
+  const alt=Math.asin(Math.max(-1,Math.min(1,sinAlt)))*180/Math.PI;
+  const cA=Math.cos(lR)*Math.cos(alt*Math.PI/180);
+  let az=Math.acos(Math.max(-1,Math.min(1,cA<1e-4?0:(sD-Math.sin(lR)*sinAlt)/cA)))*180/Math.PI;
+  if(Math.sin(ha)>0)az=360-az;
+  return{alt,az};
+}
+function moonPos(date,lat,lng){
+  lat=lat||45.08;lng=lng||13.64;
+  const d=(date.getTime()-946728000000)/86400000;
+  const L0=((218.316+13.176396*d)%360+360)%360;
+  const M=((134.963+13.064993*d)%360+360)%360;
+  const lon=(L0+6.289*Math.sin(M*Math.PI/180))*Math.PI/180;
+  const sD=Math.sin(0.40928)*Math.sin(lon);const cD=Math.sqrt(1-sD*sD);
+  const ra=Math.atan2(Math.cos(0.40928)*Math.sin(lon),Math.cos(lon))*180/Math.PI;
+  const gmst=((280.46061837+360.98564736629*d)%360+360)%360;
+  const haDeg=((gmst+lng-ra)%360+360)%360;
+  const ha=(haDeg>180?haDeg-360:haDeg)*Math.PI/180;
+  const lR=lat*Math.PI/180;
+  const sinAlt=Math.sin(lR)*sD+Math.cos(lR)*cD*Math.cos(ha);
+  const alt=Math.asin(Math.max(-1,Math.min(1,sinAlt)))*180/Math.PI;
+  const cA=Math.cos(lR)*Math.cos(alt*Math.PI/180);
+  let az=Math.acos(Math.max(-1,Math.min(1,cA<1e-4?0:(sD-Math.sin(lR)*sinAlt)/cA)))*180/Math.PI;
+  if(Math.sin(ha)>0)az=360-az;
+  return{alt,az};
 }
 
 function pulseEventIcon(ev){
@@ -1539,19 +1573,37 @@ let _minimap=null;
     });
     ctx.shadowBlur=0;ctx.restore();
 
-    /* moon phase — fixed NE on screen (counter-rotates same as compass ring) */
-    {const _mp01=moonPhase(new Date())/29.53,_mr=11;
-    const _mx=Math.sin(Math.PI*.25)*(R-22),_my=-Math.cos(Math.PI*.25)*(R-22);
+    /* celestial bodies — sun + moon at actual sky azimuth/altitude */
+    {const _now2=new Date(),_mp01=moonPhase(_now2)/29.53;
+    const _sol=solarPosition(_now2,uLat,uLng);
+    const _mpos=moonPos(_now2,uLat,uLng);
+    const skyXY=(az,alt)=>{const r=Math.max(0,(90-alt)/90*(R-18));return[Math.sin(az*Math.PI/180)*r,-Math.cos(az*Math.PI/180)*r];};
     ctx.save();ctx.translate(cx,cy);ctx.rotate(-angle*Math.PI/180);
-    const _mg=ctx.createRadialGradient(_mx,_my,_mr*.6,_mx,_my,_mr*2.2);
-    _mg.addColorStop(0,`rgba(235,228,195,${(.18+_mp01*.25).toFixed(2)})`);
-    _mg.addColorStop(1,'rgba(235,228,195,0)');
-    ctx.fillStyle=_mg;ctx.beginPath();ctx.arc(_mx,_my,_mr*2.2,0,Math.PI*2);ctx.fill();
-    ctx.save();ctx.beginPath();ctx.arc(_mx,_my,_mr,0,Math.PI*2);ctx.clip();
-    ctx.fillStyle='rgba(235,228,195,.95)';ctx.fillRect(_mx-_mr,_my-_mr,_mr*2,_mr*2);
+    /* sun */
+    if(_sol.alt>-12){
+      const[sx,sy]=skyXY(_sol.az,_sol.alt);
+      const sA=_sol.alt<0?Math.max(0,1+_sol.alt/12):.9;
+      const sC=_sol.alt>8?'255,240,140':_sol.alt>0?'255,170,55':'255,90,20';
+      const sg=ctx.createRadialGradient(sx,sy,4,sx,sy,24);
+      sg.addColorStop(0,`rgba(${sC},${sA.toFixed(2)})`);
+      sg.addColorStop(.45,`rgba(${sC},${(sA*.3).toFixed(2)})`);
+      sg.addColorStop(1,`rgba(${sC},0)`);
+      ctx.fillStyle=sg;ctx.beginPath();ctx.arc(sx,sy,24,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(sx,sy,12,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${sC},${(sA*.98).toFixed(2)})`;ctx.fill();
+    }
+    /* moon crescent — sized by phase */
+    const[mx,my]=skyXY(_mpos.az,_mpos.alt);
+    const _mr=15;
+    const mg=ctx.createRadialGradient(mx,my,_mr*.6,mx,my,_mr*2.5);
+    mg.addColorStop(0,`rgba(235,228,195,${(.18+_mp01*.25).toFixed(2)})`);
+    mg.addColorStop(1,'rgba(235,228,195,0)');
+    ctx.fillStyle=mg;ctx.beginPath();ctx.arc(mx,my,_mr*2.5,0,Math.PI*2);ctx.fill();
+    ctx.save();ctx.beginPath();ctx.arc(mx,my,_mr,0,Math.PI*2);ctx.clip();
+    ctx.fillStyle='rgba(235,228,195,.95)';ctx.fillRect(mx-_mr,my-_mr,_mr*2,_mr*2);
     ctx.fillStyle='rgba(10,16,32,.97)';ctx.beginPath();
-    if(_mp01<=0.5){ctx.arc(_mx-4*_mr*_mp01,_my,_mr,0,Math.PI*2);}
-    else{ctx.arc(_mx+4*_mr*(1-_mp01),_my,_mr,0,Math.PI*2);}
+    if(_mp01<=0.5){ctx.arc(mx-4*_mr*_mp01,my,_mr,0,Math.PI*2);}
+    else{ctx.arc(mx+4*_mr*(1-_mp01),my,_mr,0,Math.PI*2);}
     ctx.fill();ctx.restore();
     ctx.restore();}
 
