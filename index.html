@@ -185,13 +185,12 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   white-space:nowrap;animation:hintA 2.5s ease-in-out infinite}
 @keyframes hintA{0%,100%{opacity:.3}50%{opacity:.9}}
 .zpills{display:flex;gap:10px;margin-top:14px}
-.zpill{width:40px;height:40px;border-radius:50%;border:1px solid var(--border2);
-  background:transparent;cursor:pointer;transition:all var(--t-f);
-  display:flex;align-items:center;justify-content:center}
-.zpill::after{content:'';width:9px;height:9px;border-radius:50%;
-  background:var(--border2);transition:all var(--t-f)}
-.zpill.active{border-color:var(--nm)}
-.zpill.active::after{background:var(--nm);box-shadow:0 0 8px rgba(52,211,153,.7)}
+.zpill{width:44px;height:44px;border-radius:var(--r-m);border:1px solid var(--border2);
+  background:var(--surface);cursor:pointer;transition:all var(--t-f);
+  display:flex;align-items:center;justify-content:center;font-size:.55rem;
+  letter-spacing:.1em;color:var(--tm);font-weight:700;text-transform:uppercase}
+.zpill.active{border-color:var(--nm);color:var(--nm);background:rgba(52,211,153,.08);
+  box-shadow:0 0 10px rgba(52,211,153,.25)}
 .home-title{font-family:'Orbitron',monospace;font-size:clamp(1.3rem,5vw,1.9rem);
   font-weight:900;letter-spacing:.2em;text-align:center}
 [data-theme="dark"] .home-title{
@@ -424,9 +423,9 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
       <div class="home-title">PNEURADEN</div>
       <div class="home-coords" id="hcoords">45.0811°N · 13.6387°E · ROVINJ</div>
       <div class="zpills" id="zpills">
-        <div class="zpill" onclick="setZoom(0,event)"></div>
-        <div class="zpill active" onclick="setZoom(1,event)"></div>
-        <div class="zpill" onclick="setZoom(2,event)"></div>
+        <div class="zpill" onclick="setZoom(0,event)">S</div>
+        <div class="zpill active" onclick="setZoom(1,event)">M</div>
+        <div class="zpill" onclick="setZoom(2,event)">L</div>
       </div>
     </div>
     <div class="stats">
@@ -1347,9 +1346,11 @@ let _minimap=null;
     }
   }
 
-  // Desktop mouse fallback
+  // Desktop mouse fallback — disabled on touch devices (touch generates synthetic mousemove)
+  let _lastTouch=0;
+  window.addEventListener('touchstart',()=>_lastTouch=Date.now(),{passive:true});
   window.addEventListener('mousemove',e=>{
-    if(!hasGyro){
+    if(!hasGyro && Date.now()-_lastTouch>500){
       const dx=e.clientX-window.innerWidth/2,dy=e.clientY-window.innerHeight/2;
       targetAngle=Math.atan2(dx,-dy)*180/Math.PI;
     }
