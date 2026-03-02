@@ -1602,12 +1602,12 @@ let _minimap=null;
     /* subtle dark overlay so rings are visible over tiles */
     ctx.fillStyle='rgba(4,7,16,0.07)';ctx.fillRect(0,0,W,H);
 
-    /* rings — breathe with Schumann pulse at 7.83 Hz */
+    /* rings — breathe with Schumann pulse at 7.83 Hz (variant 2: real amplitude) */
     [.33,.66,1].forEach((s,i)=>{
-      const pf=_sPulse*(0.04+i*0.03);      // outer ring breathes most (0.04, 0.07, 0.10)
-      const pr=i===2?_sPulse*1.5:0;        // outer ring: ±1.5px radial breathe
+      const pf=_sPulse*(0.18+i*0.10);      // 0→0.36 swing — crosses perceptual threshold
+      const pr=_sPulse*(1.5+i*1.5);        // all rings radial: inner±1.5 mid±3 outer±4.5px
       ctx.beginPath();ctx.arc(cx,cy,R*s+pr,0,Math.PI*2);
-      ctx.strokeStyle=`rgba(0,255,80,${Math.max(.03,.08+i*.05+pf)})`;ctx.lineWidth=1;ctx.stroke();
+      ctx.strokeStyle=`rgba(0,255,80,${Math.max(.03,.10+i*.06+pf).toFixed(3)})`;ctx.lineWidth=1;ctx.stroke();
     });
 
     /* cross */
