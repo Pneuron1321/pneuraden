@@ -1539,6 +1539,22 @@ let _minimap=null;
     });
     ctx.shadowBlur=0;ctx.restore();
 
+    /* moon phase — fixed NE on screen (counter-rotates same as compass ring) */
+    {const _mp01=moonPhase(new Date())/29.53,_mr=11;
+    const _mx=Math.sin(Math.PI*.25)*(R-22),_my=-Math.cos(Math.PI*.25)*(R-22);
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(-angle*Math.PI/180);
+    const _mg=ctx.createRadialGradient(_mx,_my,_mr*.6,_mx,_my,_mr*2.2);
+    _mg.addColorStop(0,`rgba(235,228,195,${(.18+_mp01*.25).toFixed(2)})`);
+    _mg.addColorStop(1,'rgba(235,228,195,0)');
+    ctx.fillStyle=_mg;ctx.beginPath();ctx.arc(_mx,_my,_mr*2.2,0,Math.PI*2);ctx.fill();
+    ctx.save();ctx.beginPath();ctx.arc(_mx,_my,_mr,0,Math.PI*2);ctx.clip();
+    ctx.fillStyle='rgba(235,228,195,.95)';ctx.fillRect(_mx-_mr,_my-_mr,_mr*2,_mr*2);
+    ctx.fillStyle='rgba(10,16,32,.97)';ctx.beginPath();
+    if(_mp01<=0.5){ctx.arc(_mx-4*_mr*_mp01,_my,_mr,0,Math.PI*2);}
+    else{ctx.arc(_mx+4*_mr*(1-_mp01),_my,_mr,0,Math.PI*2);}
+    ctx.fill();ctx.restore();
+    ctx.restore();}
+
     /* city pulse — energy sectors for active verified events */
     const _cd=circadianFactor();
     S.events.forEach(ev=>{
@@ -1653,28 +1669,10 @@ let _minimap=null;
     ctx.beginPath();ctx.moveTo(0,-16);ctx.lineTo(-6,0);ctx.lineTo(6,0);ctx.closePath();
     ctx.fillStyle='rgba(255,255,255,.6)';ctx.fill();ctx.restore();
 
-    /* moon phase — crescent inside radar NE quadrant */
-    const _now=new Date(),_mp01=moonPhase(_now)/29.53;
-    const _mx=cx+Math.sin(Math.PI*.25)*(R-22),_my=cy-Math.cos(Math.PI*.25)*(R-22),_mr=11;
-    /* glow ring */
-    const _mg=ctx.createRadialGradient(_mx,_my,_mr*.6,_mx,_my,_mr*2.2);
-    _mg.addColorStop(0,`rgba(235,228,195,${(.18+_mp01*.25).toFixed(2)})`);
-    _mg.addColorStop(1,'rgba(235,228,195,0)');
-    ctx.fillStyle=_mg;ctx.beginPath();ctx.arc(_mx,_my,_mr*2.2,0,Math.PI*2);ctx.fill();
-    /* crescent body */
-    ctx.save();
-    ctx.beginPath();ctx.arc(_mx,_my,_mr,0,Math.PI*2);ctx.clip();
-    ctx.fillStyle='rgba(235,228,195,.95)';ctx.fillRect(_mx-_mr,_my-_mr,_mr*2,_mr*2);
-    ctx.fillStyle='rgba(10,16,32,.97)';
-    ctx.beginPath();
-    if(_mp01<=0.5){ctx.arc(_mx-4*_mr*_mp01,_my,_mr,0,Math.PI*2);}
-    else{ctx.arc(_mx+4*_mr*(1-_mp01),_my,_mr,0,Math.PI*2);}
-    ctx.fill();ctx.restore();
-
     ctx.restore(); /* end clip */
 
     /* solar ring — outer ring color based on sun angle */
-    const _sol=solarElevation(_now,uLat,uLng);
+    const _now=new Date(),_sol=solarElevation(_now,uLat,uLng);
     let _rR=0,_rG=200,_rB=75,_rA=.7;
     if(_sol<0){_rR=20;_rG=100;_rB=220;_rA=.45;}  // night: blue ring
     else if(_sol<=8){const f=1-_sol/8;_rR=Math.round(255*f);_rG=Math.round(100+90*(1-f)+10*f);_rB=Math.round(75*(1-f));_rA=.7+.08*f;}  // golden hour: amber→green
