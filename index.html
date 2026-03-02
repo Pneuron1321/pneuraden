@@ -1331,13 +1331,16 @@ let _minimap=null;
       if(head!=null){hasGyro=true;angle=head;}
     };
     if(typeof DeviceOrientationEvent.requestPermission==='function'){
-      document.getElementById('rwrap').addEventListener('click',async(e)=>{
-        e.stopPropagation();
-        try{const p=await DeviceOrientationEvent.requestPermission();
-          if(p==='granted') window.addEventListener('deviceorientation',onOrient);}catch{}
-        goMap();
-      },{once:true});
+      // iOS 13+: request on first touch of home screen — NOT tied to map navigation
+      const reqOrient=async()=>{
+        try{
+          const p=await DeviceOrientationEvent.requestPermission();
+          if(p==='granted') window.addEventListener('deviceorientation',onOrient);
+        }catch{}
+      };
+      document.getElementById('vh').addEventListener('touchstart',reqOrient,{once:true});
     } else {
+      // Android / non-iOS: no permission needed
       window.addEventListener('deviceorientation',onOrient);
     }
   }
