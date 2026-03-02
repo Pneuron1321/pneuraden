@@ -170,12 +170,13 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 #vh{align-items:center;justify-content:space-between}
 .home-main{flex:1;display:flex;flex-direction:column;align-items:center;
   justify-content:center;position:relative;z-index:5;gap:20px;padding:0 20px}
-.radar-wrap{position:relative;width:280px;height:280px;cursor:pointer;
-  user-select:none;-webkit-user-select:none}
+.radar-wrap{position:relative;
+  width:clamp(300px,82vw,360px);height:clamp(300px,82vw,360px);
+  cursor:pointer;user-select:none;-webkit-user-select:none}
 .radar-wrap:hover #radar{filter:brightness(1.15) drop-shadow(0 0 22px rgba(0,200,80,.55))}
-#radar-minimap{position:absolute;top:0;left:0;width:280px;height:280px;
+#radar-minimap{position:absolute;top:0;left:0;width:100%;height:100%;
   border-radius:50%;overflow:hidden;z-index:0}
-#radar{position:absolute;top:0;left:0;width:280px;height:280px;border-radius:50%;
+#radar{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;
   display:block;z-index:1;pointer-events:none;
   transition:filter var(--t-f);
   filter:drop-shadow(0 0 14px rgba(0,180,70,.35))}
@@ -183,10 +184,14 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   font-size:.58rem;letter-spacing:.25em;color:var(--tm);text-transform:uppercase;
   white-space:nowrap;animation:hintA 2.5s ease-in-out infinite}
 @keyframes hintA{0%,100%{opacity:.3}50%{opacity:.9}}
-.zpills{display:flex;gap:6px;margin-top:8px}
-.zpill{width:7px;height:7px;border-radius:50%;border:1px solid var(--border2);
-  background:transparent;cursor:pointer;transition:all var(--t-f)}
-.zpill.active{background:var(--nm);border-color:var(--nm);box-shadow:0 0 6px rgba(52,211,153,.6)}
+.zpills{display:flex;gap:10px;margin-top:14px}
+.zpill{width:40px;height:40px;border-radius:50%;border:1px solid var(--border2);
+  background:transparent;cursor:pointer;transition:all var(--t-f);
+  display:flex;align-items:center;justify-content:center}
+.zpill::after{content:'';width:9px;height:9px;border-radius:50%;
+  background:var(--border2);transition:all var(--t-f)}
+.zpill.active{border-color:var(--nm)}
+.zpill.active::after{background:var(--nm);box-shadow:0 0 8px rgba(52,211,153,.7)}
 .home-title{font-family:'Orbitron',monospace;font-size:clamp(1.3rem,5vw,1.9rem);
   font-weight:900;letter-spacing:.2em;text-align:center}
 [data-theme="dark"] .home-title{
