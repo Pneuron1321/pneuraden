@@ -671,6 +671,31 @@ function eventIntensity(ev){
   return .45;                           // future / distant past
 }
 
+function circadianFactor(){
+  const h=new Date().getHours()+new Date().getMinutes()/60;
+  const a=Math.sin((h-3)*Math.PI/12)*.38+.62;
+  return Math.max(.2,Math.min(1,a));
+}
+let _seismic=[];
+function triggerSeismicWave(lat,lng,type){
+  _seismic.push({lat,lng,rgb:EV_COLS[type]||'129,140,248',t:Date.now()});
+}
+let _gpsAccuracy=null;
+function moonPhase(date){
+  const d=(date-new Date(2000,0,6))/(864e5);
+  return((d%29.53058867)+29.53058867)%29.53058867; // days since new moon
+}
+function solarElevation(date){
+  const lat=uLat||45.08,lng=uLng||13.64;
+  const d=(date.getTime()-946728000000)/86400000;  // days since J2000
+  const g=(357.529+0.98560028*d)*Math.PI/180;
+  const L=(280.459+0.98564736*d+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
+  const sD=Math.sin(0.40928)*Math.sin(L); // sin(declination), e=23.44°
+  const ha=((date.getUTCHours()+date.getUTCMinutes()/60+lng/15-12)*15)*Math.PI/180;
+  const lR=lat*Math.PI/180;
+  return Math.asin(Math.sin(lR)*sD+Math.cos(lR)*Math.sqrt(1-sD*sD)*Math.cos(ha))*180/Math.PI;
+}
+
 function pulseEventIcon(ev){
   const inten=eventIntensity(ev);
   const col=EV_HEX[ev.type]||'#818cf8';
@@ -877,7 +902,7 @@ function submitEv(){
     lat:CLUB.lat+(Math.random()-.5)*.012,lng:CLUB.lng+(Math.random()-.5)*.012,
     verified:false,addedBy:S.user.email
   };
-  S.events.push(ev);saveEv();closeSheet();renderEvents();
+  S.events.push(ev);saveEv();triggerSeismicWave(ev.lat,ev.lng,ev.type);closeSheet();renderEvents();
   toast('Ивент отправлен на верификацию ✓');
   ['et','eloc','edesc','emsg'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
 }
@@ -1357,7 +1382,7 @@ function setClubLocGeo(){
 
 function verEv(id){
   const ev=S.events.find(e=>e.id===id);
-  if(ev){ev.verified=true;saveEv();renderAdmin();renderEvents();
+  if(ev){ev.verified=true;saveEv();triggerSeismicWave(ev.lat,ev.lng,ev.type);renderAdmin();renderEvents();
     if(S.mapInit&&window._map)addEvMarkers(window._map);
     toast('Ивент верифицирован ✓');}
 }
@@ -1454,7 +1479,7 @@ let _minimap=null;
   if(navigator.geolocation){
     if(window._radarGeoWatch!=null) navigator.geolocation.clearWatch(window._radarGeoWatch);
     window._radarGeoWatch=navigator.geolocation.watchPosition(p=>{
-      uLat=p.coords.latitude;uLng=p.coords.longitude;
+      uLat=p.coords.latitude;uLng=p.coords.longitude;_gpsAccuracy=p.coords.accuracy;
       if(_minimap) _minimap.setView([uLat,uLng],ZOOM_MAP[S.radarZoom],{animate:false});
       else initMinimap(uLat,uLng);
     }, ()=>{}, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
@@ -1515,6 +1540,7 @@ let _minimap=null;
     ctx.shadowBlur=0;ctx.restore();
 
     /* city pulse — energy sectors for active verified events */
+    const _cd=circadianFactor();
     S.events.forEach(ev=>{
       if(!ev.verified) return;
       const inten=eventIntensity(ev);
@@ -1527,8 +1553,8 @@ let _minimap=null;
       const span=.26+inten*.12;
       const g=ctx.createRadialGradient(cx,cy,0,cx,cy,R*.92);
       g.addColorStop(0,`rgba(${rgb},0)`);
-      g.addColorStop(.5,`rgba(${rgb},${(.13*inten).toFixed(3)})`);
-      g.addColorStop(1,`rgba(${rgb},${(.05*inten).toFixed(3)})`);
+      g.addColorStop(.5,`rgba(${rgb},${(.13*inten*_cd).toFixed(3)})`);
+      g.addColorStop(1,`rgba(${rgb},${(.05*inten*_cd).toFixed(3)})`);
       ctx.save();ctx.translate(cx,cy);
       ctx.beginPath();ctx.moveTo(0,0);
       ctx.arc(0,0,R*.92,evAng-span/2,evAng+span/2);
@@ -1550,6 +1576,67 @@ let _minimap=null;
     });
 
 
+    /* field interference — neural resonance between nearby verified events */
+    const _vev=S.events.filter(ev=>ev.verified&&eventIntensity(ev)>=.5);
+    for(let _i=0;_i<_vev.length;_i++){
+      for(let _j=_i+1;_j<_vev.length;_j++){
+        const ea=_vev[_i],eb=_vev[_j];
+        const {bx:ax,by:ay}=blipXY(ea.lat,ea.lng);
+        const {bx:bx2,by:by2}=blipXY(eb.lat,eb.lng);
+        const dd=(ax-bx2)*(ax-bx2)+(ay-by2)*(ay-by2);
+        if(dd>R*R*.49) continue;
+        const fa=1-Math.sqrt(dd)/(R*.7);
+        const ia=Math.min(eventIntensity(ea),eventIntensity(eb));
+        const alpha=fa*ia*_cd*.55;
+        const pdx=-(by2-ay),pdy=bx2-ax;
+        const pl=Math.sqrt(pdx*pdx+pdy*pdy)||1;
+        const pnx=pdx/pl,pny=pdy/pl;
+        const phase=(t*.0018+_i*2.1+_j*1.3)%(Math.PI*2);
+        ctx.beginPath();
+        for(let s=0;s<=24;s++){
+          const tp=s/24;
+          const px=ax+(bx2-ax)*tp,py=ay+(by2-ay)*tp;
+          const wave=Math.sin(tp*Math.PI*3.5+phase)*7*ia;
+          s===0?ctx.moveTo(px+pnx*wave,py+pny*wave):ctx.lineTo(px+pnx*wave,py+pny*wave);
+        }
+        const gr=ctx.createLinearGradient(ax,ay,bx2,by2);
+        gr.addColorStop(0,`rgba(${EV_COLS[ea.type]||'129,140,248'},${alpha})`);
+        gr.addColorStop(1,`rgba(${EV_COLS[eb.type]||'129,140,248'},${alpha})`);
+        ctx.strokeStyle=gr;ctx.lineWidth=1.5;ctx.stroke();
+        const mx=(ax+bx2)/2,my=(ay+by2)/2;
+        const nr=2.5+Math.sin(t*.003+_i+_j)*1.2;
+        ctx.beginPath();ctx.arc(mx,my,nr,0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,255,255,${alpha*2})`;ctx.fill();
+      }
+    }
+
+    /* seismic waves — pressure rings from new/verified events */
+    _seismic=_seismic.filter(w=>(t-w.t)<2600);
+    _seismic.forEach(w=>{
+      const el=(t-w.t)/1000;
+      const wr=el*200,wa=Math.max(0,.75-el*.3);
+      const {bx:wbx,by:wby}=blipXY(w.lat,w.lng);
+      ctx.beginPath();ctx.arc(wbx,wby,wr,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(${w.rgb},${wa})`;ctx.lineWidth=2;ctx.stroke();
+      if(wr>20){
+        ctx.beginPath();ctx.arc(wbx,wby,wr*.5,0,Math.PI*2);
+        ctx.strokeStyle=`rgba(${w.rgb},${wa*.3})`;ctx.lineWidth=1;ctx.stroke();
+      }
+    });
+
+    /* GPS accuracy aura — ionospheric uncertainty field */
+    if(_gpsAccuracy!=null){
+      const acc=Math.min(_gpsAccuracy,150);
+      const aR=8+acc*.45,qA=Math.max(.025,.1*(acc/150));
+      const ag=ctx.createRadialGradient(cx,cy,aR*.35,cx,cy,aR);
+      ag.addColorStop(0,'rgba(100,200,255,0)');
+      ag.addColorStop(.65,`rgba(100,200,255,${(qA*.4).toFixed(3)})`);
+      ag.addColorStop(1,`rgba(100,200,255,${qA.toFixed(3)})`);
+      ctx.fillStyle=ag;ctx.beginPath();ctx.arc(cx,cy,aR,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(cx,cy,aR,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(100,200,255,${(qA*3).toFixed(3)})`;ctx.lineWidth=.5;ctx.stroke();
+    }
+
     /* player dot — compass style */
     const ps=5+1.8*Math.sin(t*.004);
     const {o:uo}=getUserColorObj();
@@ -1568,11 +1655,26 @@ let _minimap=null;
 
     ctx.restore(); /* end clip */
 
+    /* cosmic radar — solar ring + moon phase */
+    const _now=new Date(),_sol=solarElevation(_now),_mp01=moonPhase(_now)/29.53;
+    let _rR=0,_rG=200,_rB=75,_rA=.7;
+    if(_sol<0){_rR=20;_rG=100;_rB=220;_rA=.45;}  // night: blue ring
+    else if(_sol<=8){const f=1-_sol/8;_rR=Math.round(255*f);_rG=Math.round(100+90*(1-f)+10*f);_rB=Math.round(75*(1-f));_rA=.7+.08*f;}  // golden hour: amber→green
     /* outer ring */
     ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);
-    ctx.strokeStyle='rgba(0,200,75,.7)';ctx.lineWidth=2.5;ctx.stroke();
+    ctx.strokeStyle=`rgba(${_rR},${_rG},${_rB},${_rA})`;ctx.lineWidth=2.5;ctx.stroke();
     ctx.beginPath();ctx.arc(cx,cy,R+6,0,Math.PI*2);
-    ctx.strokeStyle='rgba(0,200,75,.14)';ctx.lineWidth=5;ctx.stroke();
+    ctx.strokeStyle=`rgba(${_rR},${_rG},${_rB},.14)`;ctx.lineWidth=5;ctx.stroke();
+    /* moon phase — crescent indicator NE of radar ring */
+    const _mx=cx+Math.sin(Math.PI*.25)*(R+18),_my=cy-Math.cos(Math.PI*.25)*(R+18),_mr=7;
+    ctx.save();
+    ctx.beginPath();ctx.arc(_mx,_my,_mr,0,Math.PI*2);ctx.clip();
+    ctx.fillStyle='rgba(235,228,195,.92)';ctx.fillRect(_mx-_mr,_my-_mr,_mr*2,_mr*2);
+    ctx.fillStyle='rgba(12,18,35,.95)';
+    ctx.beginPath();
+    if(_mp01<=0.5){ctx.arc(_mx-4*_mr*_mp01,_my,_mr,0,Math.PI*2);}
+    else{ctx.arc(_mx+4*_mr*(1-_mp01),_my,_mr,0,Math.PI*2);}
+    ctx.fill();ctx.restore();
 
     RAF=requestAnimationFrame(frame);
   }
