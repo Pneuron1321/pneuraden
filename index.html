@@ -1331,14 +1331,18 @@ let _minimap=null;
       if(head!=null){hasGyro=true;angle=head;}
     };
     if(typeof DeviceOrientationEvent.requestPermission==='function'){
-      // iOS 13+: request on first touch of home screen — NOT tied to map navigation
-      const reqOrient=async()=>{
-        try{
-          const p=await DeviceOrientationEvent.requestPermission();
-          if(p==='granted') window.addEventListener('deviceorientation',onOrient);
-        }catch{}
-      };
-      document.getElementById('vh').addEventListener('touchstart',reqOrient,{once:true});
+      // iOS 13+: try immediately (works if already granted in a prior session)
+      // If throws (first visit / requires gesture) — fall back to first touch
+      DeviceOrientationEvent.requestPermission().then(p=>{
+        if(p==='granted') window.addEventListener('deviceorientation',onOrient);
+      }).catch(()=>{
+        document.getElementById('vh').addEventListener('touchstart',async()=>{
+          try{
+            const p=await DeviceOrientationEvent.requestPermission();
+            if(p==='granted') window.addEventListener('deviceorientation',onOrient);
+          }catch{}
+        },{once:true});
+      });
     } else {
       // Android / non-iOS: no permission needed
       window.addEventListener('deviceorientation',onOrient);
