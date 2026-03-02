@@ -170,13 +170,12 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 #vh{align-items:center;justify-content:space-between}
 .home-main{flex:1;display:flex;flex-direction:column;align-items:center;
   justify-content:center;position:relative;z-index:5;gap:20px;padding:0 20px}
-.radar-wrap{position:relative;
-  width:clamp(300px,82vw,360px);height:clamp(300px,82vw,360px);
-  cursor:pointer;user-select:none;-webkit-user-select:none}
+.radar-wrap{position:relative;width:280px;height:280px;cursor:pointer;
+  user-select:none;-webkit-user-select:none}
 .radar-wrap:hover #radar{filter:brightness(1.15) drop-shadow(0 0 22px rgba(0,200,80,.55))}
-#radar-minimap{position:absolute;top:0;left:0;width:100%;height:100%;
+#radar-minimap{position:absolute;top:0;left:0;width:280px;height:280px;
   border-radius:50%;overflow:hidden;z-index:0}
-#radar{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;
+#radar{position:absolute;top:0;left:0;width:280px;height:280px;border-radius:50%;
   display:block;z-index:1;pointer-events:none;
   transition:filter var(--t-f);
   filter:drop-shadow(0 0 14px rgba(0,180,70,.35))}
@@ -184,13 +183,10 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   font-size:.58rem;letter-spacing:.25em;color:var(--tm);text-transform:uppercase;
   white-space:nowrap;animation:hintA 2.5s ease-in-out infinite}
 @keyframes hintA{0%,100%{opacity:.3}50%{opacity:.9}}
-.zpills{display:flex;gap:10px;margin-top:14px}
-.zpill{width:44px;height:44px;border-radius:var(--r-m);border:1px solid var(--border2);
-  background:var(--surface);cursor:pointer;transition:all var(--t-f);
-  display:flex;align-items:center;justify-content:center;font-size:.55rem;
-  letter-spacing:.1em;color:var(--tm);font-weight:700;text-transform:uppercase}
-.zpill.active{border-color:var(--nm);color:var(--nm);background:rgba(52,211,153,.08);
-  box-shadow:0 0 10px rgba(52,211,153,.25)}
+.zpills{display:flex;gap:6px;margin-top:8px}
+.zpill{width:7px;height:7px;border-radius:50%;border:1px solid var(--border2);
+  background:transparent;cursor:pointer;transition:all var(--t-f)}
+.zpill.active{background:var(--nm);border-color:var(--nm);box-shadow:0 0 6px rgba(52,211,153,.6)}
 .home-title{font-family:'Orbitron',monospace;font-size:clamp(1.3rem,5vw,1.9rem);
   font-weight:900;letter-spacing:.2em;text-align:center}
 [data-theme="dark"] .home-title{
@@ -423,9 +419,9 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
       <div class="home-title">PNEURADEN</div>
       <div class="home-coords" id="hcoords">45.0811°N · 13.6387°E · ROVINJ</div>
       <div class="zpills" id="zpills">
-        <div class="zpill" onclick="setZoom(0,event)">S</div>
-        <div class="zpill active" onclick="setZoom(1,event)">M</div>
-        <div class="zpill" onclick="setZoom(2,event)">L</div>
+        <div class="zpill" onclick="setZoom(0,event)"></div>
+        <div class="zpill active" onclick="setZoom(1,event)"></div>
+        <div class="zpill" onclick="setZoom(2,event)"></div>
       </div>
     </div>
     <div class="stats">
@@ -1346,11 +1342,9 @@ let _minimap=null;
     }
   }
 
-  // Desktop mouse fallback — disabled on touch devices (touch generates synthetic mousemove)
-  let _lastTouch=0;
-  window.addEventListener('touchstart',()=>_lastTouch=Date.now(),{passive:true});
+  // Desktop mouse fallback
   window.addEventListener('mousemove',e=>{
-    if(!hasGyro && Date.now()-_lastTouch>500){
+    if(!hasGyro){
       const dx=e.clientX-window.innerWidth/2,dy=e.clientY-window.innerHeight/2;
       targetAngle=Math.atan2(dx,-dy)*180/Math.PI;
     }
