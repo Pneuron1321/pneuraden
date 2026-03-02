@@ -413,6 +413,19 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── City Pulse — Event Energy Fields ── */
+@keyframes pulseExpand{
+  0%  {transform:scale(.25);opacity:.75}
+  100%{transform:scale(1);  opacity:0}}
+@keyframes pulseGlow{
+  0%,100%{opacity:.85}
+  50%    {opacity:1}}
+.pf-ring{position:absolute;border-radius:50%;border:1.5px solid;opacity:0;
+  animation:pulseExpand 2.6s ease-out infinite}
+.pf-ring:nth-child(2){animation-delay:.87s}
+.pf-ring:nth-child(3){animation-delay:1.74s}
+.pf-core{position:absolute;inset:0;border-radius:50%;animation:pulseGlow 2s ease-in-out infinite}
 </style>
 </head>
 <body>
@@ -640,6 +653,44 @@ const USER_COLORS = [
 ];
 
 function defaultEvents(){ return []; }
+
+/* ── City Pulse helpers ─────────────────────────────────── */
+const EV_COLS={training:'168,85,247',concert:'236,72,153',market:'251,191,36',
+  meetup:'34,211,238',sport:'52,211,153',other:'129,140,248'};
+const EV_HEX={training:'#a855f7',concert:'#ec4899',market:'#fbbf24',
+  meetup:'#22d3ee',sport:'#34d399',other:'#818cf8'};
+
+function eventIntensity(ev){
+  if(!ev.verified) return .32;
+  if(!ev.date) return .6;
+  const diff=(new Date(ev.date).getTime()-Date.now())/3600000;
+  if(diff>=-1&&diff<=0)  return 1.0;   // happening NOW
+  if(diff>0 &&diff<=2)   return .88;   // starting soon (≤2h)
+  if(diff>2 &&diff<=6)   return .68;   // upcoming today (≤6h)
+  if(diff<-1&&diff>=-3)  return .72;   // just finished (≤3h ago)
+  return .45;                           // future / distant past
+}
+
+function pulseEventIcon(ev){
+  const inten=eventIntensity(ev);
+  const col=EV_HEX[ev.type]||'#818cf8';
+  const sz=Math.round(10+inten*8);          // core 10-18px
+  const fsz=Math.round(64+inten*56);        // field 64-120px
+  const off=Math.round(-fsz/2+sz/2);
+  const dur=(2.6-inten*.7).toFixed(2);
+  const rings=ev.verified&&inten>.5?`
+    <div class="pf-ring" style="width:${fsz}px;height:${fsz}px;top:${off}px;left:${off}px;border-color:${col};animation-duration:${dur}s"></div>
+    <div class="pf-ring" style="width:${fsz}px;height:${fsz}px;top:${off}px;left:${off}px;border-color:${col};animation-duration:${dur}s;animation-delay:.87s"></div>
+    <div class="pf-ring" style="width:${fsz}px;height:${fsz}px;top:${off}px;left:${off}px;border-color:${col};animation-duration:${dur}s;animation-delay:1.74s"></div>`:'';
+  const html=`<div style="position:relative;width:${sz}px;height:${sz}px">
+    ${rings}
+    <div class="pf-core" style="width:${sz}px;height:${sz}px;background:${col};
+      box-shadow:0 0 ${sz}px ${col},0 0 ${sz*2}px ${col}40;
+      border:2px solid rgba(255,255,255,.45)"></div>
+  </div>`;
+  return L.divIcon({className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
+    popupAnchor:[0,-sz/2-6],html});
+}
 
 const S = {
   view:'home',
@@ -1014,8 +1065,7 @@ function addEvMarkers(map){
   (window._ems||[]).forEach(m=>map.removeLayer(m));
   window._ems=[];
   S.events.forEach(ev=>{
-    const color=ev.verified?'#4ade80':'#fbbf24';
-    const icon=divIcon(color,10,ev.verified&&ev.type==='training');
+    const icon=pulseEventIcon(ev);
     const pop=`<div class="ev-pop">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
         <div class="ev-pop-t">${EV_ICONS[ev.type]||'📍'} ${ev.title}</div>
@@ -1464,6 +1514,28 @@ let _minimap=null;
     });
     ctx.shadowBlur=0;ctx.restore();
 
+    /* city pulse — energy sectors for active verified events */
+    S.events.forEach(ev=>{
+      if(!ev.verified) return;
+      const inten=eventIntensity(ev);
+      if(inten<.5) return;
+      const {bx,by}=blipXY(ev.lat,ev.lng);
+      const dx=bx-cx,dy=by-cy;
+      if(dx*dx+dy*dy>R*R*1.15) return;
+      const rgb=EV_COLS[ev.type]||'129,140,248';
+      const evAng=Math.atan2(dx,-dy);
+      const span=.26+inten*.12;
+      const g=ctx.createRadialGradient(cx,cy,0,cx,cy,R*.92);
+      g.addColorStop(0,`rgba(${rgb},0)`);
+      g.addColorStop(.5,`rgba(${rgb},${(.13*inten).toFixed(3)})`);
+      g.addColorStop(1,`rgba(${rgb},${(.05*inten).toFixed(3)})`);
+      ctx.save();ctx.translate(cx,cy);
+      ctx.beginPath();ctx.moveTo(0,0);
+      ctx.arc(0,0,R*.92,evAng-span/2,evAng+span/2);
+      ctx.closePath();ctx.fillStyle=g;ctx.fill();
+      ctx.restore();
+    });
+
     /* event blips */
     const t=Date.now();
     S.events.forEach(ev=>{
@@ -1553,6 +1625,30 @@ let _minimap=null;
     }
   });
 })();
+
+/* ── Migration v3: seed demo events if map is empty ─────── */
+if(!localStorage.getItem('pnd-v3')){
+  localStorage.setItem('pnd-v3','1');
+  if(S.events.length===0){
+    const n=Date.now();
+    const h=t=>new Date(n+t*3600000).toISOString().slice(0,16);
+    S.events=[
+      {id:'demo1',title:'Тренировка по борьбе',type:'training',
+       date:h(1.5),lat:CLUB.lat+.0002,lng:CLUB.lng+.0001,
+       loc:'HK Rovinj Rovigno',desc:'Открытая тренировка · все уровни',
+       verified:true,addedBy:'demo'},
+      {id:'demo2',title:'Концерт на набережной',type:'concert',
+       date:h(4),lat:CLUB.lat+.0031,lng:CLUB.lng-.0048,
+       loc:'Набережная Ровиня',desc:'Живая музыка у моря',
+       verified:true,addedBy:'demo'},
+      {id:'demo3',title:'Воскресный маркет',type:'market',
+       date:h(7),lat:CLUB.lat-.0038,lng:CLUB.lng+.0029,
+       loc:'Центр города',desc:'Местные производители',
+       verified:false,addedBy:'demo'},
+    ];
+    localStorage.setItem('pnd-ev',JSON.stringify(S.events));
+  }
+}
 
 /* ── Init ───────────────────────────────────────────────── */
 saveEv();
