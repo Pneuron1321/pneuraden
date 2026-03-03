@@ -897,14 +897,14 @@ function go(v){
   if(v===S.view && v!=='map') return;
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(el=>el.classList.remove('active'));
-  const ids={home:'vh',map:'vm',events:'ve',profile:'vp',admin:'vad'};
+  const ids={home:'vh',map:'vm',events:'ve',profile:'vp',admin:'vad',space:'vspace'};
   const el=document.getElementById(ids[v]);
   if(el) el.classList.add('active');
   const ni=document.querySelector(`.ni[data-v="${v}"]`);
   if(ni) ni.classList.add('active');
   S.view=v;
   const nav=document.getElementById('nav');
-  if(v==='map'){nav.style.display='none';initMap();}
+  if(v==='map'||v==='space'){nav.style.display='none';if(v==='map')initMap();}
   else nav.style.display='flex';
   if(v==='home' && _minimap) setTimeout(()=>_minimap.invalidateSize(),80);
   if(v==='events') renderEvents();
@@ -1145,6 +1145,7 @@ function initMap(){
     }
   }
   map.on('zoomend',_updateCosmic);
+  map.on('zoomend',()=>{if(map.getZoom()===0&&!_spaceActive)setTimeout(openSpaceView,300);});
   setInterval(()=>{if(_cosmicOp(map.getZoom())>0)_updateCosmic();},300000);
   // Star field — drawn on canvas, CSS mask shows it only outside the Earth circle
   function _drawSpaceStars(){
@@ -1993,8 +1994,16 @@ if(_rv){sessionStorage.removeItem('pnd-rv');go(_rv);}
 // Real astronomy: subsolarPoint → sun direction → terminator automatic
 // sublunarPoint → moon 3D position → correct phase from lighting
 let _spaceInited=false,_spaceActive=false;
-function openSpaceView(){go('space');_spaceActive=true;if(!_spaceInited){initSpaceView();_spaceInited=true;}}
-function closeSpaceView(){_spaceActive=false;go('m');}
+function openSpaceView(){
+  if(typeof THREE==='undefined'){setTimeout(openSpaceView,200);return;}
+  go('space');_spaceActive=true;
+  if(!_spaceInited){initSpaceView();_spaceInited=true;}
+}
+function closeSpaceView(){
+  _spaceActive=false;
+  go('map');
+  if(window._map) setTimeout(()=>window._map.setZoom(2),100);
+}
 function initSpaceView(){
   const wrap=document.getElementById('space-canvas-wrap');
   const W=window.innerWidth,H=window.innerHeight;
