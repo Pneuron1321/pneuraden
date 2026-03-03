@@ -501,8 +501,6 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
     <button class="theme-btn" onclick="toggleTheme()" style="flex-shrink:0">🌓</button>
   </div>
   <div id="map-container"></div>
-  <canvas id="star-canvas" style="position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 1.5s;z-index:455;-webkit-mask-image:radial-gradient(circle 46vmin at 50% 50%,black 0%,black 78%,white 88%);mask-image:radial-gradient(circle 46vmin at 50% 50%,black 0%,black 78%,white 88%)"></canvas>
-  <div id="space-vignette" style="position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 1.5s;z-index:450;background:radial-gradient(circle 46vmin at 50% 50%,transparent 0%,transparent 82%,rgba(0,2,16,0.50)88%,rgba(0,1,12,0.94)93%,rgba(0,0,8,1)100%)"></div>
   <div class="map-layers">
     <div class="lbtn active" id="lv" onclick="toggleL('v')" title="Верифицированные">🟢</div>
     <div class="lbtn active" id="lp" onclick="toggleL('p')" title="На проверке">🟡</div>
@@ -1135,9 +1133,6 @@ function initMap(){
   function _updateCosmic(){
     const z=map.getZoom(),op=_cosmicOp(z);
     _sunMk.setOpacity(op);_moonMk.setOpacity(op);
-    const _spOp=z<=2?'1':'0';
-    const _svEl=document.getElementById('space-vignette'),_scEl=document.getElementById('star-canvas');
-    if(_svEl)_svEl.style.opacity=_spOp;if(_scEl)_scEl.style.opacity=_spOp;
     if(op>0){
       const sp=subsolarPoint(new Date()),sl=sublunarPoint(new Date());
       _sunMk.setLatLng([sp.lat,sp.lng]).setIcon(_mkSunIcon());
@@ -1147,20 +1142,6 @@ function initMap(){
   map.on('zoomend',_updateCosmic);
   map.on('zoomend',()=>{if(map.getZoom()===0&&!_spaceActive)setTimeout(openSpaceView,300);});
   setInterval(()=>{if(_cosmicOp(map.getZoom())>0)_updateCosmic();},300000);
-  // Star field — drawn on canvas, CSS mask shows it only outside the Earth circle
-  function _drawSpaceStars(){
-    const sc=document.getElementById('star-canvas');if(!sc)return;
-    sc.width=window.innerWidth;sc.height=window.innerHeight;
-    const ctx2=sc.getContext('2d');ctx2.clearRect(0,0,sc.width,sc.height);
-    for(let i=0;i<300;i++){
-      const x=Math.random()*sc.width,y=Math.random()*sc.height;
-      const r=Math.random()*1.0+0.2,a=Math.random()*0.55+0.30;
-      ctx2.beginPath();ctx2.arc(x,y,r,0,Math.PI*2);
-      ctx2.fillStyle=`rgba(255,255,255,${a.toFixed(2)})`;ctx2.fill();
-    }
-  }
-  _drawSpaceStars();
-  window.addEventListener('resize',_drawSpaceStars);
 }
 
 function makeCompassMarker(outerColor, innerColor, size, isAdmin, label){
@@ -2057,19 +2038,23 @@ function initSpaceView(){
   // Initial Earth orientation: rotate so subsolar side roughly faces camera
   const sp0=subsolarPoint(new Date());
   earth.rotation.y=-(sp0.lng+90)*Math.PI/180;
-  // Drag to rotate Earth
-  let drag=false,px=0,py=0;
+  // Drag & pinch — touch-action:none + non-passive touchmove for iOS drag
+  let drag=false,px=0,py=0,lp=0;
   const cvs=renderer.domElement;
+  cvs.style.touchAction='none';
   cvs.addEventListener('mousedown',e=>{drag=true;px=e.clientX;py=e.clientY;});
   cvs.addEventListener('mousemove',e=>{if(!drag)return;earth.rotation.y+=(e.clientX-px)*0.006;earth.rotation.x=Math.max(-1.2,Math.min(1.2,earth.rotation.x+(e.clientY-py)*0.006));px=e.clientX;py=e.clientY;});
   cvs.addEventListener('mouseup',()=>drag=false);
-  cvs.addEventListener('touchstart',e=>{drag=true;const t=e.touches[0];px=t.clientX;py=t.clientY;},{passive:true});
-  cvs.addEventListener('touchmove',e=>{if(!drag||e.touches.length!==1)return;const t=e.touches[0];earth.rotation.y+=(t.clientX-px)*0.006;earth.rotation.x=Math.max(-1.2,Math.min(1.2,earth.rotation.x+(t.clientY-py)*0.006));px=t.clientX;py=t.clientY;},{passive:true});
+  cvs.addEventListener('touchstart',e=>{
+    if(e.touches.length===1){drag=true;px=e.touches[0].clientX;py=e.touches[0].clientY;}
+    else if(e.touches.length===2){drag=false;lp=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);}
+  },{passive:true});
+  cvs.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    if(e.touches.length===1&&drag){const t=e.touches[0];earth.rotation.y+=(t.clientX-px)*0.006;earth.rotation.x=Math.max(-1.2,Math.min(1.2,earth.rotation.x+(t.clientY-py)*0.006));px=t.clientX;py=t.clientY;}
+    else if(e.touches.length===2){const p=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);camera.position.z=Math.max(1.5,Math.min(9,camera.position.z*lp/p));if(camera.position.z>=8.8)setTimeout(closeSpaceView,300);lp=p;}
+  },{passive:false});
   cvs.addEventListener('touchend',()=>drag=false);
-  // Pinch zoom (2 fingers)
-  let lp=0;
-  cvs.addEventListener('touchstart',e=>{if(e.touches.length===2)lp=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);},{passive:true});
-  cvs.addEventListener('touchmove',e=>{if(e.touches.length===2){const p=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);camera.position.z=Math.max(1.5,Math.min(9,camera.position.z*lp/p));lp=p;}},{passive:true});
   // Render loop
   (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag)earth.rotation.y+=0.0008;renderer.render(scene,camera);})();
 }
