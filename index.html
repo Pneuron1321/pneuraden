@@ -2036,13 +2036,15 @@ function initSpaceView(){
   // Placeholder ocean+grid texture — real countries load async
   function _mkETex(){const c=document.createElement('canvas');c.width=512;c.height=256;const x=c.getContext('2d');x.fillStyle='#0a1f3e';x.fillRect(0,0,512,256);x.strokeStyle='rgba(80,160,255,0.2)';x.lineWidth=1;for(let i=1;i<8;i++){const y=i*256/8;x.beginPath();x.moveTo(0,y);x.lineTo(512,y);x.stroke();}for(let i=1;i<16;i++){const p=i*512/16;x.beginPath();x.moveTo(p,0);x.lineTo(p,256);x.stroke();}return new THREE.CanvasTexture(c);}
   function _mkMTex(){const c=document.createElement('canvas');c.width=256;c.height=128;const x=c.getContext('2d');x.fillStyle='#747474';x.fillRect(0,0,256,128);for(let i=0;i<28;i++){const cx=(i*97+30)%256,cy=(i*73+20)%128,r=1.5+i%5;x.beginPath();x.arc(cx,cy,r,0,Math.PI*2);x.fillStyle='rgba(45,45,45,0.5)';x.fill();}return new THREE.CanvasTexture(c);}
+  function _mkCloudTex(){const c=document.createElement('canvas');c.width=1024;c.height=512;const x=c.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,1024,512);for(let i=0;i<700;i++){const cx=Math.random()*1024,cy=Math.random()*512,rx=10+Math.random()*55,ry=5+Math.random()*25,a=0.12+Math.random()*0.62;x.save();x.translate(cx,cy);x.scale(rx,ry);const g=x.createRadialGradient(0,0,0,0,0,1);g.addColorStop(0,`rgba(255,255,255,${a})`);g.addColorStop(0.5,`rgba(255,255,255,${a*0.45})`);g.addColorStop(1,'rgba(255,255,255,0)');x.beginPath();x.arc(0,0,1,0,Math.PI*2);x.fillStyle=g;x.fill();x.restore();}return new THREE.CanvasTexture(c);}
   // Earth sphere (Earth stays fixed — camera orbits)
   const earth=new THREE.Mesh(new THREE.SphereGeometry(1,64,64),new THREE.MeshPhongMaterial({map:_mkETex(),specular:new THREE.Color(0x0a1020),shininess:5}));
   scene.add(earth);
   const atmo=new THREE.Mesh(new THREE.SphereGeometry(1.09,32,32),new THREE.MeshPhongMaterial({color:0x3366ff,transparent:true,opacity:0.09,side:THREE.BackSide}));
   earth.add(atmo);
-  // Cloud layer mesh — added to scene only when texture loads (opacity:0 guards premature render)
-  const clouds=new THREE.Mesh(new THREE.SphereGeometry(1.008,64,64),new THREE.MeshLambertMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false}));
+  // Cloud layer — procedural texture immediately visible; CDN real texture replaces it if available
+  const clouds=new THREE.Mesh(new THREE.SphereGeometry(1.008,64,64),new THREE.MeshLambertMaterial({alphaMap:_mkCloudTex(),color:0xffffff,transparent:true,opacity:0.88,depthWrite:false}));
+  scene.add(clouds);
   // Moon
   const moon=new THREE.Mesh(new THREE.SphereGeometry(0.272,32,32),new THREE.MeshPhongMaterial({map:_mkMTex()}));
   scene.add(moon);
@@ -2088,7 +2090,7 @@ function initSpaceView(){
     const tl=new THREE.TextureLoader();
     // Cloud layer — same CDN, same mirror fix, added to scene on load
     tl.load('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-clouds.png',
-      tex=>{tex.wrapS=THREE.RepeatWrapping;tex.repeat.x=-1;tex.offset.x=1;clouds.material.alphaMap=tex;clouds.material.opacity=0.90;clouds.material.needsUpdate=true;scene.add(clouds);});
+      tex=>{tex.wrapS=THREE.RepeatWrapping;tex.repeat.x=-1;tex.offset.x=1;clouds.material.alphaMap=tex;clouds.material.needsUpdate=true;});
     // Primary: real satellite imagery
     tl.load('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-day.jpg',
       tex=>{tex.wrapS=THREE.RepeatWrapping;tex.repeat.x=-1;tex.offset.x=1;earth.material.map=tex;earth.material.needsUpdate=true;},
