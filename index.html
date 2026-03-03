@@ -2001,53 +2001,66 @@ function initSpaceView(){
   for(let i=0;i<5000;i++){const t=Math.random()*Math.PI*2,p=Math.acos(2*Math.random()-1),r=350+Math.random()*150;sP[i*3]=r*Math.sin(p)*Math.cos(t);sP[i*3+1]=r*Math.sin(p)*Math.sin(t);sP[i*3+2]=r*Math.cos(p);}
   sG.setAttribute('position',new THREE.BufferAttribute(sP,3));
   scene.add(new THREE.Points(sG,new THREE.PointsMaterial({color:0xffffff,size:0.55})));
-  // Procedural textures — no CDN, always works, rotation visually clear
-  function _mkETex(){const c=document.createElement('canvas');c.width=512;c.height=256;const x=c.getContext('2d');x.fillStyle='#0e2850';x.fillRect(0,0,512,256);[[60,80,34,74],[148,88,23,57],[228,92,37,51],[280,96,27,41],[328,74,51,67],[378,92,21,41],[418,130,42,27],[250,20,120,15]].forEach(([cx,cy,rw,rh])=>{const g=x.createRadialGradient(cx,cy,0,cx,cy,Math.max(rw,rh));g.addColorStop(0,'rgba(50,128,45,1)');g.addColorStop(0.6,'rgba(35,90,25,0.7)');g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.beginPath();x.ellipse(cx,cy,rw,rh,0,0,Math.PI*2);x.fill();});x.fillStyle='rgba(210,235,255,0.95)';x.fillRect(0,0,512,18);x.fillRect(0,238,512,18);x.strokeStyle='rgba(80,160,255,0.18)';x.lineWidth=1;for(let i=1;i<8;i++){const y=i*256/8;x.beginPath();x.moveTo(0,y);x.lineTo(512,y);x.stroke();}for(let i=1;i<16;i++){const p=i*512/16;x.beginPath();x.moveTo(p,0);x.lineTo(p,256);x.stroke();}return new THREE.CanvasTexture(c);}
+  // Placeholder ocean+grid texture — real countries load async
+  function _mkETex(){const c=document.createElement('canvas');c.width=512;c.height=256;const x=c.getContext('2d');x.fillStyle='#0a1f3e';x.fillRect(0,0,512,256);x.strokeStyle='rgba(80,160,255,0.2)';x.lineWidth=1;for(let i=1;i<8;i++){const y=i*256/8;x.beginPath();x.moveTo(0,y);x.lineTo(512,y);x.stroke();}for(let i=1;i<16;i++){const p=i*512/16;x.beginPath();x.moveTo(p,0);x.lineTo(p,256);x.stroke();}return new THREE.CanvasTexture(c);}
   function _mkMTex(){const c=document.createElement('canvas');c.width=256;c.height=128;const x=c.getContext('2d');x.fillStyle='#747474';x.fillRect(0,0,256,128);for(let i=0;i<28;i++){const cx=(i*97+30)%256,cy=(i*73+20)%128,r=1.5+i%5;x.beginPath();x.arc(cx,cy,r,0,Math.PI*2);x.fillStyle='rgba(45,45,45,0.5)';x.fill();}return new THREE.CanvasTexture(c);}
-  // Earth sphere
+  // Earth sphere (Earth stays fixed — camera orbits)
   const earth=new THREE.Mesh(new THREE.SphereGeometry(1,64,64),new THREE.MeshPhongMaterial({map:_mkETex(),specular:new THREE.Color(0x333333),shininess:22}));
   scene.add(earth);
-  // Atmosphere glow
-  earth.add(new THREE.Mesh(new THREE.SphereGeometry(1.05,32,32),
-    new THREE.MeshPhongMaterial({color:0x3366ff,transparent:true,opacity:0.09,side:THREE.BackSide})));
+  earth.add(new THREE.Mesh(new THREE.SphereGeometry(1.05,32,32),new THREE.MeshPhongMaterial({color:0x3366ff,transparent:true,opacity:0.09,side:THREE.BackSide})));
   // Moon
   const moon=new THREE.Mesh(new THREE.SphereGeometry(0.272,32,32),new THREE.MeshPhongMaterial({map:_mkMTex()}));
   scene.add(moon);
-  // Sun (bright sphere far away)
-  const sunMesh=new THREE.Mesh(new THREE.SphereGeometry(2.8,16,16),
-    new THREE.MeshBasicMaterial({color:0xffffbb}));
+  // Sun mesh
+  const sunMesh=new THREE.Mesh(new THREE.SphereGeometry(2.8,16,16),new THREE.MeshBasicMaterial({color:0xffffbb}));
   scene.add(sunMesh);
   // Lighting
   scene.add(new THREE.AmbientLight(0x112244,0.22));
   const sunLight=new THREE.DirectionalLight(0xffffff,1.7);
   scene.add(sunLight);
-  // Geo to Three.js 3D vector
-  function geo3D(lat,lng){
-    const phi=(90-lat)*Math.PI/180,th=lng*Math.PI/180;
-    return new THREE.Vector3(Math.sin(phi)*Math.cos(th),Math.cos(phi),Math.sin(phi)*Math.sin(th));}
-  // Update sun/moon positions from real data
-  function updateAstro(){
-    const now=new Date(),sp=subsolarPoint(now),sl=sublunarPoint(now);
-    const sd=geo3D(sp.lat,sp.lng);
-    sunLight.position.copy(sd).multiplyScalar(100);
-    sunMesh.position.copy(sd).multiplyScalar(48);
-    moon.position.copy(geo3D(sl.lat,sl.lng)).multiplyScalar(6);}
-  updateAstro();
-  setInterval(updateAstro,120000);
-  // Initial Earth orientation: rotate so subsolar side roughly faces camera
-  const sp0=subsolarPoint(new Date());
-  earth.rotation.y=-(sp0.lng+90)*Math.PI/180;
-  // Pointer Events API — unified mouse+touch, iOS 13+, bypasses passive-gesture issue
+  // Geo → THREE.js 3D: lng=0→+X, lng=90E→+Z, lng=180→-X
+  function geo3D(lat,lng){const phi=(90-lat)*Math.PI/180,th=lng*Math.PI/180;return new THREE.Vector3(Math.sin(phi)*Math.cos(th),Math.cos(phi),Math.sin(phi)*Math.sin(th));}
+  function updateAstro(){const now=new Date(),sp=subsolarPoint(now),sl=sublunarPoint(now);const sd=geo3D(sp.lat,sp.lng);sunLight.position.copy(sd).multiplyScalar(100);sunMesh.position.copy(sd).multiplyScalar(48);moon.position.copy(geo3D(sl.lat,sl.lng)).multiplyScalar(6);}
+  updateAstro();setInterval(updateAstro,120000);
+  // Orbital camera — Earth fixed with real astronomy, camera orbits around it
+  let camTheta=0,camPhi=0.1,camDist=3.2;
+  function updateCam(){camera.position.set(camDist*Math.cos(camPhi)*Math.sin(camTheta),camDist*Math.sin(camPhi),camDist*Math.cos(camPhi)*Math.cos(camTheta));camera.lookAt(0,0,0);}
+  // Start facing lit side
+  const _sp0=subsolarPoint(new Date()),_sd0=geo3D(_sp0.lat,_sp0.lng);
+  camTheta=Math.atan2(_sd0.x,_sd0.z);camPhi=Math.asin(Math.max(-0.5,Math.min(0.5,_sd0.y)));
+  updateCam();
+  // Pointer Events — orbit camera + zoom-IN to close (dive into map)
   let drag=false,px=0,py=0,lp=0;
   const ptrs=new Map();
   const cvs=renderer.domElement;
   cvs.style.touchAction='none';
   cvs.addEventListener('pointerdown',e=>{cvs.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.size===1){drag=true;px=e.clientX;py=e.clientY;}else{drag=false;if(ptrs.size===2){const[a,b]=[...ptrs.values()];lp=Math.hypot(a.x-b.x,a.y-b.y);}}});
-  cvs.addEventListener('pointermove',e=>{ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.size===1&&drag){earth.rotation.y+=(e.clientX-px)*0.006;earth.rotation.x=Math.max(-1.2,Math.min(1.2,earth.rotation.x+(e.clientY-py)*0.006));px=e.clientX;py=e.clientY;}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(lp>0){camera.position.z=Math.max(1.5,Math.min(9,camera.position.z*lp/d));if(camera.position.z>=8.8)setTimeout(closeSpaceView,300);}lp=d;}});
+  cvs.addEventListener('pointermove',e=>{ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.size===1&&drag){camTheta-=(e.clientX-px)*0.006;camPhi=Math.max(-1.3,Math.min(1.3,camPhi-(e.clientY-py)*0.004));px=e.clientX;py=e.clientY;updateCam();}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(lp>0){camDist=Math.max(1.3,Math.min(12,camDist*lp/d));if(camDist<=1.35)setTimeout(closeSpaceView,300);updateCam();}lp=d;}});
   cvs.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(ptrs.size===0){drag=false;lp=0;}else if(ptrs.size===1){const[p]=[...ptrs.values()];px=p.x;py=p.y;drag=true;lp=0;}});
   cvs.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);if(ptrs.size===0){drag=false;lp=0;}});
-  // Render loop
-  (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag)earth.rotation.y+=0.0008;renderer.render(scene,camera);})();
+  // Real Earth texture — world-atlas TopoJSON, equirectangular, aligned to geo3D
+  // THREE.js SphereGeometry U: 0→-X(lng=180) 0.25→+Z(lng=90E) 0.5→+X(lng=0) 0.75→-Z(lng=90W)
+  // Correct formula: x=(180-lng)/360*w (NOT lng+180 — that mirrors east/west)
+  function _loadRealTex(){
+    const loadLib=typeof topojson!=='undefined'?Promise.resolve():new Promise(res=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js';s.onload=res;document.head.appendChild(s);});
+    Promise.all([loadLib,fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r=>r.json())])
+      .then(([,w])=>{
+        const c=document.createElement('canvas');c.width=2048;c.height=1024;
+        const ctx=c.getContext('2d');ctx.fillStyle='#0a1f3e';ctx.fillRect(0,0,2048,1024);
+        topojson.feature(w,w.objects.countries).features.forEach(f=>{
+          const polys=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;
+          polys.forEach(poly=>{ctx.beginPath();poly[0].forEach(([lng,lat],i)=>{const x=(180-lng)/360*2048,y=(90-lat)/180*1024;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.closePath();ctx.fillStyle='#2d6a2d';ctx.fill();ctx.strokeStyle='rgba(80,160,80,0.5)';ctx.lineWidth=0.8;ctx.stroke();});
+        });
+        ctx.fillStyle='rgba(220,240,255,0.92)';ctx.fillRect(0,0,2048,55);ctx.fillRect(0,969,2048,55);
+        ctx.strokeStyle='rgba(100,180,255,0.12)';ctx.lineWidth=0.5;
+        for(let i=1;i<12;i++){const y=i*1024/12;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(2048,y);ctx.stroke();}
+        for(let i=1;i<24;i++){const x=i*2048/24;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,1024);ctx.stroke();}
+        earth.material.map=new THREE.CanvasTexture(c);earth.material.needsUpdate=true;
+      }).catch(()=>{});
+  }
+  _loadRealTex();
+  // Render loop — camera auto-orbits slowly, Earth stays fixed
+  (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag){camTheta+=0.0003;updateCam();}renderer.render(scene,camera);})();
 }
 </script>
 
