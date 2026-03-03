@@ -1972,6 +1972,37 @@ updateUID();
 const _rv=sessionStorage.getItem('pnd-rv');
 if(_rv){sessionStorage.removeItem('pnd-rv');go(_rv);}
 
+// ═══ FIREBASE — Social Presence Layer ═══════════════════════════════════
+// Fill FB_CONFIG with your Firebase project settings.
+// Setup: firebase.google.com → Create project → Realtime Database + Anonymous Auth
+// DB rules: users/$uid { ".read":true, ".write":"auth.uid===$uid" }
+const FB_CONFIG={
+  apiKey:"YOUR_API_KEY",
+  authDomain:"YOUR-PROJECT.firebaseapp.com",
+  databaseURL:"https://YOUR-PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"YOUR-PROJECT",
+  appId:"YOUR_APP_ID"
+};
+let _fbDb=null,_fbUid=null;
+
+function initFirebase(){
+  // Load Firebase SDK chain (app → auth → database) then setup
+  function _seq(srcs,i,cb){if(i>=srcs.length){cb();return;}const s=document.createElement('script');s.src=srcs[i];s.onload=()=>_seq(srcs,i+1,cb);document.head.appendChild(s);}
+  _seq(['https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js'],0,_fbSetup);
+}
+function _fbSetup(){
+  if(!FB_CONFIG.apiKey||FB_CONFIG.apiKey==='YOUR_API_KEY')return; // not configured
+  if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
+  _fbDb=firebase.database();
+  firebase.auth().signInAnonymously().then(c=>{_fbUid=c.user.uid;_fbWrite();}).catch(()=>{});
+}
+function _fbWrite(){
+  if(!_fbDb||!_fbUid)return;
+  const ref=_fbDb.ref('users/'+_fbUid);
+  const _push=()=>{const p=window._getUserPos?window._getUserPos():{lat:45.08,lng:13.64};ref.update({lat:p.lat,lng:p.lng,ts:Date.now()});};
+  _push();ref.onDisconnect().remove();setInterval(_push,30000);
+}
+
 // ═══ SPACE VIEW — Three.js 3D Globe ═══════════════════════════════════
 // Real astronomy: subsolarPoint → sun direction → terminator automatic
 // sublunarPoint → moon 3D position → correct phase from lighting
@@ -2083,9 +2114,27 @@ function initSpaceView(){
     );
   }
   _loadRealTex();
+  // Community dots — other users' positions on globe (warm orange, distinct from own cyan)
+  const _cdots=new Map();
+  function _loadCommunity(){
+    if(!_fbDb){setTimeout(_loadCommunity,2000);return;}
+    _fbDb.ref('users').on('value',snap=>{
+      const now=Date.now(),data=snap.val()||{};
+      _cdots.forEach((m,uid)=>{if(!data[uid]||now-(data[uid].ts||0)>180000){scene.remove(m);_cdots.delete(uid);}});
+      Object.entries(data).forEach(([uid,d])=>{
+        if(uid===_fbUid||now-(d.ts||0)>180000)return;
+        if(!_cdots.has(uid)){const m=new THREE.Mesh(new THREE.SphereGeometry(0.011,8,8),new THREE.MeshBasicMaterial({color:0xff9966}));scene.add(m);_cdots.set(uid,m);}
+        _cdots.get(uid).position.copy(geo3D(d.lat,d.lng));
+      });
+    });
+  }
+  _loadCommunity();
   // Render loop — camera auto-orbits slowly, Earth stays fixed
   (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag&&!_diving){camTheta+=0.0003;updateCam();}const _t=Date.now(),_sch=0.5+0.5*Math.sin(_t*0.04917);atmo.material.opacity=0.04+0.09*_sch;_uhalo.material.opacity=0.1+0.12*(0.5+0.5*Math.sin(_t*0.04917+Math.PI));if(clouds.parent)clouds.rotation.y+=0.000054;renderer.render(scene,camera);})();
 }
+
+// Start Firebase presence layer (loads SDK async, safe if FB_CONFIG not filled)
+initFirebase();
 </script>
 
 <!-- SPACE VIEW — 3D Globe -->
