@@ -2040,10 +2040,10 @@ function initSpaceView(){
   // Earth sphere (Earth stays fixed — camera orbits)
   const earth=new THREE.Mesh(new THREE.SphereGeometry(1,64,64),new THREE.MeshPhongMaterial({map:_mkETex(),specular:new THREE.Color(0x0a1020),shininess:5}));
   scene.add(earth);
-  const atmo=new THREE.Mesh(new THREE.SphereGeometry(1.12,32,32),new THREE.ShaderMaterial({uniforms:{glowColor:{value:new THREE.Color(0x3a6fff)},glowOpacity:{value:0.7}},vertexShader:'varying vec3 vNormal;void main(){vNormal=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'uniform vec3 glowColor;uniform float glowOpacity;varying vec3 vNormal;void main(){float r=pow(max(0.0,1.0-dot(vNormal,vec3(0.0,0.0,1.0))),3.0);gl_FragColor=vec4(glowColor,r*glowOpacity);}',transparent:true,side:THREE.FrontSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+  const atmo=new THREE.Mesh(new THREE.SphereGeometry(1.03,32,32),new THREE.ShaderMaterial({uniforms:{glowColor:{value:new THREE.Color(0x4488ff)},glowOpacity:{value:0.4}},vertexShader:'varying vec3 vNormal;void main(){vNormal=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'uniform vec3 glowColor;uniform float glowOpacity;varying vec3 vNormal;void main(){float r=pow(max(0.0,1.0-dot(vNormal,vec3(0.0,0.0,1.0))),4.0);gl_FragColor=vec4(glowColor,r*glowOpacity);}',transparent:true,side:THREE.FrontSide,blending:THREE.AdditiveBlending,depthWrite:false}));
   earth.add(atmo);
   // Cloud layer — procedural texture immediately visible; CDN real texture replaces it if available
-  const clouds=new THREE.Mesh(new THREE.SphereGeometry(1.008,64,64),new THREE.MeshLambertMaterial({alphaMap:_mkCloudTex(),color:0xeef4ff,transparent:true,opacity:0.52,depthWrite:false}));
+  const clouds=new THREE.Mesh(new THREE.SphereGeometry(1.008,64,64),new THREE.MeshLambertMaterial({alphaMap:_mkCloudTex(),color:0xeef4ff,transparent:true,opacity:0.22,depthWrite:false}));
   scene.add(clouds);
   // Moon
   const moon=new THREE.Mesh(new THREE.SphereGeometry(0.272,32,32),new THREE.MeshPhongMaterial({map:_mkMTex()}));
