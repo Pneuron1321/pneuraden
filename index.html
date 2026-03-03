@@ -2042,10 +2042,10 @@ function initSpaceView(){
   scene.add(earth);
   const atmo=new THREE.Mesh(new THREE.SphereGeometry(1.03,32,32),new THREE.ShaderMaterial({uniforms:{glowColor:{value:new THREE.Color(0x4488ff)},glowOpacity:{value:0.4}},vertexShader:'varying vec3 vNormal;void main(){vNormal=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'uniform vec3 glowColor;uniform float glowOpacity;varying vec3 vNormal;void main(){float r=pow(max(0.0,1.0-dot(vNormal,vec3(0.0,0.0,1.0))),4.0);gl_FragColor=vec4(glowColor,r*glowOpacity);}',transparent:true,side:THREE.FrontSide,blending:THREE.AdditiveBlending,depthWrite:false}));
   earth.add(atmo);
-  // MODIS overlay — daily real satellite imagery; GLSL discard for black swath gaps → Blue Marble shows through
+  // MODIS overlay — daily real satellite imagery; smoothstep alpha blend: dark pixels fade to transparent → Blue Marble shows through
   // UV flip in vertex shader: vUv=vec2(1-u,v) mirrors equirectangular to match Three.js sphere orientation
   const _blk=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1,THREE.RGBAFormat);_blk.needsUpdate=true;
-  const modisMat=new THREE.ShaderMaterial({uniforms:{modisMap:{value:_blk},thr:{value:0.04}},vertexShader:'varying vec2 vUv;void main(){vUv=vec2(1.0-uv.x,uv.y);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'uniform sampler2D modisMap;uniform float thr;varying vec2 vUv;void main(){vec4 c=texture2D(modisMap,vUv);if(dot(c.rgb,vec3(0.299,0.587,0.114))<thr)discard;gl_FragColor=c;}',transparent:true,depthWrite:false});
+  const modisMat=new THREE.ShaderMaterial({uniforms:{modisMap:{value:_blk}},vertexShader:'varying vec2 vUv;void main(){vUv=vec2(1.0-uv.x,uv.y);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'uniform sampler2D modisMap;varying vec2 vUv;void main(){vec4 c=texture2D(modisMap,vUv);float a=smoothstep(0.03,0.18,dot(c.rgb,vec3(0.299,0.587,0.114)));gl_FragColor=vec4(c.rgb,a);}',transparent:true,depthWrite:false});
   const modisOverlay=new THREE.Mesh(new THREE.SphereGeometry(1.001,64,64),modisMat);
   scene.add(modisOverlay);
   // Moon
