@@ -2043,7 +2043,7 @@ function initSpaceView(){
   const atmo=new THREE.Mesh(new THREE.SphereGeometry(1.12,32,32),new THREE.ShaderMaterial({uniforms:{glowColor:{value:new THREE.Color(0x3a6fff)},glowOpacity:{value:0.7}},vertexShader:'varying vec3 vNormal;void main(){vNormal=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'uniform vec3 glowColor;uniform float glowOpacity;varying vec3 vNormal;void main(){float r=pow(max(0.0,1.0-dot(vNormal,vec3(0.0,0.0,1.0))),3.0);gl_FragColor=vec4(glowColor,r*glowOpacity);}',transparent:true,side:THREE.FrontSide,blending:THREE.AdditiveBlending,depthWrite:false}));
   earth.add(atmo);
   // Cloud layer — procedural texture immediately visible; CDN real texture replaces it if available
-  const clouds=new THREE.Mesh(new THREE.SphereGeometry(1.008,64,64),new THREE.MeshLambertMaterial({alphaMap:_mkCloudTex(),color:0xffffff,transparent:true,opacity:0.88,depthWrite:false}));
+  const clouds=new THREE.Mesh(new THREE.SphereGeometry(1.008,64,64),new THREE.MeshLambertMaterial({alphaMap:_mkCloudTex(),color:0xeef4ff,transparent:true,opacity:0.52,depthWrite:false}));
   scene.add(clouds);
   // Moon
   const moon=new THREE.Mesh(new THREE.SphereGeometry(0.272,32,32),new THREE.MeshPhongMaterial({map:_mkMTex()}));
@@ -2138,7 +2138,7 @@ function initSpaceView(){
   }
   _loadCommunity();
   // Render loop — camera auto-orbits slowly, Earth stays fixed
-  (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag&&!_diving){camTheta+=0.0003;updateCam();}const _t=Date.now(),_sch=0.5+0.5*Math.sin(_t*0.04917);atmo.material.uniforms.glowOpacity.value=0.4+0.4*_sch;_uhalo.material.opacity=0.1+0.12*(0.5+0.5*Math.sin(_t*0.04917+Math.PI));if(clouds.parent)clouds.rotation.y+=0.000054;renderer.render(scene,camera);})();
+  (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag&&!_diving){camTheta+=0.0003;updateCam();}const _t=Date.now(),_sch=0.5+0.5*Math.sin(_t*0.04917);atmo.material.uniforms.glowOpacity.value=0.18+0.22*_sch;_uhalo.material.opacity=0.1+0.12*(0.5+0.5*Math.sin(_t*0.04917+Math.PI));if(clouds.parent)clouds.rotation.y+=0.000054;renderer.render(scene,camera);})();
 }
 
 // Start Firebase presence layer (loads SDK async, safe if FB_CONFIG not filled)
