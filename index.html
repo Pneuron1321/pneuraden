@@ -1582,6 +1582,7 @@ let _minimap=null;
     if(_minimap) _minimap.setView([lat,lng],ZOOM_MAP[S.radarZoom],{animate:false});
     else initMinimap(lat,lng);
   };
+  window._getUserPos=()=>({lat:uLat,lng:uLng});
 
   // Leaflet minimap behind canvas
   function initMinimap(lat,lng){
@@ -2007,7 +2008,8 @@ function initSpaceView(){
   // Earth sphere (Earth stays fixed — camera orbits)
   const earth=new THREE.Mesh(new THREE.SphereGeometry(1,64,64),new THREE.MeshPhongMaterial({map:_mkETex(),specular:new THREE.Color(0x333333),shininess:22}));
   scene.add(earth);
-  earth.add(new THREE.Mesh(new THREE.SphereGeometry(1.05,32,32),new THREE.MeshPhongMaterial({color:0x3366ff,transparent:true,opacity:0.09,side:THREE.BackSide})));
+  const atmo=new THREE.Mesh(new THREE.SphereGeometry(1.05,32,32),new THREE.MeshPhongMaterial({color:0x3366ff,transparent:true,opacity:0.09,side:THREE.BackSide}));
+  earth.add(atmo);
   // Moon
   const moon=new THREE.Mesh(new THREE.SphereGeometry(0.272,32,32),new THREE.MeshPhongMaterial({map:_mkMTex()}));
   scene.add(moon);
@@ -2029,13 +2031,21 @@ function initSpaceView(){
   const _sp0=subsolarPoint(new Date()),_sd0=geo3D(_sp0.lat,_sp0.lng);
   camTheta=Math.atan2(_sd0.x,_sd0.z);camPhi=Math.asin(Math.max(-0.5,Math.min(0.5,_sd0.y)));
   updateCam();
+  // Observer on Earth — stable point within globally pulsing Schumann field
+  const _upos=window._getUserPos?window._getUserPos():{lat:45.08,lng:13.64};
+  const _ug=geo3D(_upos.lat,_upos.lng);
+  const _udot=new THREE.Mesh(new THREE.SphereGeometry(0.013,10,10),new THREE.MeshBasicMaterial({color:0x88eeff}));
+  _udot.position.copy(_ug);scene.add(_udot);
+  const _uhalo=new THREE.Mesh(new THREE.SphereGeometry(0.036,10,10),new THREE.MeshBasicMaterial({color:0x4499ff,transparent:true,opacity:0.15}));
+  _uhalo.position.copy(_ug);scene.add(_uhalo);
+  let _diving=false;
   // Pointer Events — orbit camera + zoom-IN to close (dive into map)
   let drag=false,px=0,py=0,lp=0;
   const ptrs=new Map();
   const cvs=renderer.domElement;
   cvs.style.touchAction='none';
   cvs.addEventListener('pointerdown',e=>{cvs.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.size===1){drag=true;px=e.clientX;py=e.clientY;}else{drag=false;if(ptrs.size===2){const[a,b]=[...ptrs.values()];lp=Math.hypot(a.x-b.x,a.y-b.y);}}});
-  cvs.addEventListener('pointermove',e=>{ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.size===1&&drag){camTheta-=(e.clientX-px)*0.006;camPhi=Math.max(-1.3,Math.min(1.3,camPhi-(e.clientY-py)*0.004));px=e.clientX;py=e.clientY;updateCam();}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(lp>0){camDist=Math.max(1.3,Math.min(12,camDist*lp/d));if(camDist<=1.35)setTimeout(closeSpaceView,300);updateCam();}lp=d;}});
+  cvs.addEventListener('pointermove',e=>{ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.size===1&&drag){camTheta-=(e.clientX-px)*0.006;camPhi=Math.max(-1.3,Math.min(1.3,camPhi-(e.clientY-py)*0.004));px=e.clientX;py=e.clientY;updateCam();}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(lp>0){camDist=Math.max(1.3,Math.min(12,camDist*lp/d));if(camDist<=1.35&&!_diving){_diving=true;drag=false;const _tu=Math.atan2(_ug.x,_ug.z),_pu=Math.asin(Math.max(-1.3,Math.min(1.3,_ug.y)));const _t0=performance.now();(function _df(now){const p=Math.min(1,(now-_t0)/280);camTheta+=(_tu-camTheta)*0.2;camPhi+=(_pu-camPhi)*0.2;updateCam();p<1?requestAnimationFrame(_df):closeSpaceView();})(_t0);}updateCam();}lp=d;}});
   cvs.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(ptrs.size===0){drag=false;lp=0;}else if(ptrs.size===1){const[p]=[...ptrs.values()];px=p.x;py=p.y;drag=true;lp=0;}});
   cvs.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);if(ptrs.size===0){drag=false;lp=0;}});
   // Real satellite texture — NASA/NOAA composite via three-globe npm (CORS via jsdelivr)
@@ -2066,7 +2076,7 @@ function initSpaceView(){
   }
   _loadRealTex();
   // Render loop — camera auto-orbits slowly, Earth stays fixed
-  (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag){camTheta+=0.0003;updateCam();}renderer.render(scene,camera);})();
+  (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag&&!_diving){camTheta+=0.0003;updateCam();}const _t=Date.now(),_sch=0.5+0.5*Math.sin(_t*0.04917);atmo.material.opacity=0.04+0.09*_sch;_uhalo.material.opacity=0.1+0.12*(0.5+0.5*Math.sin(_t*0.04917+Math.PI));renderer.render(scene,camera);})();
 }
 </script>
 
