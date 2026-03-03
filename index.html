@@ -2006,10 +2006,15 @@ function initSpaceView(){
   function _mkETex(){const c=document.createElement('canvas');c.width=512;c.height=256;const x=c.getContext('2d');x.fillStyle='#0a1f3e';x.fillRect(0,0,512,256);x.strokeStyle='rgba(80,160,255,0.2)';x.lineWidth=1;for(let i=1;i<8;i++){const y=i*256/8;x.beginPath();x.moveTo(0,y);x.lineTo(512,y);x.stroke();}for(let i=1;i<16;i++){const p=i*512/16;x.beginPath();x.moveTo(p,0);x.lineTo(p,256);x.stroke();}return new THREE.CanvasTexture(c);}
   function _mkMTex(){const c=document.createElement('canvas');c.width=256;c.height=128;const x=c.getContext('2d');x.fillStyle='#747474';x.fillRect(0,0,256,128);for(let i=0;i<28;i++){const cx=(i*97+30)%256,cy=(i*73+20)%128,r=1.5+i%5;x.beginPath();x.arc(cx,cy,r,0,Math.PI*2);x.fillStyle='rgba(45,45,45,0.5)';x.fill();}return new THREE.CanvasTexture(c);}
   // Earth sphere (Earth stays fixed — camera orbits)
-  const earth=new THREE.Mesh(new THREE.SphereGeometry(1,64,64),new THREE.MeshPhongMaterial({map:_mkETex(),specular:new THREE.Color(0x333333),shininess:22}));
+  const earth=new THREE.Mesh(new THREE.SphereGeometry(1,64,64),new THREE.MeshPhongMaterial({map:_mkETex(),specular:new THREE.Color(0x556677),shininess:55}));
   scene.add(earth);
-  const atmo=new THREE.Mesh(new THREE.SphereGeometry(1.05,32,32),new THREE.MeshPhongMaterial({color:0x3366ff,transparent:true,opacity:0.09,side:THREE.BackSide}));
+  const atmo=new THREE.Mesh(new THREE.SphereGeometry(1.09,32,32),new THREE.MeshPhongMaterial({color:0x3366ff,transparent:true,opacity:0.09,side:THREE.BackSide}));
   earth.add(atmo);
+  // Outer atmosphere — limb glow (BackSide: tangent rays see max depth → bright edge against space)
+  const outerAtmo=new THREE.Mesh(new THREE.SphereGeometry(1.18,32,32),new THREE.MeshPhongMaterial({color:0x3355ff,transparent:true,opacity:0.13,side:THREE.BackSide,depthWrite:false}));
+  scene.add(outerAtmo);
+  // Cloud layer mesh — added to scene only when texture loads (opacity:0 guards premature render)
+  const clouds=new THREE.Mesh(new THREE.SphereGeometry(1.008,64,64),new THREE.MeshPhongMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false}));
   // Moon
   const moon=new THREE.Mesh(new THREE.SphereGeometry(0.272,32,32),new THREE.MeshPhongMaterial({map:_mkMTex()}));
   scene.add(moon);
@@ -2018,7 +2023,7 @@ function initSpaceView(){
   scene.add(sunMesh);
   // Lighting
   scene.add(new THREE.AmbientLight(0x112244,0.22));
-  const sunLight=new THREE.DirectionalLight(0xffffff,1.7);
+  const sunLight=new THREE.DirectionalLight(0xffffff,2.4);
   scene.add(sunLight);
   // Geo → THREE.js 3D: lng=0→+X, lng=90E→+Z, lng=180→-X
   function geo3D(lat,lng){const phi=(90-lat)*Math.PI/180,th=lng*Math.PI/180;return new THREE.Vector3(Math.sin(phi)*Math.cos(th),Math.cos(phi),Math.sin(phi)*Math.sin(th));}
@@ -2053,6 +2058,9 @@ function initSpaceView(){
   // Fix: repeat.x=-1, offset.x=1 → mirrors texture horizontally → correct geo alignment
   function _loadRealTex(){
     const tl=new THREE.TextureLoader();
+    // Cloud layer — same CDN, same mirror fix, added to scene on load
+    tl.load('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-clouds.png',
+      tex=>{tex.wrapS=THREE.RepeatWrapping;tex.repeat.x=-1;tex.offset.x=1;clouds.material.alphaMap=tex;clouds.material.opacity=0.90;clouds.material.needsUpdate=true;scene.add(clouds);});
     // Primary: real satellite imagery
     tl.load('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-day.jpg',
       tex=>{tex.wrapS=THREE.RepeatWrapping;tex.repeat.x=-1;tex.offset.x=1;earth.material.map=tex;earth.material.needsUpdate=true;},
@@ -2076,7 +2084,7 @@ function initSpaceView(){
   }
   _loadRealTex();
   // Render loop — camera auto-orbits slowly, Earth stays fixed
-  (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag&&!_diving){camTheta+=0.0003;updateCam();}const _t=Date.now(),_sch=0.5+0.5*Math.sin(_t*0.04917);atmo.material.opacity=0.04+0.09*_sch;_uhalo.material.opacity=0.1+0.12*(0.5+0.5*Math.sin(_t*0.04917+Math.PI));renderer.render(scene,camera);})();
+  (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag&&!_diving){camTheta+=0.0003;updateCam();}const _t=Date.now(),_sch=0.5+0.5*Math.sin(_t*0.04917);atmo.material.opacity=0.04+0.09*_sch;_uhalo.material.opacity=0.1+0.12*(0.5+0.5*Math.sin(_t*0.04917+Math.PI));if(clouds.parent)clouds.rotation.y+=0.000054;renderer.render(scene,camera);})();
 }
 </script>
 
