@@ -2117,13 +2117,19 @@ function initSpaceView(){
         );
       }
     );
-    // LAYER 2 — MODIS Terra daily overlay (real clouds) → modisOverlay r=1.001
-    // Shader discards pixels with lum<0.04 (swath gaps) → Blue Marble visible there
+    // LAYER 2 — VIIRS SNPP daily overlay (real clouds, 3040km swath = 100% daily coverage, no gaps)
+    // smoothstep alpha blend: dark pixels → transparent, Blue Marble shows through
     // UV flip handled in vertex shader — do NOT apply repeat.x=-1 on texture
     const _d=new Date();_d.setDate(_d.getDate()-1);
-    tl.load(_base+'&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&TIME='+_d.toISOString().slice(0,10),
+    tl.load(_base+'&LAYERS=VIIRS_SNPP_CorrectedReflectance_TrueColor&TIME='+_d.toISOString().slice(0,10),
       tex=>{tex.wrapS=THREE.RepeatWrapping;modisMat.uniforms.modisMap.value=tex;modisMat.needsUpdate=true;},
-      undefined,()=>{});
+      undefined,
+      ()=>{
+        // VIIRS fallback → MODIS Terra+Aqua combined (~90% daily)
+        tl.load(_base+'&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&TIME='+_d.toISOString().slice(0,10),
+          tex=>{tex.wrapS=THREE.RepeatWrapping;modisMat.uniforms.modisMap.value=tex;modisMat.needsUpdate=true;},
+          undefined,()=>{});
+      });
   }
   _loadRealTex();
   // Community dots — other users' positions on globe (warm orange, distinct from own cyan)
