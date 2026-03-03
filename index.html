@@ -2038,25 +2038,31 @@ function initSpaceView(){
   cvs.addEventListener('pointermove',e=>{ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.size===1&&drag){camTheta-=(e.clientX-px)*0.006;camPhi=Math.max(-1.3,Math.min(1.3,camPhi-(e.clientY-py)*0.004));px=e.clientX;py=e.clientY;updateCam();}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(lp>0){camDist=Math.max(1.3,Math.min(12,camDist*lp/d));if(camDist<=1.35)setTimeout(closeSpaceView,300);updateCam();}lp=d;}});
   cvs.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(ptrs.size===0){drag=false;lp=0;}else if(ptrs.size===1){const[p]=[...ptrs.values()];px=p.x;py=p.y;drag=true;lp=0;}});
   cvs.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);if(ptrs.size===0){drag=false;lp=0;}});
-  // Real Earth texture — world-atlas TopoJSON, equirectangular, aligned to geo3D
-  // THREE.js SphereGeometry U: 0→-X(lng=180) 0.25→+Z(lng=90E) 0.5→+X(lng=0) 0.75→-Z(lng=90W)
-  // Correct formula: x=(180-lng)/360*w (NOT lng+180 — that mirrors east/west)
+  // Real satellite texture — NASA/NOAA composite via three-globe npm (CORS via jsdelivr)
+  // THREE.js sphere UV: U=0→-X(lng=180)…U=0.5→+X(lng=0). Standard equirect: left=lng=-180.
+  // Fix: repeat.x=-1, offset.x=1 → mirrors texture horizontally → correct geo alignment
   function _loadRealTex(){
-    const loadLib=typeof topojson!=='undefined'?Promise.resolve():new Promise(res=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js';s.onload=res;document.head.appendChild(s);});
-    Promise.all([loadLib,fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r=>r.json())])
-      .then(([,w])=>{
-        const c=document.createElement('canvas');c.width=2048;c.height=1024;
-        const ctx=c.getContext('2d');ctx.fillStyle='#0a1f3e';ctx.fillRect(0,0,2048,1024);
-        topojson.feature(w,w.objects.countries).features.forEach(f=>{
-          const polys=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;
-          polys.forEach(poly=>{ctx.beginPath();poly[0].forEach(([lng,lat],i)=>{const x=(180-lng)/360*2048,y=(90-lat)/180*1024;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.closePath();ctx.fillStyle='#2d6a2d';ctx.fill();ctx.strokeStyle='rgba(80,160,80,0.5)';ctx.lineWidth=0.8;ctx.stroke();});
-        });
-        ctx.fillStyle='rgba(220,240,255,0.92)';ctx.fillRect(0,0,2048,55);ctx.fillRect(0,969,2048,55);
-        ctx.strokeStyle='rgba(100,180,255,0.12)';ctx.lineWidth=0.5;
-        for(let i=1;i<12;i++){const y=i*1024/12;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(2048,y);ctx.stroke();}
-        for(let i=1;i<24;i++){const x=i*2048/24;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,1024);ctx.stroke();}
-        earth.material.map=new THREE.CanvasTexture(c);earth.material.needsUpdate=true;
-      }).catch(()=>{});
+    const tl=new THREE.TextureLoader();
+    // Primary: real satellite imagery
+    tl.load('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-day.jpg',
+      tex=>{tex.wrapS=THREE.RepeatWrapping;tex.repeat.x=-1;tex.offset.x=1;earth.material.map=tex;earth.material.needsUpdate=true;},
+      undefined,
+      ()=>{
+        // Fallback: world-atlas country outlines
+        const loadLib=typeof topojson!=='undefined'?Promise.resolve():new Promise(res=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js';s.onload=res;document.head.appendChild(s);});
+        Promise.all([loadLib,fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r=>r.json())])
+          .then(([,w])=>{
+            const c=document.createElement('canvas');c.width=2048;c.height=1024;
+            const ctx=c.getContext('2d');ctx.fillStyle='#0a1f3e';ctx.fillRect(0,0,2048,1024);
+            topojson.feature(w,w.objects.countries).features.forEach(f=>{
+              const polys=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;
+              polys.forEach(poly=>{ctx.beginPath();poly[0].forEach(([lng,lat],i)=>{const x=(180-lng)/360*2048,y=(90-lat)/180*1024;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.closePath();ctx.fillStyle='#2d6a2d';ctx.fill();ctx.strokeStyle='rgba(80,160,80,0.5)';ctx.lineWidth=0.8;ctx.stroke();});
+            });
+            ctx.fillStyle='rgba(220,240,255,0.92)';ctx.fillRect(0,0,2048,55);ctx.fillRect(0,969,2048,55);
+            earth.material.map=new THREE.CanvasTexture(c);earth.material.needsUpdate=true;
+          }).catch(()=>{});
+      }
+    );
   }
   _loadRealTex();
   // Render loop — camera auto-orbits slowly, Earth stays fixed
