@@ -2136,7 +2136,10 @@ function initSpaceView(){
   function _fetchISS(){fetch('https://api.wheretheiss.at/v1/satellites/25544').then(r=>r.json()).then(d=>_setISSPos(d.latitude,d.longitude)).catch(()=>{});}
   _fetchISS();setInterval(_fetchISS,15000);
   // ISS panel state: 0=closed 1=half-screen 2=full-screen
-  function _issSetState(s){_issState=s;_issActive=(s>0);const panel=document.getElementById('iss-panel'),btn=document.getElementById('iss-open-btn');if(!panel)return;if(s===0){panel.style.height='0';btn.style.display='block';const f=document.getElementById('iss-iframe');if(f)f.src='';}else{panel.style.height=(s===1?'50vh':'100vh');btn.style.display='none';const f=document.getElementById('iss-iframe');if(f&&!f.src)f.src='https://www.youtube.com/embed/live_stream?channel=UCryGec9PnrmLd-gbzdXZTiA&autoplay=1&mute=1';}}
+  // NASA ISS live stream: "Live Video from the International Space Station (Official NASA Stream)"
+  // If stream shows "video unavailable" → go to youtube.com, search "NASA ISS live", copy video ID, update here
+  const _ISS_YT='P9C25Un7xaM';
+  function _issSetState(s){_issState=s;_issActive=(s>0);const panel=document.getElementById('iss-panel'),btn=document.getElementById('iss-open-btn');if(!panel)return;if(s===0){panel.style.height='0';btn.style.display='block';const f=document.getElementById('iss-iframe');if(f)f.src='';}else{panel.style.height=(s===1?'50vh':'100vh');btn.style.display='none';const f=document.getElementById('iss-iframe'),lnk=document.getElementById('iss-ytlink');if(f&&!f.src){f.src='https://www.youtube.com/embed/'+_ISS_YT+'?autoplay=1&mute=1';}if(lnk)lnk.href='https://www.youtube.com/watch?v='+_ISS_YT;}}
   window.issOpen=()=>_issSetState(1);window.issResize=()=>_issSetState(_issState===1?2:1);window.issClose=()=>_issSetState(0);
   // Community dots — other users' positions on globe (warm orange, distinct from own cyan)
   const _cdots=new Map();
@@ -2171,7 +2174,8 @@ initFirebase();
   <div id="iss-panel" style="position:absolute;bottom:0;left:0;width:100%;height:0;transition:height 0.35s cubic-bezier(0.4,0,0.2,1);overflow:hidden;z-index:9990;display:flex;flex-direction:column;background:#000008">
     <div style="height:44px;min-height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(2,6,18,0.97);border-top:1px solid rgba(0,200,100,0.3);box-sizing:border-box">
       <span style="color:rgba(0,200,100,0.92);font-size:0.62rem;letter-spacing:0.13em;font-family:inherit">ISS &#9679; LIVE</span>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <a id="iss-ytlink" href="#" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.5);font-size:0.6rem;font-family:inherit;text-decoration:none;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:7px">YT&#8599;</a>
         <button onclick="issResize()" style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.75);padding:5px 13px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-family:inherit">&#8597;</button>
         <button onclick="issClose()" style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.75);padding:5px 13px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-family:inherit">&#10005;</button>
       </div>
