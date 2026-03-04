@@ -2125,7 +2125,9 @@ function initSpaceView(){
     // TIME format: full datetime ISO string (not just date)
     // Round to 10-min slot, subtract 30 min for data pipeline delay
     function _goesTime(){const n=new Date(Date.now()-30*60000);n.setUTCSeconds(0,0);n.setUTCMinutes(Math.floor(n.getUTCMinutes()/10)*10);return n.toISOString().slice(0,19)+'Z';}
-    function _loadGOES(){const tg=new THREE.TextureLoader();tg.load(_base+'&LAYERS=GOES-East_ABI_GeoColor&TIME='+_goesTime(),tex=>{tex.wrapS=THREE.RepeatWrapping;goesMat.uniforms.modisMap.value=tex;goesMat.needsUpdate=true;},undefined,()=>{});}
+    // LIVE chip — announces that this is real satellite data, not CGI
+    const _liveChip=(()=>{const el=document.createElement('div');el.style.cssText='position:absolute;bottom:18px;right:18px;background:rgba(2,10,25,0.82);border:1px solid rgba(0,220,120,0.45);color:rgba(0,220,120,0.92);padding:5px 11px;border-radius:7px;font-size:0.62rem;letter-spacing:0.12em;pointer-events:none;z-index:9999;font-family:inherit';document.getElementById('vspace').appendChild(el);return el;})();
+    function _loadGOES(){const t=_goesTime();const tg=new THREE.TextureLoader();tg.load(_base+'&LAYERS=GOES-East_ABI_GeoColor&TIME='+t,tex=>{tex.wrapS=THREE.RepeatWrapping;goesMat.uniforms.modisMap.value=tex;goesMat.needsUpdate=true;_liveChip.textContent='GOES-E \u25CF LIVE \u00B7 '+t.slice(11,16)+' UTC';},undefined,()=>{_liveChip.textContent='GOES-E \u25CB GIBS';});}
     _loadGOES();
     setInterval(_loadGOES,600000);// refresh every 10 minutes — GOES live update
   }
