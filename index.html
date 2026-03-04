@@ -2042,19 +2042,16 @@ function initSpaceView(){
   scene.add(earth);
   const atmo=new THREE.Mesh(new THREE.SphereGeometry(1.03,32,32),new THREE.ShaderMaterial({uniforms:{glowColor:{value:new THREE.Color(0x4488ff)},glowOpacity:{value:0.4}},vertexShader:'varying vec3 vNormal;void main(){vNormal=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'uniform vec3 glowColor;uniform float glowOpacity;varying vec3 vNormal;void main(){float r=pow(max(0.0,1.0-dot(vNormal,vec3(0.0,0.0,1.0))),4.0);gl_FragColor=vec4(glowColor,r*glowOpacity);}',transparent:true,side:THREE.FrontSide,blending:THREE.AdditiveBlending,depthWrite:false}));
   earth.add(atmo);
-  // Satellite overlay — dual VIIRS layer: SNPP (r=1.001) + NOAA-20 (r=1.002)
-  // Two satellites have different orbital phases → granule seams in different geographic locations
-  // Blending both at 0.75 opacity: seams of one covered by clean data of other → pseudo-seamless
-  // UV flip in vertex shader: vUv=vec2(1-u,v) mirrors equirectangular to match Three.js sphere orientation
+  // GOES-East_ABI_GeoColor overlay — geostationary satellite, 10-min updates, NO orbital seams
+  // Geostationary = fixed point in space → same viewing angle always → physically impossible to have sweep artifacts
+  // Coverage: Americas + Atlantic + W.Europe/Africa. Non-coverage areas = black → transparent → Blue Marble shows
+  // GeoColor: daytime true color + nighttime IR (city lights, lightning) — always something to show
   const _blk=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1,THREE.RGBAFormat);_blk.needsUpdate=true;
-  const _satFrag='uniform sampler2D modisMap;varying vec2 vUv;void main(){vec4 c=texture2D(modisMap,vUv);float a=smoothstep(0.12,0.30,dot(c.rgb,vec3(0.299,0.587,0.114)));gl_FragColor=vec4(c.rgb,a*0.75);}';
   const _satVert='varying vec2 vUv;void main(){vUv=vec2(1.0-uv.x,uv.y);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
-  const modisMat=new THREE.ShaderMaterial({uniforms:{modisMap:{value:_blk}},vertexShader:_satVert,fragmentShader:_satFrag,transparent:true,depthWrite:false});
-  const modisOverlay=new THREE.Mesh(new THREE.SphereGeometry(1.001,64,64),modisMat);
-  scene.add(modisOverlay);
-  const noaaMat=new THREE.ShaderMaterial({uniforms:{modisMap:{value:_blk}},vertexShader:_satVert,fragmentShader:_satFrag,transparent:true,depthWrite:false});
-  const noaaOverlay=new THREE.Mesh(new THREE.SphereGeometry(1.002,64,64),noaaMat);
-  scene.add(noaaOverlay);
+  const _goesFrag='uniform sampler2D modisMap;varying vec2 vUv;void main(){vec4 c=texture2D(modisMap,vUv);float a=smoothstep(0.05,0.20,dot(c.rgb,vec3(0.299,0.587,0.114)));gl_FragColor=vec4(c.rgb,a);}';
+  const goesMat=new THREE.ShaderMaterial({uniforms:{modisMap:{value:_blk}},vertexShader:_satVert,fragmentShader:_goesFrag,transparent:true,depthWrite:false});
+  const goesOverlay=new THREE.Mesh(new THREE.SphereGeometry(1.001,64,64),goesMat);
+  scene.add(goesOverlay);
   // Moon
   const moon=new THREE.Mesh(new THREE.SphereGeometry(0.272,32,32),new THREE.MeshPhongMaterial({map:_mkMTex()}));
   scene.add(moon);
@@ -2124,23 +2121,13 @@ function initSpaceView(){
         );
       }
     );
-    // LAYER 2 — VIIRS SNPP (Suomi NPP) daily overlay, r=1.001
-    // LAYER 3 — VIIRS NOAA-20 daily overlay, r=1.002 (different orbital phase → seams in different locations)
-    // Combined: each satellite's seam zone covered by clean data of other → pseudo-seamless composite
-    const _d=new Date();_d.setDate(_d.getDate()-1);
-    const _dt=_d.toISOString().slice(0,10);
-    tl.load(_base+'&LAYERS=VIIRS_SNPP_CorrectedReflectance_TrueColor&TIME='+_dt,
-      tex=>{tex.wrapS=THREE.RepeatWrapping;modisMat.uniforms.modisMap.value=tex;modisMat.needsUpdate=true;},
-      undefined,
-      ()=>{
-        tl.load(_base+'&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&TIME='+_dt,
-          tex=>{tex.wrapS=THREE.RepeatWrapping;modisMat.uniforms.modisMap.value=tex;modisMat.needsUpdate=true;},
-          undefined,()=>{});
-      });
-    // NOAA-20 VIIRS — loads independently, different orbit from SNPP
-    tl.load(_base+'&LAYERS=VIIRS_NOAA20_CorrectedReflectance_TrueColor&TIME='+_dt,
-      tex=>{tex.wrapS=THREE.RepeatWrapping;noaaMat.uniforms.modisMap.value=tex;noaaMat.needsUpdate=true;},
-      undefined,()=>{});
+    // LAYER 2 — GOES-East_ABI_GeoColor (geostationary, 10-min updates, no orbital seams)
+    // TIME format: full datetime ISO string (not just date)
+    // Round to 10-min slot, subtract 30 min for data pipeline delay
+    function _goesTime(){const n=new Date(Date.now()-30*60000);n.setUTCSeconds(0,0);n.setUTCMinutes(Math.floor(n.getUTCMinutes()/10)*10);return n.toISOString().slice(0,19)+'Z';}
+    function _loadGOES(){const tg=new THREE.TextureLoader();tg.load(_base+'&LAYERS=GOES-East_ABI_GeoColor&TIME='+_goesTime(),tex=>{tex.wrapS=THREE.RepeatWrapping;goesMat.uniforms.modisMap.value=tex;goesMat.needsUpdate=true;},undefined,()=>{});}
+    _loadGOES();
+    setInterval(_loadGOES,600000);// refresh every 10 minutes — GOES live update
   }
   _loadRealTex();
   // Community dots — other users' positions on globe (warm orange, distinct from own cyan)
