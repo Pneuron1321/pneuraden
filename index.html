@@ -2139,7 +2139,7 @@ function initSpaceView(){
   // NASA ISS live stream: "Live Video from the International Space Station (Official NASA Stream)"
   // If stream shows "video unavailable" → go to youtube.com, search "NASA ISS live", copy video ID, update here
   const _ISS_YT='zPH5KtjJFaQ'; // NASA ISS live — verified 2026-03-04
-  function _issSetState(s){_issState=s;_issActive=(s>0);const panel=document.getElementById('iss-panel'),btn=document.getElementById('iss-open-btn');if(!panel)return;if(s===0){panel.style.height='0';btn.style.display='block';const f=document.getElementById('iss-iframe');if(f)f.src='';}else{panel.style.height=(s===1?'50vh':'100vh');btn.style.display='none';const f=document.getElementById('iss-iframe'),lnk=document.getElementById('iss-ytlink');if(f&&!f.src){f.src='https://www.youtube.com/embed/'+_ISS_YT+'?autoplay=1&mute=1';}if(lnk)lnk.href='https://www.youtube.com/watch?v='+_ISS_YT;}}
+  function _issSetState(s){_issState=s;_issActive=(s>0);const panel=document.getElementById('iss-panel'),btn=document.getElementById('iss-open-btn');if(!panel)return;if(s===0){panel.style.height='0';btn.style.display='block';const f=document.getElementById('iss-iframe');if(f)f.src='';}else{panel.style.height=(s===1?'50vh':'100vh');btn.style.display='none';const f=document.getElementById('iss-iframe'),lnk=document.getElementById('iss-ytlink');if(f&&!f.src){f.src='https://www.youtube.com/embed/'+_ISS_YT+'?playsinline=1&rel=0';}if(lnk)lnk.href='https://www.youtube.com/watch?v='+_ISS_YT;}}
   window.issOpen=()=>_issSetState(1);window.issResize=()=>_issSetState(_issState===1?2:1);window.issClose=()=>_issSetState(0);
   // Community dots — other users' positions on globe (warm orange, distinct from own cyan)
   const _cdots=new Map();
