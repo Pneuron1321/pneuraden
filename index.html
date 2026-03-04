@@ -2048,7 +2048,9 @@ function initSpaceView(){
   // GeoColor: daytime true color + nighttime IR (city lights, lightning) — always something to show
   const _blk=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1,THREE.RGBAFormat);_blk.needsUpdate=true;
   const _satVert='varying vec2 vUv;void main(){vUv=vec2(1.0-uv.x,uv.y);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
-  const _goesFrag='uniform sampler2D modisMap;varying vec2 vUv;void main(){vec4 c=texture2D(modisMap,vUv);float a=smoothstep(0.05,0.20,dot(c.rgb,vec3(0.299,0.587,0.114)));gl_FragColor=vec4(c.rgb,a);}';
+  const _goesFrag='uniform sampler2D modisMap;varying vec2 vUv;void main(){vec4 c=texture2D(modisMap,vUv);float lum=dot(c.rgb,vec3(0.299,0.587,0.114));float mx=max(c.r,max(c.g,c.b));float sat=mx>0.01?(mx-min(c.r,min(c.g,c.b)))/mx:0.0;float a=smoothstep(0.30,0.55,lum)*smoothstep(0.30,0.05,sat);gl_FragColor=vec4(c.rgb,a);}';
+  // Cloud detection: bright (lum>0.30) AND desaturated (sat<0.30) → clouds visible
+  // Ocean dark (low lum) → transparent | Land/desert colorful (high sat) → transparent | Seams dim → transparent
   const goesMat=new THREE.ShaderMaterial({uniforms:{modisMap:{value:_blk}},vertexShader:_satVert,fragmentShader:_goesFrag,transparent:true,depthWrite:false});
   const goesOverlay=new THREE.Mesh(new THREE.SphereGeometry(1.001,64,64),goesMat);
   scene.add(goesOverlay);
@@ -2121,17 +2123,21 @@ function initSpaceView(){
         );
       }
     );
-    // LAYER 2 — GOES-East_ABI_GeoColor (geostationary, 10-min updates, no orbital seams)
-    // TIME format: full datetime ISO string (not just date)
-    // Round to 10-min slot, subtract 30 min for data pipeline delay
-    function _goesTime(){const n=new Date(Date.now()-30*60000);n.setUTCSeconds(0,0);n.setUTCMinutes(Math.floor(n.getUTCMinutes()/10)*10);return n.toISOString().slice(0,19)+'Z';}
-    // LIVE chip — announces that this is real satellite data, not CGI
-    const _liveChip=(()=>{const el=document.createElement('div');el.style.cssText='position:absolute;bottom:18px;right:18px;background:rgba(2,10,25,0.82);border:1px solid rgba(0,220,120,0.45);color:rgba(0,220,120,0.92);padding:5px 11px;border-radius:7px;font-size:0.62rem;letter-spacing:0.12em;pointer-events:none;z-index:9999;font-family:inherit';document.getElementById('vspace').appendChild(el);return el;})();
-    function _loadGOES(){const t=_goesTime();const tg=new THREE.TextureLoader();tg.load(_base+'&LAYERS=GOES-East_ABI_GeoColor&TIME='+t,tex=>{tex.wrapS=THREE.RepeatWrapping;goesMat.uniforms.modisMap.value=tex;goesMat.needsUpdate=true;_liveChip.textContent='GOES-E \u25CF LIVE \u00B7 '+t.slice(11,16)+' UTC';},undefined,()=>{_liveChip.textContent='GOES-E \u25CB GIBS';});}
-    _loadGOES();
-    setInterval(_loadGOES,600000);// refresh every 10 minutes — GOES live update
+    // LAYER 2 — GOES satellite overlay (Phase B: toggle button, loaded on demand)
+    // goesOverlay stays invisible until GOES toggle activated: _blk tex → lum=0 → alpha=0 in shader
   }
   _loadRealTex();
+  // ── ISS TRACKING — real-time position via public API, no auth needed, CORS ok ──────────────
+  let _issLat=0,_issLng=0,_issCamTheta=0,_issCamPhi=0,_issActive=false,_issState=0;
+  const _issDot=new THREE.Mesh(new THREE.SphereGeometry(0.016,10,10),new THREE.MeshBasicMaterial({color:0x88ff44}));
+  const _issRing=new THREE.Mesh(new THREE.SphereGeometry(0.044,10,10),new THREE.MeshBasicMaterial({color:0x55ee22,transparent:true,opacity:0.13}));
+  scene.add(_issDot);scene.add(_issRing);
+  function _setISSPos(lat,lng){_issLat=lat;_issLng=lng;const p=geo3D(lat,lng);_issDot.position.copy(p).multiplyScalar(1.016);_issRing.position.copy(p).multiplyScalar(1.016);_issCamTheta=Math.atan2(p.x,p.z);_issCamPhi=Math.asin(Math.max(-0.95,Math.min(0.95,p.y)));}
+  function _fetchISS(){fetch('https://api.wheretheiss.at/v1/satellites/25544').then(r=>r.json()).then(d=>_setISSPos(d.latitude,d.longitude)).catch(()=>{});}
+  _fetchISS();setInterval(_fetchISS,15000);
+  // ISS panel state: 0=closed 1=half-screen 2=full-screen
+  function _issSetState(s){_issState=s;_issActive=(s>0);const panel=document.getElementById('iss-panel'),btn=document.getElementById('iss-open-btn');if(!panel)return;if(s===0){panel.style.height='0';btn.style.display='block';const f=document.getElementById('iss-iframe');if(f)f.src='';}else{panel.style.height=(s===1?'50vh':'100vh');btn.style.display='none';const f=document.getElementById('iss-iframe');if(f&&!f.src)f.src='https://www.youtube.com/embed/live_stream?channel=UCryGec9PnrmLd-gbzdXZTiA&autoplay=1&mute=1';}}
+  window.issOpen=()=>_issSetState(1);window.issResize=()=>_issSetState(_issState===1?2:1);window.issClose=()=>_issSetState(0);
   // Community dots — other users' positions on globe (warm orange, distinct from own cyan)
   const _cdots=new Map();
   function _loadCommunity(){
@@ -2147,8 +2153,8 @@ function initSpaceView(){
     });
   }
   _loadCommunity();
-  // Render loop — camera auto-orbits slowly, Earth stays fixed
-  (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag&&!_diving){camTheta+=0.0003;updateCam();}const _t=Date.now(),_sch=0.5+0.5*Math.sin(_t*0.04917);atmo.material.uniforms.glowOpacity.value=0.18+0.22*_sch;_uhalo.material.opacity=0.1+0.12*(0.5+0.5*Math.sin(_t*0.04917+Math.PI));renderer.render(scene,camera);})();
+  // Render loop — auto-orbits normally; when ISS panel open → camera tracks ISS position
+  (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag&&!_diving){if(_issActive){let _dt=_issCamTheta-camTheta;while(_dt>Math.PI)_dt-=2*Math.PI;while(_dt<-Math.PI)_dt+=2*Math.PI;camTheta+=_dt*0.025;camPhi+=(_issCamPhi-camPhi)*0.025;}else{camTheta+=0.0003;}updateCam();}const _t=Date.now(),_sch=0.5+0.5*Math.sin(_t*0.04917);atmo.material.uniforms.glowOpacity.value=0.18+0.22*_sch;_uhalo.material.opacity=0.1+0.12*(0.5+0.5*Math.sin(_t*0.04917+Math.PI));renderer.render(scene,camera);})();
 }
 
 // Start Firebase presence layer (loads SDK async, safe if FB_CONFIG not filled)
@@ -2158,7 +2164,20 @@ initFirebase();
 <!-- SPACE VIEW — 3D Globe -->
 <div id="vspace" class="view" style="background:#000008;touch-action:none">
   <button onclick="closeSpaceView()" style="position:absolute;top:14px;left:14px;z-index:9999;background:rgba(4,7,22,0.85);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.85);border-radius:10px;padding:10px 18px;cursor:pointer;font-family:inherit;font-size:.75rem;letter-spacing:.12em;pointer-events:auto">&#8592; КАРТА</button>
+  <!-- ISS button — visible when panel closed -->
+  <button id="iss-open-btn" onclick="issOpen()" style="position:absolute;bottom:18px;right:18px;z-index:9999;background:rgba(2,8,20,0.88);border:1px solid rgba(0,200,100,0.4);color:rgba(0,200,100,0.92);border-radius:10px;padding:10px 18px;cursor:pointer;font-family:inherit;font-size:.72rem;letter-spacing:.12em;pointer-events:auto">ISS &#9679; LIVE</button>
   <div id="space-canvas-wrap" style="width:100%;height:100%;position:absolute;inset:0"></div>
+  <!-- ISS panel — slides up from bottom, 3 states: 0=hidden 1=half 2=full -->
+  <div id="iss-panel" style="position:absolute;bottom:0;left:0;width:100%;height:0;transition:height 0.35s cubic-bezier(0.4,0,0.2,1);overflow:hidden;z-index:9990;display:flex;flex-direction:column;background:#000008">
+    <div style="height:44px;min-height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(2,6,18,0.97);border-top:1px solid rgba(0,200,100,0.3);box-sizing:border-box">
+      <span style="color:rgba(0,200,100,0.92);font-size:0.62rem;letter-spacing:0.13em;font-family:inherit">ISS &#9679; LIVE</span>
+      <div style="display:flex;gap:8px">
+        <button onclick="issResize()" style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.75);padding:5px 13px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-family:inherit">&#8597;</button>
+        <button onclick="issClose()" style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.75);padding:5px 13px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-family:inherit">&#10005;</button>
+      </div>
+    </div>
+    <iframe id="iss-iframe" style="flex:1;width:100%;border:none;background:#000008;display:block" src="" allow="autoplay;fullscreen" allowfullscreen></iframe>
+  </div>
 </div>
 </body>
 </html>
