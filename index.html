@@ -1977,23 +1977,26 @@ if(_rv){sessionStorage.removeItem('pnd-rv');go(_rv);}
 // Setup: firebase.google.com → Create project → Realtime Database + Anonymous Auth
 // DB rules: users/$uid { ".read":true, ".write":"auth.uid===$uid" }
 const FB_CONFIG={
-  apiKey:"YOUR_API_KEY",
-  authDomain:"YOUR-PROJECT.firebaseapp.com",
-  databaseURL:"https://YOUR-PROJECT-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId:"YOUR-PROJECT",
-  appId:"YOUR_APP_ID"
+  apiKey:"AIzaSyCjNAjEDmkQFplLta9bAKcV812Yf3utVXQ",
+  authDomain:"pneuron-app.firebaseapp.com",
+  databaseURL:"https://pneuron-app-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"pneuron-app",
+  storageBucket:"pneuron-app.firebasestorage.app",
+  messagingSenderId:"950975182775",
+  appId:"1:950975182775:web:7f5a8dbab8d432bc461a32"
 };
-let _fbDb=null,_fbUid=null;
+let _fbDb=null,_fbUid=null,_fsDb=null;
 
 function initFirebase(){
   // Load Firebase SDK chain (app → auth → database) then setup
   function _seq(srcs,i,cb){if(i>=srcs.length){cb();return;}const s=document.createElement('script');s.src=srcs[i];s.onload=()=>_seq(srcs,i+1,cb);document.head.appendChild(s);}
-  _seq(['https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js'],0,_fbSetup);
+  _seq(['https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js'],0,_fbSetup);
 }
 function _fbSetup(){
   if(!FB_CONFIG.apiKey||FB_CONFIG.apiKey==='YOUR_API_KEY')return; // not configured
   if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
   _fbDb=firebase.database();
+  _fsDb=firebase.firestore();
   firebase.auth().signInAnonymously().then(c=>{_fbUid=c.user.uid;_fbWrite();}).catch(()=>{});
 }
 function _fbWrite(){
