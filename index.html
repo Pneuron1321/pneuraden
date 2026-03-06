@@ -2128,19 +2128,20 @@ function initSpaceView(){
   }
   _loadRealTex();
   // ── ISS TRACKING — real-time position via public API, no auth needed, CORS ok ──────────────
-  let _issLat=0,_issLng=0,_issCamTheta=0,_issCamPhi=0,_issActive=false,_issState=0;
+  let _issLat=0,_issLng=0,_issCamTheta=0,_issCamPhi=0,_issActive=false,_issState=0,_issAlt=0,_issSpd=0,_issVis='';
   const _issDot=new THREE.Mesh(new THREE.SphereGeometry(0.016,10,10),new THREE.MeshBasicMaterial({color:0x88ff44}));
   const _issRing=new THREE.Mesh(new THREE.SphereGeometry(0.044,10,10),new THREE.MeshBasicMaterial({color:0x55ee22,transparent:true,opacity:0.13}));
   scene.add(_issDot);scene.add(_issRing);
   function _setISSPos(lat,lng){_issLat=lat;_issLng=lng;const p=geo3D(lat,lng);_issDot.position.copy(p).multiplyScalar(1.016);_issRing.position.copy(p).multiplyScalar(1.016);_issCamTheta=Math.atan2(p.x,p.z);_issCamPhi=Math.asin(Math.max(-0.95,Math.min(0.95,p.y)));}
-  function _fetchISS(){fetch('https://api.wheretheiss.at/v1/satellites/25544').then(r=>r.json()).then(d=>_setISSPos(d.latitude,d.longitude)).catch(()=>{});}
+  function _fetchISS(){fetch('https://api.wheretheiss.at/v1/satellites/25544').then(r=>r.json()).then(d=>{_setISSPos(d.latitude,d.longitude);_issAlt=Math.round(d.altitude||0);_issSpd=Math.round(d.velocity||0);_issVis=d.visibility||'';const ea=document.getElementById('iss-alt'),es=document.getElementById('iss-spd'),ev=document.getElementById('iss-vis');if(ea)ea.textContent=_issAlt.toLocaleString();if(es)es.textContent=_issSpd.toLocaleString();if(ev)ev.textContent=_issVis==='daylight'?'\u2600 ДЕНЬ':'\u25d7 ТЕНЬ';}).catch(()=>{});}
   _fetchISS();setInterval(_fetchISS,15000);
   // ISS panel state: 0=closed 1=half-screen 2=full-screen
   // NASA ISS live stream: "Live Video from the International Space Station (Official NASA Stream)"
   // If stream shows "video unavailable" → go to youtube.com, search "NASA ISS live", copy video ID, update here
   const _ISS_YT='zPH5KtjJFaQ'; // NASA ISS live — verified 2026-03-04
-  function _issSetState(s){_issState=s;_issActive=(s>0);const panel=document.getElementById('iss-panel'),btn=document.getElementById('iss-open-btn');if(!panel)return;if(s===0){panel.style.height='0';btn.style.display='block';const f=document.getElementById('iss-iframe');if(f)f.src='';}else{panel.style.height=(s===1?'50vh':'100vh');btn.style.display='none';const f=document.getElementById('iss-iframe'),lnk=document.getElementById('iss-ytlink');if(f&&!f.src){f.src='https://www.youtube.com/embed/'+_ISS_YT+'?playsinline=1&rel=0';}if(lnk)lnk.href='https://www.youtube.com/watch?v='+_ISS_YT;}}
+  function _issSetState(s){_issState=s;_issActive=(s>0);const panel=document.getElementById('iss-panel'),btn=document.getElementById('iss-open-btn');if(!panel)return;if(s===0){panel.style.height='0';btn.style.display='block';const slot=document.getElementById('iss-video-slot'),f=slot&&slot.querySelector('iframe');if(f)f.remove();const poster=document.getElementById('iss-poster');if(poster)poster.style.display='flex';}else{panel.style.height=(s===1?'50vh':'100vh');btn.style.display='none';const lnk=document.getElementById('iss-ytlink');if(lnk)lnk.href='https://www.youtube.com/watch?v='+_ISS_YT;}}
   window.issOpen=()=>_issSetState(1);window.issResize=()=>_issSetState(_issState===1?2:1);window.issClose=()=>_issSetState(0);
+  window.issPlayVideo=function(){const slot=document.getElementById('iss-video-slot');const poster=document.getElementById('iss-poster');if(!slot||slot.querySelector('iframe'))return;if(poster)poster.style.display='none';const f=document.createElement('iframe');f.style.cssText='position:absolute;inset:0;width:100%;height:100%;border:none;background:#000008;display:block';f.src='https://www.youtube.com/embed/'+_ISS_YT+'?autoplay=1&playsinline=1&rel=0';f.setAttribute('allow','autoplay;fullscreen');f.allowFullscreen=true;slot.appendChild(f);};
   // Community dots — other users' positions on globe (warm orange, distinct from own cyan)
   const _cdots=new Map();
   function _loadCommunity(){
@@ -2172,7 +2173,7 @@ initFirebase();
   <div id="space-canvas-wrap" style="width:100%;height:100%;position:absolute;inset:0"></div>
   <!-- ISS panel — slides up from bottom, 3 states: 0=hidden 1=half 2=full -->
   <div id="iss-panel" style="position:absolute;bottom:0;left:0;width:100%;height:0;transition:height 0.35s cubic-bezier(0.4,0,0.2,1);overflow:hidden;z-index:9990;display:flex;flex-direction:column;background:#000008">
-    <div style="height:44px;min-height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(2,6,18,0.97);border-top:1px solid rgba(0,200,100,0.3);box-sizing:border-box">
+    <div style="height:44px;min-height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(2,6,18,0.97);border-top:1px solid rgba(0,200,100,0.3);box-sizing:border-box;flex-shrink:0">
       <span style="color:rgba(0,200,100,0.92);font-size:0.62rem;letter-spacing:0.13em;font-family:inherit">ISS &#9679; LIVE</span>
       <div style="display:flex;gap:8px;align-items:center">
         <a id="iss-ytlink" href="#" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.5);font-size:0.6rem;font-family:inherit;text-decoration:none;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:7px">YT&#8599;</a>
@@ -2180,7 +2181,20 @@ initFirebase();
         <button onclick="issClose()" style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.75);padding:5px 13px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-family:inherit">&#10005;</button>
       </div>
     </div>
-    <iframe id="iss-iframe" style="flex:1;width:100%;border:none;background:#000008;display:block" src="" allow="autoplay;fullscreen" allowfullscreen></iframe>
+    <div style="padding:6px 14px;background:rgba(2,6,18,0.95);border-bottom:1px solid rgba(0,200,100,0.12);display:flex;gap:18px;align-items:center;box-sizing:border-box;flex-shrink:0">
+      <span style="color:rgba(0,200,100,0.65);font-size:0.58rem;letter-spacing:0.1em;font-family:inherit">&#9650; <span id="iss-alt">—</span> КМ</span>
+      <span style="color:rgba(0,200,100,0.65);font-size:0.58rem;letter-spacing:0.1em;font-family:inherit">&#9654; <span id="iss-spd">—</span> КМ/Ч</span>
+      <span id="iss-vis" style="color:rgba(0,200,100,0.45);font-size:0.58rem;letter-spacing:0.1em;font-family:inherit">—</span>
+    </div>
+    <div id="iss-video-slot" style="flex:1;width:100%;background:#000008;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden">
+      <div id="iss-poster" onclick="issPlayVideo()" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:radial-gradient(ellipse at 40% 35%,#071828 0%,#000008 100%);-webkit-tap-highlight-color:transparent">
+        <div style="width:70px;height:70px;border-radius:50%;background:radial-gradient(circle at 35% 32%,#1a5080 0%,#0a2840 55%,#03101e 100%);box-shadow:0 0 28px rgba(0,180,100,0.18),inset 0 0 14px rgba(0,100,200,0.25);margin-bottom:22px"></div>
+        <div style="width:52px;height:52px;border-radius:50%;border:1.5px solid rgba(0,200,100,0.5);display:flex;align-items:center;justify-content:center;background:rgba(0,200,100,0.07);margin-bottom:14px;box-shadow:0 0 18px rgba(0,200,100,0.12)">
+          <div style="width:0;height:0;border-top:9px solid transparent;border-bottom:9px solid transparent;border-left:15px solid rgba(0,200,100,0.85);margin-left:5px"></div>
+        </div>
+        <span style="color:rgba(0,200,100,0.65);font-size:0.58rem;letter-spacing:0.18em;font-family:inherit">НАЖМИТЕ ДЛЯ ПРОСМОТРА</span>
+      </div>
+    </div>
   </div>
 </div>
 </body>
