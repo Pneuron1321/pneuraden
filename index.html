@@ -426,6 +426,9 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
 .pf-ring:nth-child(2){animation-delay:.87s}
 .pf-ring:nth-child(3){animation-delay:1.74s}
 .pf-core{position:absolute;inset:0;border-radius:50%;animation:pulseGlow 2s ease-in-out infinite}
+/* ── Physics Whisper ─────────────────────────────── */
+#physics-whisper{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;pointer-events:none;padding:40px;text-align:center;opacity:0;}
+#physics-whisper span{font-family:'Rajdhani',sans-serif;font-size:clamp(1rem,4vw,1.45rem);font-weight:500;color:rgba(210,230,255,0.95);line-height:1.65;text-shadow:0 0 40px rgba(120,180,255,0.75),0 0 80px rgba(80,120,255,0.35);letter-spacing:0.03em;max-width:420px;display:block;}
 </style>
 <script defer src="https://unpkg.com/three@0.148.0/build/three.min.js"></script>
 </head>
@@ -2014,9 +2017,11 @@ function openSpaceView(){
   if(typeof THREE==='undefined'){setTimeout(openSpaceView,200);return;}
   go('space');_spaceActive=true;
   if(!_spaceInited){initSpaceView();_spaceInited=true;}
+  _whisperStart();
 }
 function closeSpaceView(){
   _spaceActive=false;
+  _whisperStop();
   go('map');
   if(window._map) setTimeout(()=>window._map.setZoom(2),100);
 }
@@ -2135,6 +2140,17 @@ function initSpaceView(){
   const _issDot=new THREE.Mesh(new THREE.SphereGeometry(0.016,10,10),new THREE.MeshBasicMaterial({color:0x88ff44}));
   const _issRing=new THREE.Mesh(new THREE.SphereGeometry(0.044,10,10),new THREE.MeshBasicMaterial({color:0x55ee22,transparent:true,opacity:0.13}));
   scene.add(_issDot);scene.add(_issRing);
+  // ── АНТИПОД — точка напрямую сквозь ядро Земли ──────────────────────────
+  const _apDot=new THREE.Mesh(new THREE.SphereGeometry(0.013,10,10),new THREE.MeshBasicMaterial({color:0xff6633,transparent:true,opacity:0.85}));
+  const _apHalo=new THREE.Mesh(new THREE.SphereGeometry(0.032,10,10),new THREE.MeshBasicMaterial({color:0xff4400,transparent:true,opacity:0.12}));
+  const _coreLineGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,0)]);
+  const _coreLine=new THREE.Line(_coreLineGeo,new THREE.LineBasicMaterial({color:0xff6633,transparent:true,opacity:0.22}));
+  scene.add(_apDot);scene.add(_apHalo);scene.add(_coreLine);
+  (function(){const aLat=-_upos.lat,aLng=(((_upos.lng+180)%360)+360)%360-180;const ap=geo3D(aLat,aLng);_apDot.position.copy(ap);_apHalo.position.copy(ap);const up=geo3D(_upos.lat,_upos.lng);const arr=_coreLineGeo.attributes.position.array;arr[0]=up.x;arr[1]=up.y;arr[2]=up.z;arr[3]=ap.x;arr[4]=ap.y;arr[5]=ap.z;_coreLineGeo.attributes.position.needsUpdate=true;const elLat=document.getElementById('antipode-lat'),elLng=document.getElementById('antipode-lng');if(elLat)elLat.textContent=(aLat>=0?'+':'')+aLat.toFixed(1)+'\u00b0';if(elLng)elLng.textContent=(aLng>=0?'+':'')+aLng.toFixed(1)+'\u00b0';})();
+  // ── ГРАВИТАЦИОННЫЙ ПРИЛИВ КОРЫ (Solid Earth Tide) ───────────────────────
+  function _solidTide(){const t=Date.now()/1000;return 0.25*Math.cos(2*Math.PI*(t%44712)/44712)+0.11*Math.cos(2*Math.PI*(t%43200)/43200);}
+  function _updateTide(){const v=_solidTide(),cm=(v*100).toFixed(1),el=document.getElementById('tidal-cm');if(el)el.textContent=(v>=0?'+':'')+cm;}
+  setInterval(_updateTide,8000);_updateTide();
   function _setISSPos(lat,lng){_issLat=lat;_issLng=lng;const p=geo3D(lat,lng);_issDot.position.copy(p).multiplyScalar(1.016);_issRing.position.copy(p).multiplyScalar(1.016);_issCamTheta=Math.atan2(p.x,p.z);_issCamPhi=Math.asin(Math.max(-0.95,Math.min(0.95,p.y)));}
   function _fetchISS(){fetch('https://api.wheretheiss.at/v1/satellites/25544').then(r=>r.json()).then(d=>{_setISSPos(d.latitude,d.longitude);_issAlt=Math.round(d.altitude||0);_issSpd=Math.round(d.velocity||0);_issVis=d.visibility||'';const ea=document.getElementById('iss-alt'),es=document.getElementById('iss-spd'),ev=document.getElementById('iss-vis');if(ea)ea.textContent=_issAlt.toLocaleString();if(es)es.textContent=_issSpd.toLocaleString();if(ev)ev.textContent=_issVis==='daylight'?'\u2600 ДЕНЬ':'\u25d7 ТЕНЬ';}).catch(()=>{});}
   _fetchISS();setInterval(_fetchISS,15000);
@@ -2164,6 +2180,28 @@ function initSpaceView(){
   (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag&&!_diving){if(_issActive){let _dt=_issCamTheta-camTheta;while(_dt>Math.PI)_dt-=2*Math.PI;while(_dt<-Math.PI)_dt+=2*Math.PI;camTheta+=_dt*0.025;camPhi+=(_issCamPhi-camPhi)*0.025;}else{camTheta+=0.0003;}updateCam();}const _t=Date.now(),_sch=0.5+0.5*Math.sin(_t*0.04917);atmo.material.uniforms.glowOpacity.value=0.18+0.22*_sch;_uhalo.material.opacity=0.1+0.12*(0.5+0.5*Math.sin(_t*0.04917+Math.PI));renderer.render(scene,camera);})();
 }
 
+// ── PHYSICS WHISPER — воплощённый голос физических сил ──────────────────
+const _WHISPERS=[
+  'Прямо сквозь твои ноги — 12,742 км расплавленного железа. На другой стороне — другой океан.',
+  'За последние 60 секунд сквозь твоё тело прошло около 6,000 частиц от звёзд умерших миллионы лет назад.',
+  'Земля под тобой сейчас медленно поднимается — лунная гравитация деформирует кору планеты.',
+  'Твой компас отклонён от истинного Севера. Это делает расплавленное железо вращающееся в 2,900 км под тобой.',
+  'МКС огибает Землю каждые 92 минуты. Сейчас там люди движутся со скоростью 27,600 км/ч.',
+  'Луна которую ты видишь — образ из прошлого. Настоящая луна на 1.3 секунды впереди.',
+  'Солнечный свет достигающий Земли сейчас покинул Солнце 8 минут 20 секунд назад.',
+  'Ты стоишь на тектонической плите движущейся со скоростью ногтя — несколько сантиметров в год.',
+  'Земля вращается. Прямо сейчас ты движешься на восток со скоростью около 1,200 км/ч.',
+  'Атмосфера давит с силой 10 тонн на каждый квадратный метр твоего тела. Ты не чувствуешь — внутри то же давление.',
+  'Каждый атом кислорода который ты вдыхаешь был создан внутри звезды которой давно нет.',
+  'Земное магнитное поле защищает тебя от солнечного ветра. Без него атмосфера испарилась бы за миллионы лет.',
+  'Полярное сияние происходит прямо сейчас в полярных регионах — солнечные частицы входят в магнитосферу.',
+  'Между тобой и ближайшей звездой после Солнца — 40,000,000,000,000 км пустоты.',
+  'Земля как планета существует 4,500,000,000 лет. Вся история людей — последние 0.000003% этого времени.'
+];
+let _whisperIdx=0,_whisperTimer=null,_whisperActive=false;
+function _whisperShow(){const el=document.getElementById('physics-whisper');if(!el||!_whisperActive)return;const sp=el.querySelector('span');if(!sp)return;sp.textContent=_WHISPERS[_whisperIdx%_WHISPERS.length];_whisperIdx++;el.style.transition='opacity 0.8s ease';el.style.opacity='1';setTimeout(()=>{if(el){el.style.transition='opacity 1.2s ease';el.style.opacity='0';}},4800);}
+function _whisperStart(){if(_whisperActive)return;_whisperActive=true;setTimeout(_whisperShow,1800);_whisperTimer=setInterval(_whisperShow,13000);}
+function _whisperStop(){_whisperActive=false;clearInterval(_whisperTimer);const el=document.getElementById('physics-whisper');if(el){el.style.transition='opacity 0.8s ease';el.style.opacity='0';}}
 // Start Firebase presence layer (loads SDK async, safe if FB_CONFIG not filled)
 initFirebase();
 </script>
@@ -2174,6 +2212,7 @@ initFirebase();
   <!-- ISS button — visible when panel closed -->
   <button id="iss-open-btn" onclick="issOpen()" style="position:absolute;bottom:18px;right:18px;z-index:9999;background:rgba(2,8,20,0.88);border:1px solid rgba(0,200,100,0.4);color:rgba(0,200,100,0.92);border-radius:10px;padding:10px 18px;cursor:pointer;font-family:inherit;font-size:.72rem;letter-spacing:.12em;pointer-events:auto">ISS &#9679; LIVE</button>
   <div id="space-canvas-wrap" style="width:100%;height:100%;position:absolute;inset:0"></div>
+  <div style="position:absolute;top:14px;right:14px;z-index:9999;background:rgba(4,7,22,0.85);border:1px solid rgba(255,100,50,0.35);border-radius:10px;padding:8px 14px;font-family:inherit;font-size:0.6rem;letter-spacing:0.1em;color:rgba(255,130,80,0.9);pointer-events:none;line-height:1.7;text-align:right">&#9673; АНТИПОД<br><span id="antipode-lat">—</span> / <span id="antipode-lng">—</span></div>
   <!-- ISS panel — slides up from bottom, 3 states: 0=hidden 1=half 2=full -->
   <div id="iss-panel" style="position:absolute;bottom:0;left:0;width:100%;height:0;transition:height 0.35s cubic-bezier(0.4,0,0.2,1);overflow:hidden;z-index:9990;display:flex;flex-direction:column;background:#000008">
     <div style="height:44px;min-height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(2,6,18,0.97);border-top:1px solid rgba(0,200,100,0.3);box-sizing:border-box;flex-shrink:0">
@@ -2188,6 +2227,7 @@ initFirebase();
       <span style="color:rgba(0,200,100,0.65);font-size:0.58rem;letter-spacing:0.1em;font-family:inherit">&#9650; <span id="iss-alt">—</span> КМ</span>
       <span style="color:rgba(0,200,100,0.65);font-size:0.58rem;letter-spacing:0.1em;font-family:inherit">&#9654; <span id="iss-spd">—</span> КМ/Ч</span>
       <span id="iss-vis" style="color:rgba(0,200,100,0.45);font-size:0.58rem;letter-spacing:0.1em;font-family:inherit">—</span>
+      <span style="color:rgba(100,160,255,0.65);font-size:0.58rem;letter-spacing:0.1em;font-family:inherit;margin-left:auto" title="Деформация коры планеты (лунный прилив)">&#9662;&#9650; <span id="tidal-cm">—</span> СМ</span>
     </div>
     <div id="iss-video-slot" style="flex:1;width:100%;background:#000008;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden">
       <div id="iss-poster" onclick="issPlayVideo()" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:radial-gradient(ellipse at 40% 35%,#071828 0%,#000008 100%);-webkit-tap-highlight-color:transparent">
@@ -2200,5 +2240,6 @@ initFirebase();
     </div>
   </div>
 </div>
+<div id="physics-whisper"><span></span></div>
 </body>
 </html>
