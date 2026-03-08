@@ -216,10 +216,12 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 [data-theme="light"] .radar-wrap::after{
   background:conic-gradient(
     rgba(99,102,241,0) 0deg,
-    rgba(99,102,241,.20) 8deg,
-    rgba(99,102,241,0) 22deg)}
+    rgba(99,102,241,.65) 4deg,
+    rgba(14,165,233,.50) 18deg,
+    rgba(14,165,233,0) 32deg)}
 .home-main{flex:1;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;position:relative;z-index:5;gap:20px;padding:0 20px}
+  justify-content:center;position:relative;z-index:5;gap:20px;padding:0 20px;
+  perspective:700px;perspective-origin:50% 38%}
 .radar-wrap{position:relative;width:280px;height:280px;cursor:pointer;
   user-select:none;-webkit-user-select:none;border-radius:50%;
   box-shadow:
@@ -230,11 +232,12 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .radar-wrap::after{content:'';position:absolute;inset:-4px;border-radius:50%;z-index:2;
   pointer-events:none;
   background:conic-gradient(
-    rgba(200,240,255,0) 0deg,
-    rgba(200,240,255,.22) 8deg,
-    rgba(200,240,255,0) 22deg);
-  -webkit-mask:radial-gradient(circle at 50% 50%,transparent 48.5%,black 49.5%);
-  mask:radial-gradient(circle at 50% 50%,transparent 48.5%,black 49.5%);
+    rgba(168,85,247,0) 0deg,
+    rgba(168,85,247,.70) 4deg,
+    rgba(34,211,238,.55) 18deg,
+    rgba(34,211,238,0) 32deg);
+  -webkit-mask:radial-gradient(circle at 50% 50%,transparent 91%,black 92%);
+  mask:radial-gradient(circle at 50% 50%,transparent 91%,black 92%);
   animation:sweepRing 3.5s linear infinite}
 @keyframes sweepRing{to{transform:rotate(360deg)}}
 #radar-minimap{position:absolute;top:0;left:0;width:280px;height:280px;
@@ -248,7 +251,7 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   white-space:nowrap;animation:hintA 2.5s ease-in-out infinite;
   text-shadow:0 -2px 10px rgba(52,211,153,.28)}
 @keyframes hintA{0%,100%{opacity:.3}50%{opacity:.9}}
-.zpills{display:flex;gap:6px;margin-top:8px}
+.zpills{display:flex;gap:6px;margin-top:8px;transform:translateZ(10px)}
 .zpill{width:7px;height:7px;border-radius:50%;border:1px solid var(--border2);
   background:transparent;cursor:pointer;transition:all var(--t-f)}
 .zpill.active{background:var(--nm);border-color:var(--nm);box-shadow:0 0 6px rgba(52,211,153,.6);width:14px;border-radius:3px}
@@ -258,16 +261,19 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
     rgba(168 85 247/var(--aura-a2,.17)) 48%,
     transparent 72%);
 }
-.home-title{font-family:'Orbitron',monospace;font-size:clamp(1.3rem,5vw,1.9rem);
-  font-weight:900;letter-spacing:.2em;text-align:center}
+.home-title{font-family:'Orbitron',monospace;font-size:clamp(1.8rem,7vw,2.6rem);
+  font-weight:900;letter-spacing:.2em;text-align:center;transform:translateZ(22px)}
 [data-theme="dark"] .home-title{
   background:linear-gradient(135deg,#a855f7,#ec4899,#38bdf8);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 [data-theme="light"] .home-title{color:var(--nl)}
 .home-coords{font-family:'Orbitron',monospace;font-size:.67rem;letter-spacing:.12em;
   color:rgba(251,191,36,0.52);text-align:center;margin-top:4px;
-  text-shadow:0 -3px 18px rgba(52,211,153,.55)}
-.stats{display:flex;gap:10px;width:100%;max-width:340px}
+  text-shadow:0 -3px 18px rgba(52,211,153,.55);transform:translateZ(14px)}
+.stats{display:flex;gap:10px;width:100%;max-width:340px;transform:translateZ(-18px)}
+.stats .stat:nth-child(1){border-left:2px solid rgba(34,211,238,.55)}
+.stats .stat:nth-child(2){border-left:2px solid rgba(251,191,36,.55)}
+.stats .stat:nth-child(3){border-left:2px solid rgba(52,211,153,.55)}
 .stat{flex:1;padding:10px 12px;border-radius:var(--r-m);background:var(--surface);
   border:1px solid var(--border);text-align:center;
   animation:cardBreathe 6s ease-in-out infinite;transition:transform var(--t-f)}
@@ -1723,7 +1729,7 @@ let _minimap=null;
     // Schumann pulse — 7.83 Hz with subtle natural irregularity
     const _sT=Date.now()*0.001;
     _sPulse=(Math.sin(_sT*7.83*Math.PI*2)*(.9+.1*Math.sin(_sT*.17*Math.PI*2)))*_schumannBase;
-    const _af=0.7+_sPulse*0.3;
+    const _af=0.82+0.18*Math.sin(_sT*0.32*Math.PI*2); // slow 3s breath, no flicker
     document.documentElement.style.setProperty('--aura-a1',(_af*0.20).toFixed(3));
     document.documentElement.style.setProperty('--aura-a2',(_af*0.17).toFixed(3));
 
@@ -1743,8 +1749,9 @@ let _minimap=null;
 
     /* rings — Schumann pulse at 7.83 Hz when enabled via toggle */
     [.33,.66,1].forEach((s,i)=>{
-      const pf=_schumannOn?_sPulse*(0.18+i*0.10):0;
-      const pr=_schumannOn?_sPulse*(1.5+i*1.5):0;
+      const _sSlow=Math.sin(_sT*0.32*Math.PI*2);
+      const pf=_schumannOn?_sSlow*0.05:0;
+      const pr=0;
       ctx.beginPath();ctx.arc(cx,cy,R*s+pr,0,Math.PI*2);
       ctx.strokeStyle=`rgba(0,255,80,${Math.max(.03,.10+i*.06+pf).toFixed(3)})`;ctx.lineWidth=1;ctx.stroke();
     });
