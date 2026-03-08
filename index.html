@@ -90,8 +90,11 @@ input,select,textarea{font-family:inherit}
   box-shadow:0 0 0 1px rgba(168,85,247,0.05),0 4px 24px rgba(0,0,0,0.45),
     0 12px 40px rgba(0,0,0,0.5),0 0 60px rgba(168,85,247,0.04),inset 0 1px 0 rgba(255,255,255,0.04)}
 [data-theme="light"] .island{
-  box-shadow:0 0 0 1px rgba(79,70,229,0.05),0 4px 24px rgba(79,70,229,0.08),
-    0 1px 3px rgba(0,0,0,0.06),inset 0 1px 0 rgba(255,255,255,0.8)}
+  background:rgba(255,255,255,.52);
+  backdrop-filter:blur(18px) saturate(180%);-webkit-backdrop-filter:blur(18px) saturate(180%);
+  border:1px solid rgba(255,255,255,.72);
+  box-shadow:0 8px 32px rgba(99,102,241,.18),0 2px 8px rgba(0,0,0,.07),
+    inset 0 1px 0 rgba(255,255,255,.85)}
 .island::before{content:'';position:absolute;inset:0;border-radius:inherit;
   background:linear-gradient(135deg,rgba(255,255,255,0.07) 0%,transparent 50%,rgba(0,0,0,0.02) 100%);
   pointer-events:none}
@@ -202,6 +205,20 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 #vh::before{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
   background:radial-gradient(ellipse 52% 48% at 50% 46%,
     transparent 18%, rgba(0,0,0,.52) 65%, rgba(0,0,0,.80) 100%)}
+[data-theme="light"] #vh::before{
+  background:radial-gradient(ellipse 70% 45% at 50% 0%,
+    rgba(99,102,241,.10) 0%,rgba(168,85,247,.06) 60%,transparent 100%)}
+[data-theme="light"] .radar-wrap{
+  box-shadow:
+    0 0 0 2px rgba(99,102,241,.50),
+    0 0 60px 20px rgba(99,102,241,.25),
+    0 0 130px 60px rgba(99,102,241,.11)}
+[data-theme="light"] .radar-wrap::after{
+  background:conic-gradient(
+    rgba(99,102,241,0) 0deg,
+    rgba(99,102,241,.75) 45deg,
+    rgba(99,102,241,.20) 110deg,
+    rgba(99,102,241,0) 190deg)}
 .home-main{flex:1;display:flex;flex-direction:column;align-items:center;
   justify-content:center;position:relative;z-index:5;gap:20px;padding:0 20px}
 .radar-wrap{position:relative;width:280px;height:280px;cursor:pointer;
@@ -211,6 +228,17 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
     0 0 60px 20px rgba(52,211,153,.38),
     0 0 140px 70px rgba(52,211,153,.16)}
 .radar-wrap:hover #radar{filter:brightness(1.15) drop-shadow(0 0 22px rgba(0,200,80,.55))}
+.radar-wrap::after{content:'';position:absolute;inset:-4px;border-radius:50%;z-index:2;
+  pointer-events:none;
+  background:conic-gradient(
+    rgba(52,211,153,0) 0deg,
+    rgba(52,211,153,.75) 45deg,
+    rgba(52,211,153,.20) 110deg,
+    rgba(52,211,153,0) 190deg);
+  -webkit-mask:radial-gradient(circle at 50% 50%,transparent 48.5%,black 49.5%);
+  mask:radial-gradient(circle at 50% 50%,transparent 48.5%,black 49.5%);
+  animation:sweepRing 3.5s linear infinite}
+@keyframes sweepRing{to{transform:rotate(360deg)}}
 #radar-minimap{position:absolute;top:0;left:0;width:280px;height:280px;
   border-radius:50%;overflow:hidden;z-index:0}
 #radar{position:absolute;top:0;left:0;width:280px;height:280px;border-radius:50%;
