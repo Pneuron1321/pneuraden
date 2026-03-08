@@ -340,12 +340,14 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .ev-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 .sec-lbl{display:flex;align-items:center;gap:10px;padding:8px 0 4px}
 .sec-lbl-t{font-size:.6rem;letter-spacing:.28em;text-transform:uppercase;
-  color:var(--tm);font-weight:700;white-space:nowrap}
+  color:var(--nc);font-weight:700;white-space:nowrap}
+.sec-lbl-t::before{content:'▸';margin-right:6px;display:inline-block;animation:pdotA 1.5s ease-in-out infinite}
 .sec-line{flex:1;height:1px;background:var(--border)}
 .ev-card{padding:14px 16px;border-radius:var(--r-m);background:var(--surface);
-  border:1px solid var(--border);transition:all var(--t-f);cursor:pointer}
+  border:1px solid var(--border);border-left:3px solid var(--ev-accent,var(--border2));
+  transition:all var(--t-f);cursor:pointer}
 .ev-card:hover{border-color:var(--border2);transform:translateY(-1px);
-  box-shadow:0 4px 16px rgba(0,0,0,.2)}
+  box-shadow:0 4px 16px rgba(0,0,0,.2),0 0 14px var(--ev-accent,rgba(168,85,247,0.2))}
 .ev-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
 .ev-card-t{font-weight:700;font-size:.88rem;flex:1;margin-right:8px}
 .ev-card-m{display:flex;flex-direction:column;gap:3px;font-size:.68rem;color:var(--td)}
@@ -491,11 +493,11 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
     <div class="stats">
       <div class="stat">
         <div class="stat-n" id="sv">0</div>
-        <div class="stat-l">Верифицировано</div>
+        <div class="stat-l">СОБЫТИЯ</div>
       </div>
       <div class="stat">
         <div class="stat-n" id="sp" style="color:var(--pnd)">0</div>
-        <div class="stat-l">На проверке</div>
+        <div class="stat-l">ОЖИДАЮТ</div>
       </div>
       <div class="stat">
         <div id="cs-dot" style="font-size:1.1rem;color:var(--ag)">●</div>
