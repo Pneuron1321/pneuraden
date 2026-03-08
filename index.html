@@ -202,7 +202,8 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .home-main{flex:1;display:flex;flex-direction:column;align-items:center;
   justify-content:center;position:relative;z-index:5;gap:20px;padding:0 20px}
 .radar-wrap{position:relative;width:280px;height:280px;cursor:pointer;
-  user-select:none;-webkit-user-select:none}
+  user-select:none;-webkit-user-select:none;
+  box-shadow:0 0 0 1px rgba(52,211,153,.10),0 0 40px 12px rgba(52,211,153,.18),0 0 110px 45px rgba(52,211,153,.07)}
 .radar-wrap:hover #radar{filter:brightness(1.15) drop-shadow(0 0 22px rgba(0,200,80,.55))}
 #radar-minimap{position:absolute;top:0;left:0;width:280px;height:280px;
   border-radius:50%;overflow:hidden;z-index:0}
@@ -212,16 +213,20 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   filter:drop-shadow(0 0 14px rgba(0,180,70,.35))}
 .radar-hint{position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);
   font-size:.58rem;letter-spacing:.25em;color:var(--tm);text-transform:uppercase;
-  white-space:nowrap;animation:hintA 2.5s ease-in-out infinite}
+  white-space:nowrap;animation:hintA 2.5s ease-in-out infinite;
+  text-shadow:0 -2px 10px rgba(52,211,153,.28)}
 @keyframes hintA{0%,100%{opacity:.3}50%{opacity:.9}}
 .zpills{display:flex;gap:6px;margin-top:8px}
 .zpill{width:7px;height:7px;border-radius:50%;border:1px solid var(--border2);
   background:transparent;cursor:pointer;transition:all var(--t-f)}
 .zpill.active{background:var(--nm);border-color:var(--nm);box-shadow:0 0 6px rgba(52,211,153,.6);width:14px;border-radius:3px}
 .home-main::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
-  background:radial-gradient(ellipse 60% 45% at 50% 38%,rgba(168,85,247,0.08) 0%,transparent 70%);
+  background:radial-gradient(ellipse 62% 52% at 50% 38%,
+    rgba(136 238 255/var(--aura-a1,.13)) 0%,
+    rgba(168 85 247/var(--aura-a2,.11)) 48%,
+    transparent 72%);
   animation:radarAura 128ms ease-in-out infinite}
-@keyframes radarAura{0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes radarAura{0%,100%{opacity:.45;transform:scale(.97)}50%{opacity:1;transform:scale(1)}}
 .home-title{font-family:'Orbitron',monospace;font-size:clamp(1.3rem,5vw,1.9rem);
   font-weight:900;letter-spacing:.2em;text-align:center}
 [data-theme="dark"] .home-title{
@@ -229,7 +234,8 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 [data-theme="light"] .home-title{color:var(--nl)}
 .home-coords{font-family:'Orbitron',monospace;font-size:.67rem;letter-spacing:.12em;
-  color:rgba(251,191,36,0.52);text-align:center;margin-top:4px}
+  color:rgba(251,191,36,0.52);text-align:center;margin-top:4px;
+  text-shadow:0 -3px 18px rgba(52,211,153,.55)}
 .stats{display:flex;gap:10px;width:100%;max-width:340px}
 .stat{flex:1;padding:10px 12px;border-radius:var(--r-m);background:var(--surface);
   border:1px solid var(--border);text-align:center;
@@ -1686,6 +1692,9 @@ let _minimap=null;
     // Schumann pulse — 7.83 Hz with subtle natural irregularity
     const _sT=Date.now()*0.001;
     _sPulse=(Math.sin(_sT*7.83*Math.PI*2)*(.9+.1*Math.sin(_sT*.17*Math.PI*2)))*_schumannBase;
+    const _af=0.7+_sPulse*0.3;
+    document.documentElement.style.setProperty('--aura-a1',(_af*0.13).toFixed(3));
+    document.documentElement.style.setProperty('--aura-a2',(_af*0.11).toFixed(3));
 
     // Rotate minimap to keep North up relative to canvas (angle is CW heading)
     if(_minimap){
