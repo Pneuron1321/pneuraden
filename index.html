@@ -177,13 +177,22 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .nav{position:fixed;bottom:0;left:0;right:0;z-index:100;display:flex;
   align-items:center;justify-content:space-around;
   padding:8px 16px max(16px,env(safe-area-inset-bottom));
-  background:var(--glass);border-top:1px solid var(--border);
-  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+  background:var(--glass);border-top:1px solid rgba(255,255,255,.10);
+  backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);
+  box-shadow:0 -1px 0 rgba(255,255,255,.04),0 -28px 52px rgba(0,0,0,.28)}
 .ni{display:flex;flex-direction:column;align-items:center;gap:3px;
   padding:6px 16px;border-radius:var(--r-m);cursor:pointer;
   transition:all var(--t-f);border:1px solid transparent;
   background:none;color:var(--tm);min-width:54px}
-.ni.active{color:var(--np);border-color:rgba(168,85,247,0.35);background:var(--surface2);box-shadow:inset 0 2px 0 var(--np),0 -2px 10px rgba(168,85,247,0.18)}
+.ni.active{
+  border-color:var(--ni-border,rgba(168,85,247,.30));
+  background:var(--ni-bg,rgba(168,85,247,.08));
+  box-shadow:0 -6px 18px var(--ni-glow,rgba(168,85,247,.40)),inset 0 1px 0 rgba(255,255,255,.06)}
+.ni.active .ni-icon{transform:scale(1.18) translateY(-2px)}
+.ni[data-v="home"].active  {color:rgba(52,211,153,1); --ni-border:rgba(52,211,153,.28); --ni-bg:rgba(52,211,153,.08); --ni-glow:rgba(52,211,153,.38)}
+.ni[data-v="map"].active   {color:rgba(34,211,238,1); --ni-border:rgba(34,211,238,.28); --ni-bg:rgba(34,211,238,.08); --ni-glow:rgba(34,211,238,.38)}
+.ni[data-v="events"].active{color:rgba(168,85,247,1); --ni-border:rgba(168,85,247,.28); --ni-bg:rgba(168,85,247,.08); --ni-glow:rgba(168,85,247,.38)}
+.ni[data-v="profile"].active{color:rgba(251,191,36,1); --ni-border:rgba(251,191,36,.28); --ni-bg:rgba(251,191,36,.08); --ni-glow:rgba(251,191,36,.38)}
 .ni:hover:not(.active){color:var(--td)}
 .ni-icon{font-size:1.2rem;line-height:1}
 .ni-lbl{font-size:.5rem;letter-spacing:.15em;text-transform:uppercase;font-weight:700}
