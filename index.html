@@ -547,6 +547,16 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
         <div class="zpill active" onclick="setZoom(1,event)"></div>
         <div class="zpill" onclick="setZoom(2,event)"></div>
       </div>
+      <div id="tp-card" onclick="TP.toggle()" style="margin-top:12px;padding:10px 18px;border:1px solid var(--border2);border-radius:16px;background:var(--glass);text-align:center;cursor:pointer;min-width:236px;transition:border-color 0.8s ease">
+        <div style="font-size:.56rem;letter-spacing:.22em;color:var(--td);text-transform:uppercase">Пульс времени · мировая линия</div>
+        <div id="tp-count" style="font-family:'Orbitron',monospace;font-size:1.22rem;font-weight:700;margin:3px 0;transition:color 0.8s ease">+0.00 нс</div>
+        <div id="tp-rate" style="font-size:.62rem;color:var(--td);letter-spacing:.05em">темп — · — м · 0 км/ч</div>
+        <div id="tp-det" style="display:none;text-align:left;margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+          <div style="font-size:.6rem;color:var(--td);line-height:1.6">Собственное время твоей траектории против часов, покоящихся на уровне моря: <b style="color:var(--ng)">выше — время идёт быстрее</b> (золото), <b style="color:var(--nc)">движешься — медленнее</b> (циан); фиолетовый покой — у самой воды. Формула 1-го порядка gh/c²−v²/2c² — та же физика, на которой живёт GPS: спутники корректируют ~38 мкс/сутки, иначе навигация уплывала бы на километры. Телефон — интегратор, не атомные часы; высота сглаживается; член Саньяка опущен; счёт идёт, пока Pneuraden открыт.</div>
+          <div style="font-size:.58rem;letter-spacing:.18em;color:var(--tm);margin:8px 0 4px">СЕГОДНЯ: <span id="tp-today">+0.00 нс</span></div>
+          <div id="tp-log" style="font-size:.62rem;color:var(--td);line-height:1.7"></div>
+        </div>
+      </div>
     </div>
     <div class="stats">
       <div class="stat">
@@ -702,7 +712,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════
-   PNEURADEN v1.1 — Core
+   PNEURADEN v1.3 — Core
    ═══════════════════════════════════════════════════════════ */
 
 // One-time migration: clear fake default events from v1.0
@@ -778,13 +788,15 @@ const PM={w:null,subs:[],last:null,
   sub(fn){this.subs.push(fn);if(this.last)fn(this.last);this.start();},
   start(){if(this.w!=null||!navigator.geolocation)return;
     this.w=navigator.geolocation.watchPosition(
-      p=>{this.last={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
+      p=>{this.last={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy,
+            alt:p.coords.altitude,spd:p.coords.speed,ts:p.timestamp||Date.now()};
           _gpsAccuracy=p.coords.accuracy;this.subs.forEach(f=>f(this.last));},
       e=>{if(e.code===e.PERMISSION_DENIED)toast('Разрешите геолокацию для точного отображения');},
       {enableHighAccuracy:true,timeout:15000,maximumAge:0});},
   refresh(cb,err){if(!navigator.geolocation){err&&err();return;}
     navigator.geolocation.getCurrentPosition(
-      p=>{this.last={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
+      p=>{this.last={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy,
+            alt:p.coords.altitude,spd:p.coords.speed,ts:p.timestamp||Date.now()};
           _gpsAccuracy=p.coords.accuracy;this.subs.forEach(f=>f(this.last));cb&&cb(this.last);},
       ()=>{err&&err();},{enableHighAccuracy:true,timeout:12000,maximumAge:0});}
 };
@@ -818,6 +830,101 @@ function _eotMin(d){
   return 229.18*(0.000075+0.001868*Math.cos(B)-0.032077*Math.sin(B)
     -0.014615*Math.cos(2*B)-0.040849*Math.sin(2*B));
 }
+/* ── ПУЛЬС ВРЕМЕНИ — хронометр мировой линии ────────────────────
+   ОТО+СТО, первый порядок относительно часов, ПОКОЯЩИХСЯ НА ГЕОИДЕ
+   (все часы на уровне моря тикают одинаково — естественный нуль планеты):
+       dτ/dt − 1 ≈ g·h/c² − v²/(2c²)
+   Выше — время идёт быстрее; движешься — медленнее. Та же физика,
+   на которой живёт GPS (спутники корректируют ~38 мкс/сутки, иначе
+   навигация уплывала бы на километры в день). Честные края: телефон —
+   ИНТЕГРАТОР установленной формулы вдоль траектории, не атомные часы;
+   высота GPS шумит (EMA-сглаживание); член Саньяка опущен;
+   счёт идёт, пока Pneuraden открыт.
+   ── АССОЦИАТИВНЫЙ ОТТЕНОК ВЛИЯНИЯ ──
+   Цвет показывает, ЧТО прямо сейчас гнёт твоё время:
+   ЗОЛОТО — высота (гравитация отпускает, ход ускоряется),
+   ЦИАН — движение (скорость замедляет),
+   ФИОЛЕТОВЫЙ ПОКОЙ — у самого моря, когда оба влияния ~0.
+   Оттенком дышат: счётчик, рамка карточки, кольцо радара и бегущая
+   по нему метка — её скорость и направление = темп и знак твоего хода. ── */
+const TP={
+  G:9.80665,C2:8.987551787e16,
+  ns:0,todayNs:0,todayKey:'',alt:0,spd:0,haveAlt:false,nsd:0,
+  _lastFix:null,_lastT:null,_flight:null,log:[],
+  tintRGB:[168,85,247],omega:0,_ang:0,
+  start(){
+    try{const s=JSON.parse(localStorage.getItem('pnd-tp')||'null');
+      if(s){this.ns=s.ns||0;this.log=s.log||[];this.todayNs=s.todayNs||0;this.todayKey=s.todayKey||'';}}catch(e){}
+    const k=new Date().toISOString().slice(0,10);
+    if(this.todayKey!==k){this.todayKey=k;this.todayNs=0;}
+    PM.sub(p=>this._onFix(p));
+    this._lastT=Date.now();
+    setInterval(()=>this._tick(),1000);
+    setInterval(()=>this._save(),15000);
+    this._render();
+  },
+  _onFix(p){
+    const t=Date.now();
+    if(p.alt!=null&&isFinite(p.alt)&&(p.acc==null||p.acc<80)){
+      this.alt=this.haveAlt?this.alt*0.8+p.alt*0.2:p.alt;this.haveAlt=true;}
+    let v=(p.spd!=null&&isFinite(p.spd)&&p.spd>=0)?p.spd:null;
+    if(v==null&&this._lastFix){const dt=(t-this._lastFix.t)/1000;
+      if(dt>1&&dt<30){const d=this._dist(this._lastFix.lat,this._lastFix.lng,p.lat,p.lng);
+        if(d/dt<350)v=d/dt;}}
+    if(v!=null)this.spd=v<0.5?this.spd*0.5:this.spd*0.6+Math.min(v,340)*0.4;
+    this._lastFix={lat:p.lat,lng:p.lng,t};
+  },
+  _dist(a1,o1,a2,o2){const R=6371000,r=Math.PI/180,
+    x=(o2-o1)*r*Math.cos((a1+a2)*r/2),y=(a2-a1)*r;return Math.hypot(x,y)*R;},
+  _tick(){
+    const t=Date.now(),dt=Math.min(5,(t-this._lastT)/1000);this._lastT=t;
+    if(this.spd<0.4)this.spd*=0.8;
+    const grav=this.G*Math.max(-430,Math.min(9000,this.alt))/this.C2;
+    const vel=this.spd*this.spd/(2*this.C2);
+    const rate=grav-vel;
+    const dns=rate*dt*1e9;
+    this.ns+=dns;this.todayNs+=dns;
+    this.nsd=rate*8.64e13; // нс/сутки
+    const tot=grav+vel;
+    if(tot<5e-16)this.tintRGB=[168,85,247];
+    else{const u=((grav-vel)/tot+1)/2; // 0=циан · 1=золото
+      this.tintRGB=[Math.round(34+u*217),Math.round(211-u*20),Math.round(238-u*202)];}
+    const s=Math.sign(rate)||1;
+    this.omega=s*(0.0015+0.0009*Math.sqrt(Math.min(10000,Math.abs(this.nsd))));
+    if(!this._flight&&this.spd>45)this._flight={t0:t,ns0:this.ns,slow:0};
+    else if(this._flight){
+      if(this.spd<25){this._flight.slow+=dt;
+        if(this._flight.slow>90){const f=this._flight;
+          this._addLog('✈ полёт · '+Math.round((t-f.t0)/60000)+' мин · '+this._fmt(this.ns-f.ns0));
+          this._flight=null;}}
+      else this._flight.slow=0;}
+    const k2=new Date().toISOString().slice(0,10);
+    if(k2!==this.todayKey){this._addLog('∑ '+this.todayKey+' · '+this._fmt(this.todayNs));
+      this.todayKey=k2;this.todayNs=0;}
+    this._render();
+  },
+  _addLog(s){this.log.unshift(s);if(this.log.length>12)this.log.length=12;this._save();},
+  _save(){try{localStorage.setItem('pnd-tp',JSON.stringify({ns:this.ns,log:this.log,todayNs:this.todayNs,todayKey:this.todayKey}));}catch(e){}},
+  _fmt(n){const a=Math.abs(n),s=n>=0?'+':'−';
+    return a>=1e6?s+(a/1e6).toFixed(3)+' мс':a>=1000?s+(a/1000).toFixed(2)+' мкс':s+a.toFixed(2)+' нс';},
+  tint(a){const c=this.tintRGB;return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';},
+  toggle(){const d=document.getElementById('tp-det');if(d)d.style.display=d.style.display==='none'?'block':'none';},
+  _render(){
+    const c=document.getElementById('tp-count');if(!c)return;
+    c.textContent=this._fmt(this.ns);
+    const r=document.getElementById('tp-rate');
+    if(r)r.textContent='темп '+this._fmt(this.nsd)+'/сут · '
+      +(this.haveAlt?Math.round(this.alt)+' м':'— м')+' · '+(this.spd*3.6).toFixed(0)+' км/ч';
+    c.style.color=this.tint(1);c.style.textShadow='0 0 18px '+this.tint(0.55);
+    const card=document.getElementById('tp-card');
+    if(card)card.style.borderColor=this.tint(0.32);
+    const td=document.getElementById('tp-today');if(td)td.textContent=this._fmt(this.todayNs);
+    const lg=document.getElementById('tp-log');
+    if(lg&&lg.dataset.n!=String(this.log.length)){lg.dataset.n=String(this.log.length);
+      lg.innerHTML=this.log.map(x=>'<div>'+x+'</div>').join('')||'<div style="opacity:.5">событий пока нет</div>';}
+  }
+};
+
 function moonPhase(date){
   const d=(date-new Date(2000,0,6))/(864e5);
   return((d%29.53058867)+29.53058867)%29.53058867; // days since new moon
@@ -1963,6 +2070,15 @@ let _minimap=null;
     ctx.beginPath();ctx.arc(cx,cy,R+6,0,Math.PI*2);
     ctx.strokeStyle=`rgba(${_rR},${_rG},${_rB},.14)`;ctx.lineWidth=5;ctx.stroke();
 
+    // Пульс времени: кольцо-оттенок влияния (золото=высота · циан=движение)
+    // и бегущая метка — её скорость и направление = темп и знак твоего хода
+    ctx.beginPath();ctx.arc(cx,cy,R+1,0,Math.PI*2);
+    ctx.strokeStyle=TP.tint(0.22);ctx.lineWidth=1.5;ctx.stroke();
+    TP._ang+=TP.omega;
+    const _tpx=cx+(R+1)*Math.sin(TP._ang),_tpy=cy-(R+1)*Math.cos(TP._ang);
+    ctx.beginPath();ctx.arc(_tpx,_tpy,3,0,Math.PI*2);
+    ctx.fillStyle=TP.tint(0.95);ctx.shadowColor=TP.tint(0.9);ctx.shadowBlur=9;ctx.fill();ctx.shadowBlur=0;
+
     RAF=requestAnimationFrame(frame);
   }
   frame();
@@ -2331,6 +2447,7 @@ const ED={quakes:[],kp:null,_qLayer:null,_pulsed:{},
 // Start Firebase presence layer (loads SDK async, safe if FB_CONFIG not filled)
 initFirebase();
 ED.start();
+TP.start();
 </script>
 
 <!-- SPACE VIEW — 3D Globe -->
