@@ -527,6 +527,8 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
     <span class="logo">PNEURADEN</span>
     <div style="display:flex;gap:8px;align-items:center">
       <span id="uid" style="font-size:.6rem;letter-spacing:.15em;color:var(--tm);text-transform:uppercase"></span>
+      <span id="eq-chip" style="font-size:.6rem;letter-spacing:.08em;color:var(--dng);opacity:.9"></span>
+      <span id="kp-chip" style="font-size:.6rem;letter-spacing:.08em;color:var(--nc);opacity:.9"></span>
       <button id="schumann-btn" class="theme-btn" onclick="toggleSchumann()" title="Schumann 7.83Hz" style="opacity:0.28"><svg viewBox="0 0 26 14" width="20" height="11" style="display:block"><path d="M0,7 L3,7 L5.5,1 L8,13 L10.5,7 L13,7 L15.5,1 L18,13 L20.5,7 L23,7 L26,7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="theme-btn" onclick="toggleTheme()">🌓</button>
     </div>
@@ -575,6 +577,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
     <div class="lbtn active" id="lv" onclick="toggleL('v')" title="Верифицированные">🟢</div>
     <div class="lbtn active" id="lp" onclick="toggleL('p')" title="На проверке">🟡</div>
     <div class="lbtn active" id="lc" onclick="toggleL('c')" title="Клуб">⭕</div>
+    <div class="lbtn active" id="lq" onclick="toggleL('q')" title="Землетрясения · USGS live">🌋</div>
   </div>
   <div class="map-legend" id="mleg">
     <div class="leg-tog" onclick="document.getElementById('mleg').classList.toggle('open')">☰</div>
@@ -766,6 +769,55 @@ let _gpsAccuracy=null;
 let _schumannBase=0.8;  // planetary storm activity 0.6..1.0 (updates 1/min)
 let _sPulse=0;          // current Schumann pulse value -1..1
 let _schumannOn=false;  // Schumann 7.83Hz display: off by default
+
+/* ── PositionManager: ОДНА GPS-подписка на всё приложение ──
+   Раньше карта и радар держали два параллельных watchPosition
+   с enableHighAccuracy — двойной расход батареи. Теперь один поток,
+   все потребители (карта, радар, Firebase) подписываются. ── */
+const PM={w:null,subs:[],last:null,
+  sub(fn){this.subs.push(fn);if(this.last)fn(this.last);this.start();},
+  start(){if(this.w!=null||!navigator.geolocation)return;
+    this.w=navigator.geolocation.watchPosition(
+      p=>{this.last={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
+          _gpsAccuracy=p.coords.accuracy;this.subs.forEach(f=>f(this.last));},
+      e=>{if(e.code===e.PERMISSION_DENIED)toast('Разрешите геолокацию для точного отображения');},
+      {enableHighAccuracy:true,timeout:15000,maximumAge:0});},
+  refresh(cb,err){if(!navigator.geolocation){err&&err();return;}
+    navigator.geolocation.getCurrentPosition(
+      p=>{this.last={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
+          _gpsAccuracy=p.coords.accuracy;this.subs.forEach(f=>f(this.last));cb&&cb(this.last);},
+      ()=>{err&&err();},{enableHighAccuracy:true,timeout:12000,maximumAge:0});}
+};
+
+/* ── OrientationManager: одно iOS-разрешение, общий компас ──
+   Раньше карта звала requestPermission() при инициализации БЕЗ жеста
+   пользователя — на iOS это всегда падало, и поворот не работал никогда.
+   Теперь единый шлюз: радарный оверлей = единственная точка запроса. ── */
+const OM={subs:[],on:false,head:null,
+  sub(fn){this.subs.push(fn);if(this.head!=null)fn(this.head);},
+  _h(e){const h=e.webkitCompassHeading!=null?e.webkitCompassHeading
+      :(e.alpha!=null?(360-e.alpha)%360:null);
+    if(h==null)return;OM.head=h;OM.subs.forEach(f=>f(h));},
+  attach(){if(this.on)return;this.on=true;
+    // Android Chrome: absolute-вариант привязан к сторонам света
+    if('ondeviceorientationabsolute' in window)
+      window.addEventListener('deviceorientationabsolute',this._h);
+    else window.addEventListener('deviceorientation',this._h);},
+  request(){ // iOS 13+: вызывать только из жеста пользователя
+    if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+      return DeviceOrientationEvent.requestPermission()
+        .then(p=>{if(p==='granted')this.attach();return p;});}
+    this.attach();return Promise.resolve('granted');}
+};
+
+/* ── Уравнение времени (Spencer 1971): подсолнечная точка и терминатор
+   раньше считались по среднему солнцу — ошибка до ~4° долготы (≈16 мин). ── */
+function _eotMin(d){
+  const start=Date.UTC(d.getUTCFullYear(),0,1);
+  const B=2*Math.PI*((d.getTime()-start)/864e5)/365.2422;
+  return 229.18*(0.000075+0.001868*Math.cos(B)-0.032077*Math.sin(B)
+    -0.014615*Math.cos(2*B)-0.040849*Math.sin(2*B));
+}
 function moonPhase(date){
   const d=(date-new Date(2000,0,6))/(864e5);
   return((d%29.53058867)+29.53058867)%29.53058867; // days since new moon
@@ -776,7 +828,7 @@ function solarElevation(date,lat,lng){
   const g=(357.529+0.98560028*d)*Math.PI/180;
   const L=(280.459+0.98564736*d+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
   const sD=Math.sin(0.40928)*Math.sin(L);
-  const ha=((date.getUTCHours()+date.getUTCMinutes()/60+lng/15-12)*15)*Math.PI/180;
+  const ha=((date.getUTCHours()+date.getUTCMinutes()/60+_eotMin(date)/60+lng/15-12)*15)*Math.PI/180;
   const lR=lat*Math.PI/180;
   return Math.asin(Math.sin(lR)*sD+Math.cos(lR)*Math.sqrt(1-sD*sD)*Math.cos(ha))*180/Math.PI;
 }
@@ -786,7 +838,7 @@ function solarPosition(date,lat,lng){
   const g=(357.529+0.98560028*d)*Math.PI/180;
   const L=(280.459+0.98564736*d+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
   const sD=Math.sin(0.40928)*Math.sin(L);const cD=Math.sqrt(1-sD*sD);
-  const ha=((date.getUTCHours()+date.getUTCMinutes()/60+lng/15-12)*15)*Math.PI/180;
+  const ha=((date.getUTCHours()+date.getUTCMinutes()/60+_eotMin(date)/60+lng/15-12)*15)*Math.PI/180;
   const lR=lat*Math.PI/180;
   const sinAlt=Math.sin(lR)*sD+Math.cos(lR)*cD*Math.cos(ha);
   const alt=Math.asin(Math.max(-1,Math.min(1,sinAlt)))*180/Math.PI;
@@ -811,7 +863,7 @@ function nightPolygon(d){
   const Lsun=(280.459+0.98564736*days+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
   const dec=Math.asin(Math.max(-1,Math.min(1,Math.sin(0.40928)*Math.sin(Lsun))));
   // Subsolar longitude: where it's solar noon right now
-  const h=d.getUTCHours()+d.getUTCMinutes()/60+d.getUTCSeconds()/3600;
+  const h=d.getUTCHours()+d.getUTCMinutes()/60+d.getUTCSeconds()/3600+_eotMin(d)/60;
   const lngSub=((12-h)*15+540)%360-180;
   // Terminator: latitude where solar elevation=0° for each longitude
   // Must use atan (not atan2) — atan2 gives wrong quadrant when tan(dec)<0
@@ -831,7 +883,7 @@ function subsolarPoint(d){
   const g=(357.529+0.98560028*days)*Math.PI/180;
   const Lsun=(280.459+0.98564736*days+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
   const dec=Math.asin(Math.max(-1,Math.min(1,Math.sin(0.40928)*Math.sin(Lsun))));
-  const h=d.getUTCHours()+d.getUTCMinutes()/60+d.getUTCSeconds()/3600;
+  const h=d.getUTCHours()+d.getUTCMinutes()/60+d.getUTCSeconds()/3600+_eotMin(d)/60;
   return{lat:dec*180/Math.PI,lng:((12-h)*15+540)%360-180};
 }
 // Real sublunar point — where the Moon is directly overhead right now (simplified Meeus)
@@ -1086,7 +1138,7 @@ function submitEv(){
 }
 
 /* ── Map ────────────────────────────────────────────────── */
-const LV={v:true,p:true,c:true};
+const LV={v:true,p:true,c:true,q:true};
 let _mapAngle=0;
 
 function initMap(){
@@ -1105,51 +1157,24 @@ function initMap(){
   L.control.attribution({position:'bottomleft',prefix:false})
     .addAttribution('© CartoDB · © OSM').addTo(map);
   addEvMarkers(map);
-  if(navigator.geolocation){
-    // watchPosition + enableHighAccuracy = continuous GPS-grade updates
-    let firstFix=true;
-    if(window._geoWatch!=null) navigator.geolocation.clearWatch(window._geoWatch);
-    window._geoWatch=navigator.geolocation.watchPosition(
-      p=>{
-        const lat=p.coords.latitude,lng=p.coords.longitude;
-        addUserMarker(map,lat,lng);
-        if(firstFix){
-          firstFix=false;
-          map.setView([lat,lng],16); // centre on user, zoom in
-        }
-      },
-      e=>{
-        // Fall back to rough position on error
-        if(e.code===e.PERMISSION_DENIED) toast('Разрешите геолокацию для точного отображения');
-      },
-      {enableHighAccuracy:true, timeout:15000, maximumAge:0}
-    );
-  }
+  setTimeout(()=>{if(typeof ED!=='undefined')ED._renderMap();},400);
+  // Позиция — из единого PM (один watchPosition на всё приложение)
+  let firstFix=true;
+  PM.sub(pos=>{
+    addUserMarker(map,pos.lat,pos.lng);
+    if(firstFix){firstFix=false;map.setView([pos.lat,pos.lng],16);}
+  });
 
-  // Map rotation via deviceorientation
-  if('DeviceOrientationEvent' in window){
-    const onOrient = e=>{
-      // webkitCompassHeading (iOS) = 0..360 CW from North — reliable
-      // e.alpha (Android) = device rotation CCW; convert to CW heading
-      const head = e.webkitCompassHeading != null
-        ? e.webkitCompassHeading
-        : (e.alpha != null ? (360 - e.alpha) % 360 : null);
-      if(head == null) return;
-      const container=document.getElementById('map-container');
-      if(container) container.style.transform=`rotate(${-head}deg)`;
-      // Counter-rotate compass markers so they always point true north
-      document.querySelectorAll('.cmarker-inner').forEach(el=>{
-        el.style.transform=`rotate(${head}deg)`;
-      });
-    };
-    if(typeof DeviceOrientationEvent.requestPermission==='function'){
-      DeviceOrientationEvent.requestPermission().then(r=>{
-        if(r==='granted') window.addEventListener('deviceorientation',onOrient);
-      }).catch(()=>{});
-    } else {
-      window.addEventListener('deviceorientation',onOrient);
-    }
-  }
+  // Компас: вращаем стрелку пользователя, НЕ контейнер карты.
+  // CSS-поворот #map-container ломал координаты касаний Leaflet
+  // (драг шёл не туда при любом повороте) и подгрузку тайлов по углам;
+  // а requestPermission() без жеста на iOS падал всегда — поворот был мёртв.
+  // Теперь: общий OM (шлюз разрешения — оверлей радара), карта — подписчик.
+  OM.sub(h=>{
+    document.querySelectorAll('.cmarker-inner').forEach(el=>{
+      el.style.transform=`rotate(${h}deg)`;
+    });
+  });
 
   // Day/night terminator — real astronomy, always present at every zoom
   // Reality doesn't switch off. Proximity changes what you can see.
@@ -1349,33 +1374,26 @@ function addEvMarkers(map){
 }
 
 function refreshGeo(){
-  if(!navigator.geolocation){toast('Геолокация недоступна');return;}
   toast('Определяю позицию…');
-  navigator.geolocation.getCurrentPosition(
-    p=>{
-      const lat=p.coords.latitude,lng=p.coords.longitude;
-      if(window._setRadarPos) window._setRadarPos(lat,lng);
-      if(window._map){
-        addUserMarker(window._map,lat,lng);
-        window._map.setView([lat,lng],Math.max(window._map.getZoom(),15));
-      }
-      toast('Позиция обновлена ✓');
-    },
-    ()=>toast('Не удалось получить позицию'),
-    {enableHighAccuracy:true,timeout:12000,maximumAge:0}
-  );
+  PM.refresh(pos=>{
+    if(window._setRadarPos) window._setRadarPos(pos.lat,pos.lng);
+    if(window._map){
+      addUserMarker(window._map,pos.lat,pos.lng);
+      window._map.setView([pos.lat,pos.lng],Math.max(window._map.getZoom(),15));
+    }
+    toast('Позиция обновлена ✓');
+  },()=>toast('Не удалось получить позицию'));
 }
 function locate(){
-  if(!navigator.geolocation){toast('Геолокация недоступна');return;}
-  navigator.geolocation.getCurrentPosition(
-    p=>{addUserMarker(window._map,p.coords.latitude,p.coords.longitude);
-        window._map.setView([p.coords.latitude,p.coords.longitude],15);toast('Позиция обновлена');},
+  PM.refresh(pos=>{addUserMarker(window._map,pos.lat,pos.lng);
+      window._map.setView([pos.lat,pos.lng],15);toast('Позиция обновлена');},
     ()=>toast('Не удалось получить позицию'));
 }
 
 function toggleL(l){
   LV[l]=!LV[l];
   document.getElementById('l'+l)?.classList.toggle('active',LV[l]);
+  if(l==='q'&&typeof ED!=='undefined')ED._renderMap();
   toast(LV[l]?'Слой включён':'Слой выключен');
 }
 
@@ -1676,33 +1694,20 @@ let _minimap=null;
   // Device orientation
   // webkitCompassHeading (iOS): 0..360 CW from magnetic North — use directly
   // e.alpha (Android): device rotation CCW (positive=CCW), convert to CW heading
-  if('DeviceOrientationEvent' in window){
-    const onOrient=e=>{
-      const head=e.webkitCompassHeading!=null
-        ?e.webkitCompassHeading
-        :(e.alpha!=null?(360-e.alpha)%360:null);
-      if(head!=null){hasGyro=true;angle=head;}
-    };
-    if(typeof DeviceOrientationEvent.requestPermission==='function'){
-      // iOS 13+: try immediately first (works if already granted)
-      DeviceOrientationEvent.requestPermission().then(p=>{
-        if(p==='granted') window.addEventListener('deviceorientation',onOrient);
-      }).catch(()=>{
-        // Not yet granted — show overlay immediately, request on tap
-        const ov=document.getElementById('gyro-overlay');
-        ov.classList.remove('hidden');
-        ov.addEventListener('click',async()=>{
-          try{
-            const p=await DeviceOrientationEvent.requestPermission();
-            if(p==='granted') window.addEventListener('deviceorientation',onOrient);
-          }catch{}
-          ov.classList.add('hidden');
-        },{once:true});
-      });
-    } else {
-      // Android / non-iOS: no permission needed
-      window.addEventListener('deviceorientation',onOrient);
-    }
+  // Ориентация — через общий OM (одно разрешение на всё приложение)
+  OM.sub(h=>{hasGyro=true;angle=h;});
+  if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+    // iOS 13+: пробуем сразу (сработает, если уже выдано), иначе оверлей с тапом
+    OM.request().then(p=>{if(p!=='granted')throw 0;}).catch(()=>{
+      const ov=document.getElementById('gyro-overlay');
+      ov.classList.remove('hidden');
+      ov.addEventListener('click',async()=>{
+        try{await OM.request();}catch{}
+        ov.classList.add('hidden');
+      },{once:true});
+    });
+  } else {
+    OM.attach();
   }
 
   // Desktop mouse fallback — disabled on touch devices (they use gyroscope instead)
@@ -1717,14 +1722,11 @@ let _minimap=null;
   }
 
   // User location — watchPosition for continuous GPS-grade accuracy
-  if(navigator.geolocation){
-    if(window._radarGeoWatch!=null) navigator.geolocation.clearWatch(window._radarGeoWatch);
-    window._radarGeoWatch=navigator.geolocation.watchPosition(p=>{
-      uLat=p.coords.latitude;uLng=p.coords.longitude;_gpsAccuracy=p.coords.accuracy;
-      if(_minimap) _minimap.setView([uLat,uLng],ZOOM_MAP[S.radarZoom],{animate:false});
-      else initMinimap(uLat,uLng);
-    }, ()=>{}, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
-  }
+  PM.sub(pos=>{
+    uLat=pos.lat;uLng=pos.lng;
+    if(_minimap) _minimap.setView([uLat,uLng],ZOOM_MAP[S.radarZoom],{animate:false});
+    else initMinimap(uLat,uLng);
+  });
 
   function blipXY(lat,lng){
     const r=ZOOM_R[S.radarZoom];
@@ -1732,6 +1734,7 @@ let _minimap=null;
   }
 
   function frame(){
+    if(S.view!=='home'){RAF=requestAnimationFrame(frame);return;} // радар виден только на HOME — не жжём GPU зря
     if(!hasGyro) angle+=(targetAngle-angle)*.05;
     ctx.clearRect(0,0,W,H);
 
@@ -2062,32 +2065,34 @@ const FB_CONFIG={
 let _fbDb=null,_fbUid=null,_fsDb=null;
 
 function initFirebase(){
-  // Load Firebase SDK chain (app → auth → database) then setup
+  // Конфиг проверяем ДО загрузки SDK: раньше четыре compat-бандла (~450КБ)
+  // грузились даже с пустым конфигом; firestore грузился, но не использовался вовсе.
+  if(!FB_CONFIG.apiKey||FB_CONFIG.apiKey==='YOUR_API_KEY')return;
   function _seq(srcs,i,cb){if(i>=srcs.length){cb();return;}const s=document.createElement('script');s.src=srcs[i];s.onload=()=>_seq(srcs,i+1,cb);document.head.appendChild(s);}
-  _seq(['https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js'],0,_fbSetup);
+  _seq(['https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js'],0,_fbSetup);
 }
 function _fbSetup(){
-  if(!FB_CONFIG.apiKey||FB_CONFIG.apiKey==='YOUR_API_KEY')return; // not configured
   if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
   _fbDb=firebase.database();
-  _fsDb=firebase.firestore();
   firebase.auth().signInAnonymously().then(c=>{_fbUid=c.user.uid;_fbWrite();}).catch(()=>{});
 }
 function _fbWrite(){
   if(!_fbDb||!_fbUid)return;
   const ref=_fbDb.ref('users/'+_fbUid);
   const _push=()=>{const p=window._getUserPos?window._getUserPos():{lat:45.08,lng:13.64};ref.update({lat:p.lat,lng:p.lng,ts:Date.now()});};
-  _push();ref.onDisconnect().remove();setInterval(_push,30000);
+  _push();ref.onDisconnect().remove();if(!window._fbPushIv)window._fbPushIv=setInterval(_push,30000);
 }
 
 // ═══ SPACE VIEW — Three.js 3D Globe ═══════════════════════════════════
 // Real astronomy: subsolarPoint → sun direction → terminator automatic
 // sublunarPoint → moon 3D position → correct phase from lighting
-let _spaceInited=false,_spaceActive=false;
+let _spaceInited=false,_spaceActive=false,_kpGlow=0;
+window._setAuroraKp=k=>{_kpGlow=Math.min(1,(k||0)/9);}; // реальный Kp → дыхание атмосферы
 function openSpaceView(){
   if(typeof THREE==='undefined'){setTimeout(openSpaceView,200);return;}
   go('space');_spaceActive=true;
   if(!_spaceInited){initSpaceView();_spaceInited=true;}
+  else if(!window._spaceRAF&&window._spaceAnim)window._spaceAnim(); // рестарт остановленного цикла
   _whisperStart();
 }
 function closeSpaceView(){
@@ -2146,7 +2151,7 @@ function initSpaceView(){
   // Geo → THREE.js 3D: lng=0→+X, lng=90E→+Z, lng=180→-X
   function geo3D(lat,lng){const phi=(90-lat)*Math.PI/180,th=lng*Math.PI/180;return new THREE.Vector3(Math.sin(phi)*Math.cos(th),Math.cos(phi),Math.sin(phi)*Math.sin(th));}
   function updateAstro(){const now=new Date(),sp=subsolarPoint(now),sl=sublunarPoint(now);const sd=geo3D(sp.lat,sp.lng);sunLight.position.copy(sd).multiplyScalar(100);sunMesh.position.copy(sd).multiplyScalar(48);moon.position.copy(geo3D(sl.lat,sl.lng)).multiplyScalar(6);}
-  updateAstro();setInterval(updateAstro,120000);
+  updateAstro();setInterval(()=>{if(_spaceActive)updateAstro();},120000);
   // Orbital camera — Earth fixed with real astronomy, camera orbits around it
   let camTheta=0,camPhi=0.1,camDist=3.2;
   function updateCam(){camera.position.set(camDist*Math.cos(camPhi)*Math.sin(camTheta),camDist*Math.sin(camPhi),camDist*Math.cos(camPhi)*Math.cos(camTheta));camera.lookAt(0,0,0);}
@@ -2221,10 +2226,10 @@ function initSpaceView(){
   // ── ГРАВИТАЦИОННЫЙ ПРИЛИВ КОРЫ (Solid Earth Tide) ───────────────────────
   function _solidTide(){const t=Date.now()/1000;return 0.25*Math.cos(2*Math.PI*(t%44712)/44712)+0.11*Math.cos(2*Math.PI*(t%43200)/43200);}
   function _updateTide(){const v=_solidTide(),cm=(v*100).toFixed(1),el=document.getElementById('tidal-cm');if(el)el.textContent=(v>=0?'+':'')+cm;}
-  setInterval(_updateTide,8000);_updateTide();
+  setInterval(()=>{if(_spaceActive)_updateTide();},8000);_updateTide();
   function _setISSPos(lat,lng){_issLat=lat;_issLng=lng;const p=geo3D(lat,lng);_issDot.position.copy(p).multiplyScalar(1.016);_issRing.position.copy(p).multiplyScalar(1.016);_issCamTheta=Math.atan2(p.x,p.z);_issCamPhi=Math.asin(Math.max(-0.95,Math.min(0.95,p.y)));}
   function _fetchISS(){fetch('https://api.wheretheiss.at/v1/satellites/25544').then(r=>r.json()).then(d=>{_setISSPos(d.latitude,d.longitude);_issAlt=Math.round(d.altitude||0);_issSpd=Math.round(d.velocity||0);_issVis=d.visibility||'';const ea=document.getElementById('iss-alt'),es=document.getElementById('iss-spd'),ev=document.getElementById('iss-vis');if(ea)ea.textContent=_issAlt.toLocaleString();if(es)es.textContent=_issSpd.toLocaleString();if(ev)ev.textContent=_issVis==='daylight'?'\u2600 ДЕНЬ':'\u25d7 ТЕНЬ';}).catch(()=>{});}
-  _fetchISS();setInterval(_fetchISS,15000);
+  _fetchISS();setInterval(()=>{if(_spaceActive)_fetchISS();},15000); // МКС опрашиваем только когда космос открыт
   // ISS panel state: 0=closed 1=half-screen 2=full-screen
   // NASA ISS live stream: "Live Video from the International Space Station (Official NASA Stream)"
   // If stream shows "video unavailable" → go to youtube.com, search "NASA ISS live", copy video ID, update here
@@ -2248,7 +2253,7 @@ function initSpaceView(){
   }
   _loadCommunity();
   // Render loop — auto-orbits normally; when ISS panel open → camera tracks ISS position
-  (function _anim(){requestAnimationFrame(_anim);if(!_spaceActive)return;if(!drag&&!_diving){if(_issActive){let _dt=_issCamTheta-camTheta;while(_dt>Math.PI)_dt-=2*Math.PI;while(_dt<-Math.PI)_dt+=2*Math.PI;camTheta+=_dt*0.025;camPhi+=(_issCamPhi-camPhi)*0.025;}else{camTheta+=0.0003;}updateCam();}const _t=Date.now(),_sch=0.5+0.5*Math.sin(_t*0.04917);atmo.material.uniforms.glowOpacity.value=0.18+0.22*_sch;_uhalo.material.opacity=0.1+0.12*(0.5+0.5*Math.sin(_t*0.04917+Math.PI));renderer.render(scene,camera);})();
+  window._spaceAnim=function _anim(){if(!_spaceActive){window._spaceRAF=null;return;}window._spaceRAF=requestAnimationFrame(_anim);if(!drag&&!_diving){if(_issActive){let _dt=_issCamTheta-camTheta;while(_dt>Math.PI)_dt-=2*Math.PI;while(_dt<-Math.PI)_dt+=2*Math.PI;camTheta+=_dt*0.025;camPhi+=(_issCamPhi-camPhi)*0.025;}else{camTheta+=0.0003;}updateCam();}const _t=Date.now(),_sch=0.5+0.5*Math.sin(_t*0.04917);atmo.material.uniforms.glowOpacity.value=Math.min(0.85,0.18+0.22*_sch+0.3*_kpGlow);_uhalo.material.opacity=0.1+0.12*(0.5+0.5*Math.sin(_t*0.04917+Math.PI));renderer.render(scene,camera);};window._spaceAnim();
 }
 
 // ── PHYSICS WHISPER — воплощённый голос физических сил ──────────────────
@@ -2273,8 +2278,59 @@ let _whisperIdx=0,_whisperTimer=null,_whisperActive=false;
 function _whisperShow(){const el=document.getElementById('physics-whisper');if(!el||!_whisperActive)return;const sp=el.querySelector('span');if(!sp)return;sp.textContent=_WHISPERS[_whisperIdx%_WHISPERS.length];_whisperIdx++;el.style.transition='opacity 0.8s ease';el.style.opacity='1';setTimeout(()=>{if(el){el.style.transition='opacity 1.2s ease';el.style.opacity='0';}},4800);}
 function _whisperStart(){if(_whisperActive)return;_whisperActive=true;setTimeout(_whisperShow,1800);_whisperTimer=setInterval(_whisperShow,13000);}
 function _whisperStop(){_whisperActive=false;clearInterval(_whisperTimer);const el=document.getElementById('physics-whisper');if(el){el.style.transition='opacity 0.8s ease';el.style.opacity='0';}}
+/* ═══ EARTH LAYERS — живые данные планеты (без ключей, CORS открыт) ═══
+   USGS: реальные землетрясения суток → круги на карте + НАСТОЯЩИЕ
+   сейсмоволны на радаре (свежие M≥4.5 питают triggerSeismicWave).
+   NOAA SWPC: планетарный Kp-индекс → сияние атмосферы глобуса дышит
+   реальной геомагнитной погодой. Земля начинает питать свой портрет. ═══ */
+const ED={quakes:[],kp:null,_qLayer:null,_pulsed:{},
+  start(){
+    this._q();this._k();
+    setInterval(()=>{if(document.visibilityState==='visible')this._q();},300000);
+    setInterval(()=>{if(document.visibilityState==='visible')this._k();},600000);
+  },
+  _q(){fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson')
+    .then(r=>r.json()).then(d=>{
+      this.quakes=(d.features||[]).map(f=>({
+        id:f.id,lat:f.geometry.coordinates[1],lng:f.geometry.coordinates[0],
+        depth:f.geometry.coordinates[2]||0,mag:f.properties.mag||0,
+        place:f.properties.place||'',time:f.properties.time}));
+      this._renderMap();this._pulseRecent();
+      const el=document.getElementById('eq-chip');
+      if(el&&this.quakes.length){
+        const m=this.quakes.reduce((a,b)=>a.mag>b.mag?a:b);
+        el.textContent='🌋 M'+m.mag.toFixed(1);el.title=m.place;
+      }
+    }).catch(()=>{});},
+  _k(){fetch('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json')
+    .then(r=>r.json()).then(a=>{
+      if(!a||!a.length)return;
+      const last=a[a.length-1];
+      this.kp=parseFloat(last.kp_index??last.estimated_kp??0)||0;
+      const el=document.getElementById('kp-chip');
+      if(el)el.textContent='Kp '+this.kp.toFixed(1)+(this.kp>=5?' ⚡':'');
+      window._setAuroraKp&&window._setAuroraKp(this.kp);
+    }).catch(()=>{});},
+  _renderMap(){if(!window._map)return;
+    if(this._qLayer){window._map.removeLayer(this._qLayer);this._qLayer=null;}
+    if(!LV.q||!this.quakes.length)return;
+    this._qLayer=L.layerGroup(this.quakes.map(q=>{
+      const r=Math.max(4,q.mag*2.6),age=(Date.now()-q.time)/3600000;
+      const op=Math.max(0.25,1-age/24);
+      return L.circleMarker([q.lat,q.lng],{radius:r,color:'#f43f5e',weight:1.5,
+        fillColor:'#f43f5e',fillOpacity:0.18*op,opacity:0.85*op,interactive:true})
+        .bindPopup(`<div class="user-pop"><b>M${q.mag.toFixed(1)}</b> · ${q.place}<br>`+
+          `<span style="font-size:.65rem;color:var(--td)">глубина ${Math.round(q.depth)} км · ${age<1?Math.round(age*60)+' мин':Math.round(age)+' ч'} назад · USGS</span></div>`);
+    })).addTo(window._map);},
+  _pulseRecent(){ // свежие сильные толчки (≤1 ч, M≥4.5) — настоящая волна на радаре
+    const now=Date.now();
+    this.quakes.filter(q=>now-q.time<3600000&&q.mag>=4.5&&!this._pulsed[q.id])
+      .forEach(q=>{this._pulsed[q.id]=1;triggerSeismicWave(q.lat,q.lng,'other');});}
+};
+
 // Start Firebase presence layer (loads SDK async, safe if FB_CONFIG not filled)
 initFirebase();
+ED.start();
 </script>
 
 <!-- SPACE VIEW — 3D Globe -->
