@@ -580,9 +580,11 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
 <div id="vm" class="view">
   <div class="map-top">
     <button class="map-back" onclick="go('home')">←</button>
-    <input class="map-search" placeholder="Поиск..." type="text">
+    <input id="srch-in" class="map-search" placeholder="Поиск места…" type="text" autocomplete="off">
     <button class="theme-btn" onclick="toggleTheme()" style="flex-shrink:0">🌓</button>
   </div>
+  <div id="srch-res" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 60px);left:12px;right:12px;z-index:30;background:rgba(10,14,30,.93);backdrop-filter:blur(14px);border:1px solid var(--border2);border-radius:14px;overflow:hidden;max-height:46vh;overflow-y:auto"></div>
+  <div id="cam-near" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 64px);left:50%;transform:translateX(-50%);z-index:25;background:var(--glass);border:1px solid var(--border2);border-radius:9999px;padding:5px 14px;font-family:'Orbitron',monospace;font-size:.72rem;letter-spacing:.06em;color:var(--txt)"></div>
   <div id="map-container"></div>
   <div class="map-layers">
     <div class="lbtn active" id="lv" onclick="toggleL('v')" title="Верифицированные">🟢</div>
@@ -592,6 +594,8 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
     <div class="lbtn active" id="lo" onclick="toggleL('o')" title="Места · OSM">📍</div>
     <div class="lbtn active" id="lcam" onclick="toggleL('cam')" title="Камеры скорости · OSM">📸</div>
     <div class="lbtn" onclick="openTraffic()" title="Пробки · Waze Live (Google)">🚦</div>
+    <div class="lbtn" onclick="openAR()" title="Навести · дополненная реальность">🔭</div>
+    <div class="lbtn active" id="lsnd" onclick="CA.toggle()" title="Звук радаров">🔔</div>
   </div>
   <div class="map-legend" id="mleg">
     <div class="leg-tog" onclick="document.getElementById('mleg').classList.toggle('open')">☰</div>
@@ -809,9 +813,10 @@ const PM={w:null,subs:[],last:null,
    Раньше карта звала requestPermission() при инициализации БЕЗ жеста
    пользователя — на iOS это всегда падало, и поворот не работал никогда.
    Теперь единый шлюз: радарный оверлей = единственная точка запроса. ── */
-const OM={subs:[],on:false,head:null,
+const OM={subs:[],on:false,head:null,pitch:45,
   sub(fn){this.subs.push(fn);if(this.head!=null)fn(this.head);},
-  _h(e){const h=e.webkitCompassHeading!=null?e.webkitCompassHeading
+  _h(e){if(e.beta!=null)OM.pitch=e.beta;
+    const h=e.webkitCompassHeading!=null?e.webkitCompassHeading
       :(e.alpha!=null?(360-e.alpha)%360:null);
     if(h==null)return;OM.head=h;OM.subs.forEach(f=>f(h));},
   attach(){if(this.on)return;this.on=true;
@@ -1156,14 +1161,14 @@ function go(v){
   if(v===S.view && v!=='map') return;
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(el=>el.classList.remove('active'));
-  const ids={home:'vh',map:'vm',events:'ve',profile:'vp',admin:'vad',space:'vspace',traffic:'vtraffic'};
+  const ids={home:'vh',map:'vm',events:'ve',profile:'vp',admin:'vad',space:'vspace',traffic:'vtraffic',ar:'var'};
   const el=document.getElementById(ids[v]);
   if(el) el.classList.add('active');
   const ni=document.querySelector(`.ni[data-v="${v}"]`);
   if(ni) ni.classList.add('active');
   S.view=v;
   const nav=document.getElementById('nav');
-  if(v==='map'||v==='space'||v==='traffic'){nav.style.display='none';if(v==='map')initMap();}
+  if(v==='map'||v==='space'||v==='traffic'||v==='ar'){nav.style.display='none';if(v==='map')initMap();}
   else nav.style.display='flex';
   if(v==='home' && _minimap) setTimeout(()=>_minimap.invalidateSize(),80);
   if(v==='events') renderEvents();
@@ -2480,14 +2485,16 @@ const ED={quakes:[],kp:null,_qLayer:null,_pulsed:{},
 };
 
 /* ═══ МЕСТА · OSM Overpass — все места мира, открытые данные ═══
-   Google не отдаёт наружу ни мест, ни радаров (закрытый флот, лицензия
-   запрещает наложение на чужие карты). OpenStreetMap отдаёт ВСЁ:
-   кафе, магазины, музеи, аптеки — и камеры контроля скорости
-   (highway=speed_camera), которых нет даже в платном Google API.
-   Дисциплина к общему колодцу: запросы только на уличном зуме,
-   кэш 8 минут, лимит 340 объектов, одиночный полёт с очередью. ═══ */
+   Google не отдаёт наружу ни мест, ни радаров (закрытый флот).
+   OpenStreetMap отдаёт ВСЁ. Места — с уличного зума (16+), кэш 8 мин,
+   лимит 340, одиночный полёт с очередью.
+   РАДАРЫ v2: видны на ЛЮБОМ зуме — грузятся пакетами «вокруг якоря»
+   радиусом 75 км; якоря ставятся по позиции пользователя и по центру
+   карты, куда бы он её ни увёл. Камеры статичны → кэш по якорям,
+   дедупликация по OSM id. ═══ */
 const PO={
-  _cache:new Map(),_poi:null,_cams:null,_t:null,_busy:false,_pending:null,
+  _cache:new Map(),_poi:null,_camLayer:null,_t:null,_busy:false,_pending:null,
+  cams:[],_camIds:{},_camAnch:[],lastPois:[],
   EMO_A:{cafe:'☕',restaurant:'🍽️',bar:'🍸',pub:'🍺',fast_food:'🍔',ice_cream:'🍦',
     pharmacy:'💊',hospital:'🏥',clinic:'🩺',doctors:'🩺',dentist:'🦷',veterinary:'🐾',
     school:'🏫',kindergarten:'🧸',university:'🎓',college:'🎓',library:'📚',
@@ -2510,6 +2517,9 @@ const PO={
     parking_space:1,motorcycle_parking:1,vending_machine:1,grit_bin:1,
     hunting_stand:1,parking_entrance:1,shelter:1},
   _esc(s){return String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));},
+  init(){ // якорь радаров по позиции пользователя — с первого же фикса
+    PM.sub(p=>this.ensureCams(p.lat,p.lng));
+  },
   hook(map){
     map.on('moveend zoomend',()=>{clearTimeout(this._t);
       this._t=setTimeout(()=>this.refresh(),700);});
@@ -2517,23 +2527,58 @@ const PO={
   },
   refresh(){
     const m=window._map;if(!m)return;
-    const z=m.getZoom(),b=m.getBounds();
-    if(LV.cam&&z>=12)this._fetch('cam',b,z);else this._clear('_cams');
-    if(LV.o&&z>=16)this._fetch('poi',b,z);else this._clear('_poi');
+    const z=m.getZoom(),b=m.getBounds(),c=m.getCenter();
+    this.ensureCams(c.lat,c.lng); // радары: любой зум, любая точка карты
+    if(LV.o&&z>=16)this._fetchPoi(b,z);else this._clear('_poi');
+    if(!LV.cam)this._clear('_camLayer');
+    else if(!this._camLayer)this._drawCams();
   },
   _clear(k){if(this[k]&&window._map){window._map.removeLayer(this[k]);this[k]=null;}},
-  _key(t,b,r){const f=x=>Math.round(x/r)*r;
-    return t+'|'+f(b.getSouth())+'|'+f(b.getWest())+'|'+f(b.getNorth())+'|'+f(b.getEast());},
-  _fetch(type,b,z){
-    const r=type==='cam'?0.05:0.01,k=this._key(type,b,r);
-    const c=this._cache.get(k);
-    if(c&&Date.now()-c.t<480000){this._draw(type,c.els,z);return;}
-    if(this._busy){this._pending=[type,b,z];return;}
+  /* ── РАДАРЫ: пакеты вокруг якорей, 75 км ── */
+  ensureCams(lat,lng){
+    if(lat==null||lng==null)return;
+    for(const a of this._camAnch)
+      if(TP._dist(lat,lng,a.lat,a.lng)<50000)return; // зона уже покрыта
+    this._camAnch.push({lat,lng});
+    if(this._camAnch.length>10)this._camAnch.shift();
+    const q='[out:json][timeout:14];nwr["highway"="speed_camera"](around:75000,'
+      +lat.toFixed(4)+','+lng.toFixed(4)+');out center 700;';
+    fetch('https://overpass-api.de/api/interpreter',{method:'POST',
+      body:'data='+encodeURIComponent(q)})
+      .then(r=>r.json()).then(d=>{
+        let add=0;
+        (d.elements||[]).forEach(e=>{
+          const la=e.lat??(e.center&&e.center.lat),lo=e.lon??(e.center&&e.center.lon);
+          if(la==null||this._camIds[e.id])return;
+          this._camIds[e.id]=1;add++;
+          this.cams.push({id:e.id,lat:la,lng:lo,tags:e.tags||{}});
+        });
+        if(this.cams.length>1200)this.cams.length=1200;
+        if(add)this._drawCams();
+      }).catch(()=>{});
+  },
+  _drawCams(){
+    const m=window._map;if(!m)return;
+    this._clear('_camLayer');
+    if(!LV.cam||!this.cams.length)return;
+    this._camLayer=L.layerGroup(this.cams.map(e=>{
+      const ms=e.tags.maxspeed?' · лимит '+this._esc(e.tags.maxspeed):'';
+      return L.marker([e.lat,e.lng],{icon:L.divIcon({className:'',iconSize:[22,22],
+        iconAnchor:[11,11],html:'<div style="font-size:17px;filter:drop-shadow(0 0 4px rgba(244,63,94,.8))">📸</div>'})})
+        .bindPopup('<div class="user-pop"><b>📸 Камера скорости</b>'+ms+
+          '<br><span style="font-size:.62rem;color:var(--td)">данные OSM</span></div>');
+    })).addTo(m);
+  },
+  /* ── МЕСТА: уличный зум, кэш, одиночный полёт ── */
+  _key(b,r){const f=x=>Math.round(x/r)*r;
+    return f(b.getSouth())+'|'+f(b.getWest())+'|'+f(b.getNorth())+'|'+f(b.getEast());},
+  _fetchPoi(b,z){
+    const k=this._key(b,0.01),c=this._cache.get(k);
+    if(c&&Date.now()-c.t<480000){this._drawPoi(c.els,z);return;}
+    if(this._busy){this._pending=[b,z];return;}
     this._busy=true;
     const bb=[b.getSouth(),b.getWest(),b.getNorth(),b.getEast()].map(x=>x.toFixed(4)).join(',');
-    const q=type==='cam'
-      ?'[out:json][timeout:12];nwr["highway"="speed_camera"]('+bb+');out center 200;'
-      :'[out:json][timeout:14];nwr[~"^(amenity|shop|tourism|leisure|healthcare)$"~"."]('+bb+');out center 340;';
+    const q='[out:json][timeout:14];nwr[~"^(amenity|shop|tourism|leisure|healthcare)$"~"."]('+bb+');out center 340;';
     fetch('https://overpass-api.de/api/interpreter',{method:'POST',
       body:'data='+encodeURIComponent(q)})
       .then(r2=>r2.json()).then(d=>{
@@ -2542,9 +2587,9 @@ const PO={
           tags:e.tags||{}})).filter(e=>e.lat!=null);
         this._cache.set(k,{t:Date.now(),els});
         if(this._cache.size>40){const fk=this._cache.keys().next().value;this._cache.delete(fk);}
-        this._draw(type,els,z);
+        this._drawPoi(els,z);
       }).catch(()=>{}).finally(()=>{this._busy=false;
-        if(this._pending){const pq=this._pending;this._pending=null;this._fetch(pq[0],pq[1],pq[2]);}});
+        if(this._pending){const pq=this._pending;this._pending=null;this._fetchPoi(pq[0],pq[1]);}});
   },
   _emo(t){
     if(t.amenity&&this.EMO_A[t.amenity])return this.EMO_A[t.amenity];
@@ -2554,25 +2599,15 @@ const PO={
     if(t.healthcare)return '🩺';
     return '📍';
   },
-  _draw(type,els,z){
+  _drawPoi(els,z){
     const m=window._map;if(!m)return;
-    if(type==='cam'){
-      this._clear('_cams');if(!LV.cam)return;
-      this._cams=L.layerGroup(els.map(e=>{
-        const ms=e.tags.maxspeed?' · лимит '+this._esc(e.tags.maxspeed):'';
-        return L.marker([e.lat,e.lng],{icon:L.divIcon({className:'',iconSize:[22,22],
-          iconAnchor:[11,11],html:'<div style="font-size:17px;filter:drop-shadow(0 0 4px rgba(244,63,94,.8))">📸</div>'})})
-          .bindPopup('<div class="user-pop"><b>📸 Камера скорости</b>'+ms+
-            '<br><span style="font-size:.62rem;color:var(--td)">данные OSM</span></div>');
-      })).addTo(m);
-      return;
-    }
     this._clear('_poi');if(!LV.o)return;
     let list=els.filter(e=>{const t=e.tags;
       const v=t.amenity||t.shop||t.tourism||t.leisure||t.healthcare;
       return v&&!this.SKIP[t.amenity]&&!this.SKIP[t.leisure];});
-    if(z<17)list=list.filter(e=>e.tags.name); // на 16-м зуме — только именованные
+    if(z<17)list=list.filter(e=>e.tags.name);
     if(list.length>340)list.length=340;
+    this.lastPois=list; // источник для режима НАВЕСТИ
     this._poi=L.layerGroup(list.map(e=>{
       const t=e.tags,name=this._esc(t.name||''),emo=this._emo(t);
       const kind=this._esc(t.amenity||t.shop||t.tourism||t.leisure||t.healthcare||'');
@@ -2585,6 +2620,230 @@ const PO={
     })).addTo(m);
   }
 };
+
+/* ═══ СИГНАЛ РАДАРА — нарастающий звук приближения ═══
+   Каждую секунду: расстояние до ближайшей камеры из PO.cams.
+   Ближе 1200 м И в движении (>7 км/ч) — пинги WebAudio: чем ближе,
+   тем чаще, громче и выше тоном. Чип расстояния на карте — всегда,
+   звук — только в движении (иначе дом рядом с радаром сведёт с ума).
+   Кнопка 🔔/🔕 на карте; выбор хранится в localStorage.
+   iOS отдаёт звук только после первого касания экрана. ═══ */
+const CA={
+  on:true,ctx:null,_next:0,near:null,
+  init(){
+    try{this.on=JSON.parse(localStorage.getItem('pnd-camsnd')??'true');}catch(e){}
+    document.addEventListener('pointerdown',()=>{
+      if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();},{passive:true});
+    setInterval(()=>this._tick(),1000);
+    this._ui();
+  },
+  toggle(){
+    this.on=!this.on;
+    try{localStorage.setItem('pnd-camsnd',JSON.stringify(this.on));}catch(e){}
+    if(this.on&&!this.ctx)this._mk();
+    this._ui();
+    toast(this.on?'Звук радаров включён':'Звук радаров выключен');
+  },
+  _ui(){const b=document.getElementById('lsnd');
+    if(b){b.textContent=this.on?'🔔':'🔕';b.classList.toggle('active',this.on);}},
+  _mk(){try{this.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}},
+  _beep(g,f){
+    if(!this.ctx)this._mk();const c=this.ctx;if(!c)return;
+    if(c.state==='suspended'){c.resume();return;}
+    const o=c.createOscillator(),v=c.createGain(),t=c.currentTime;
+    o.type='sine';o.frequency.value=f;
+    v.gain.setValueAtTime(0,t);
+    v.gain.linearRampToValueAtTime(g,t+0.012);
+    v.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
+    o.connect(v);v.connect(c.destination);
+    o.start(t);o.stop(t+0.18);
+  },
+  _tick(){
+    const chip=document.getElementById('cam-near');
+    this.near=null;
+    if(!PM.last||!PO.cams.length){if(chip)chip.style.display='none';return;}
+    let best=1e9,bc=null;
+    for(const cm of PO.cams){
+      const d=TP._dist(PM.last.lat,PM.last.lng,cm.lat,cm.lng);
+      if(d<best){best=d;bc=cm;}
+    }
+    this.near={d:best,cam:bc};
+    if(chip){
+      if(best<1500){chip.style.display='';
+        chip.textContent='📸 '+(best<1000?Math.round(best)+' м':(best/1000).toFixed(1)+' км');
+        chip.style.borderColor=best<400?'rgba(244,63,94,.75)':'var(--border2)';}
+      else chip.style.display='none';
+    }
+    if(!this.on||document.hidden)return;
+    const spd=(typeof TP!=='undefined')?TP.spd:0;
+    if(spd<2||best>1200)return; // сигналим только в движении
+    const k=Math.max(0,Math.min(1,(1200-best)/1100));
+    const interval=1.6-1.42*k, gain=0.045+0.18*k, freq=740+440*k;
+    const now=Date.now();
+    if(now>=this._next){this._next=now+interval*1000;this._beep(gain,freq);}
+  }
+};
+
+/* ═══ ПОИСК МЕСТ — Photon (komoot) поверх OSM, весь мир, без ключей ═══ */
+const SR={
+  _t:null,_fs:[],_mk:null,
+  init(){
+    const i=document.getElementById('srch-in');if(!i)return;
+    i.addEventListener('input',()=>{
+      clearTimeout(this._t);const q=i.value.trim();
+      if(q.length<2){this._show([]);return;}
+      this._t=setTimeout(()=>this._go(q),350);
+    });
+    i.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){clearTimeout(this._t);this._go(i.value.trim());i.blur();}});
+    i.addEventListener('blur',()=>setTimeout(()=>{
+      const b=document.getElementById('srch-res');
+      if(b&&!b.matches(':hover'))this._show([]);},300));
+  },
+  _go(q){
+    if(q.length<2)return;
+    const c=window._map?window._map.getCenter():((typeof PM!=='undefined'&&PM.last)||{lat:45.08,lng:13.64});
+    fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(q)
+      +'&limit=6&lang=ru&lat='+(+c.lat).toFixed(3)+'&lon='+(+c.lng).toFixed(3))
+      .then(r=>r.json()).then(d=>this._show(d.features||[]))
+      .catch(()=>this._show([]));
+  },
+  _show(fs){
+    const box=document.getElementById('srch-res');if(!box)return;
+    this._fs=fs;
+    if(!fs.length){box.style.display='none';box.innerHTML='';return;}
+    box.innerHTML=fs.map((f,ix)=>{
+      const pr=f.properties||{};
+      const nm=PO._esc(pr.name||pr.street||'—');
+      const sub=PO._esc([pr.city||pr.county,pr.state,pr.country].filter(Boolean).join(', '));
+      const emo=PO._emo({[pr.osm_key||'x']:pr.osm_value});
+      return '<div class="sr-it" data-i="'+ix+'" style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer">'
+        +'<b style="font-size:.78rem">'+emo+' '+nm+'</b><br>'
+        +'<span style="font-size:.62rem;color:var(--td)">'+sub+'</span></div>';
+    }).join('');
+    box.style.display='block';
+    box.querySelectorAll('.sr-it').forEach(el=>{
+      el.onclick=()=>this._pick(+el.dataset.i);});
+  },
+  _pick(i){
+    const f=this._fs[i];if(!f)return;
+    const lng=f.geometry.coordinates[0],lat=f.geometry.coordinates[1];
+    const pr=f.properties||{};
+    this._show([]);
+    const inp=document.getElementById('srch-in');
+    if(inp){inp.value=pr.name||'';inp.blur();}
+    const m=window._map;if(!m)return;
+    m.flyTo([lat,lng],Math.max(m.getZoom(),16),{duration:0.9});
+    if(this._mk)m.removeLayer(this._mk);
+    this._mk=L.marker([lat,lng]).addTo(m)
+      .bindPopup('<div class="user-pop"><b>'+PO._esc(pr.name||'Место')+'</b><br>'
+        +'<span style="font-size:.62rem;color:var(--td)">'
+        +PO._esc([pr.city,pr.country].filter(Boolean).join(', '))+'</span></div>');
+    setTimeout(()=>{if(this._mk)this._mk.openPopup();},950);
+  }
+};
+
+/* ═══ НАВЕСТИ — дополненная реальность из уже живущих органов ═══
+   GPS (PM) + компас и тангаж (OM) + места и радары (PO) + камера
+   телефона. Наводишь телефон на улицу — метки висят над реальностью,
+   привязанные к сторонам света. Ни одной новой библиотеки. ═══ */
+const AR={
+  act:false,stream:null,raf:null,
+  async open(){
+    go('ar');this.act=true;
+    try{await OM.request();}catch(e){}
+    const v=document.getElementById('ar-video');
+    try{
+      this.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+      v.srcObject=this.stream;await v.play().catch(()=>{});
+      document.getElementById('ar-err').style.display='none';
+    }catch(e){document.getElementById('ar-err').style.display='block';}
+    const cv=document.getElementById('ar-canvas'),dpr=Math.min(2,window.devicePixelRatio||1);
+    cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;
+    cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';
+    const cx=cv.getContext('2d');cx.setTransform(dpr,0,0,dpr,0,0);
+    const loop=()=>{if(!this.act)return;this._draw(cx,innerWidth,innerHeight);this.raf=requestAnimationFrame(loop);};
+    loop();
+  },
+  close(){
+    this.act=false;
+    if(this.raf)cancelAnimationFrame(this.raf);
+    if(this.stream){this.stream.getTracks().forEach(t=>t.stop());this.stream=null;}
+    const v=document.getElementById('ar-video');if(v)v.srcObject=null;
+    go('map');
+  },
+  _brg(a1,o1,a2,o2){const r=Math.PI/180,
+    y=Math.sin((o2-o1)*r)*Math.cos(a2*r),
+    x=Math.cos(a1*r)*Math.sin(a2*r)-Math.sin(a1*r)*Math.cos(a2*r)*Math.cos((o2-o1)*r);
+    return (Math.atan2(y,x)*180/Math.PI+360)%360;},
+  _draw(cx,W,H){
+    cx.clearRect(0,0,W,H);
+    const pos=PM.last,head=OM.head;
+    cx.shadowColor='rgba(0,0,0,.85)';cx.shadowBlur=5;
+    // компасная лента
+    cx.font='600 11px Rajdhani,sans-serif';cx.textAlign='center';
+    if(head!=null){
+      for(let a=0;a<360;a+=15){
+        let d=((a-head+540)%360)-180;
+        if(Math.abs(d)>40)continue;
+        const x=(d/80+0.5)*W;
+        const card={0:'С',90:'В',180:'Ю',270:'З'}[a];
+        cx.fillStyle=card?'rgba(251,191,36,.95)':'rgba(255,255,255,.45)';
+        cx.fillRect(x-0.5,16,1,card?12:7);
+        if(card)cx.fillText(card,x,42);
+      }
+    }
+    // прицел
+    cx.strokeStyle='rgba(255,255,255,.55)';cx.lineWidth=1;
+    cx.beginPath();cx.arc(W/2,H/2,14,0,Math.PI*2);cx.stroke();
+    cx.beginPath();cx.moveTo(W/2-22,H/2);cx.lineTo(W/2-8,H/2);
+    cx.moveTo(W/2+8,H/2);cx.lineTo(W/2+22,H/2);cx.stroke();
+    if(pos==null||head==null){
+      cx.fillStyle='rgba(255,255,255,.8)';cx.font='600 13px Rajdhani,sans-serif';
+      cx.fillText(pos==null?'жду GPS…':'компас не выдан — тапни оверлей радара на HOME',W/2,H-92);
+      cx.shadowBlur=0;return;
+    }
+    const pitchShift=(45-(OM.pitch!=null?OM.pitch:45))*3.2;
+    const items=[];
+    for(const c of PO.cams){
+      const d=TP._dist(pos.lat,pos.lng,c.lat,c.lng);
+      if(d<8000)items.push({emo:'📸',name:'радар',d,
+        b:this._brg(pos.lat,pos.lng,c.lat,c.lng),cam:1});
+    }
+    for(const p2 of PO.lastPois){
+      const d=TP._dist(pos.lat,pos.lng,p2.lat,p2.lng);
+      if(d<2200)items.push({emo:PO._emo(p2.tags),name:p2.tags.name||'',d,
+        b:this._brg(pos.lat,pos.lng,p2.lat,p2.lng)});
+    }
+    items.sort((a,b)=>b.d-a.d); // дальние первыми — ближние поверх
+    let drawn=0;
+    for(const it of items){
+      let diff=((it.b-head+540)%360)-180;
+      if(Math.abs(diff)>32)continue;
+      if(++drawn>26)break;
+      const x=(diff/64+0.5)*W;
+      const depth=Math.min(1,it.d/(it.cam?8000:2200));
+      const y=H*0.30+depth*H*0.36+pitchShift;
+      const fs=it.cam?20-6*depth:18-7*depth;
+      cx.globalAlpha=1-0.55*depth;
+      if(it.cam){
+        cx.beginPath();cx.arc(x,y-fs*0.38,fs*0.95,0,Math.PI*2);
+        cx.strokeStyle='rgba(244,63,94,.85)';cx.lineWidth=1.5;cx.stroke();
+      }
+      cx.font=fs+'px sans-serif';
+      cx.fillStyle='#fff';
+      cx.fillText(it.emo,x,y);
+      const nm=it.name?(it.name.length>18?it.name.slice(0,17)+'…':it.name):'';
+      const dist=it.d<1000?Math.round(it.d)+' м':(it.d/1000).toFixed(1)+' км';
+      cx.font='600 '+Math.max(9,Math.round(fs*0.55))+'px Rajdhani,sans-serif';
+      cx.fillStyle=it.cam?'rgba(255,170,182,.96)':'rgba(255,255,255,.93)';
+      cx.fillText((nm?nm+' · ':'')+dist,x,y+14);
+      cx.globalAlpha=1;
+    }
+    cx.shadowBlur=0;
+  }
+};
+function openAR(){AR.open();}
 
 /* ── Пробки: Waze Live Map (Google) — официальный встраиваемый iframe ── */
 function openTraffic(){
@@ -2603,9 +2862,23 @@ function closeTraffic(){
 initFirebase();
 ED.start();
 TP.start();
+PO.init();
+CA.init();
+SR.init();
 </script>
 
 <!-- SPACE VIEW — 3D Globe -->
+<!-- ═══ НАВЕСТИ · дополненная реальность ═══ -->
+<div id="var" class="view" style="background:#000">
+  <video id="ar-video" autoplay playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>
+  <canvas id="ar-canvas" style="position:absolute;inset:0;z-index:3"></canvas>
+  <div id="ar-err" style="display:none;position:absolute;top:46%;width:100%;text-align:center;z-index:4;color:rgba(255,255,255,.85);font-family:'Rajdhani',sans-serif;font-size:.85rem;padding:0 30px">Нет доступа к камере — разреши в настройках браузера.<br>Метки всё равно работают по компасу.</div>
+  <button onclick="AR.close()" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;z-index:6;background:rgba(10,14,30,.55);backdrop-filter:blur(10px);border:1px solid var(--border2);color:#fff;border-radius:9999px;padding:8px 16px;font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.06em;font-size:.78rem">← КАРТА</button>
+  <div style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);left:0;width:100%;text-align:center;z-index:5;pointer-events:none">
+    <span style="background:rgba(10,14,30,.55);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:9999px;padding:5px 14px;font-size:.58rem;letter-spacing:.12em;color:rgba(255,255,255,.75)">НАВЕДИ · МЕСТА И РАДАРЫ ПРИВЯЗАНЫ К СТОРОНАМ СВЕТА</span>
+  </div>
+</div>
+
 <!-- ═══ TRAFFIC · Waze Live (Google) ═══ -->
 <div id="vtraffic" class="view" style="background:#0a0f1e">
   <iframe id="waze-frame" src="about:blank" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="geolocation"></iframe>
