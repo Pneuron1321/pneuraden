@@ -558,6 +558,17 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
           <div id="tp-log" style="font-size:.62rem;color:var(--td);line-height:1.7"></div>
         </div>
       </div>
+      <div id="sat-card" onclick="SAT.toggle()" style="margin-top:10px;padding:9px 16px;border:1px solid var(--border2);border-radius:16px;background:var(--glass);text-align:center;cursor:pointer;min-width:236px;display:none">
+        <div style="font-size:.56rem;letter-spacing:.22em;color:var(--td);text-transform:uppercase">Небо над тобой · станции</div>
+        <div id="sat-next" style="font-family:'Rajdhani',sans-serif;font-size:.86rem;font-weight:600;margin:3px 0;color:var(--txt)">считаю орбиты…</div>
+        <div id="sat-det" style="display:none;text-align:left;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;font-size:.66rem;color:var(--td);line-height:1.8"></div>
+      </div>
+      <div id="tt-card" onclick="TT.toggle()" style="margin-top:10px;padding:9px 16px;border:1px solid var(--border2);border-radius:16px;background:var(--glass);text-align:center;cursor:pointer;min-width:236px">
+        <div style="font-size:.56rem;letter-spacing:.22em;color:var(--td);text-transform:uppercase">Истинный трек · сегодня пройдено</div>
+        <div id="tt-main" style="font-family:'Orbitron',monospace;font-size:1.04rem;font-weight:700;margin:3px 0;color:var(--nc);text-shadow:0 0 14px rgba(34,211,238,.45)">— км</div>
+        <div id="tt-sub" style="font-size:.6rem;color:var(--td);letter-spacing:.04em">относительно реликтового света Большого взрыва</div>
+        <div id="tt-det" style="display:none;text-align:left;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;font-size:.64rem;color:var(--td);line-height:1.85"></div>
+      </div>
     </div>
     <div class="stats">
       <div class="stat">
@@ -594,6 +605,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
     <div class="lbtn active" id="lo" onclick="toggleL('o')" title="Места · OSM">📍</div>
     <div class="lbtn active" id="lcam" onclick="toggleL('cam')" title="Камеры скорости · OSM">📸</div>
     <div class="lbtn active" id="lair" onclick="toggleL('air')" title="Самолёты · ADS-B live">✈️</div>
+    <div class="lbtn" id="llt" onclick="LT.toggle()" title="Молнии · Blitzortung (эксперимент)">⚡</div>
     <div class="lbtn" onclick="openTraffic()" title="Пробки · Waze Live (Google)">🚦</div>
     <div class="lbtn" onclick="openAR()" title="Навести · дополненная реальность">🔭</div>
     <div class="lbtn active" id="lsnd" onclick="CA.toggle()" title="Звук радаров">🔔</div>
@@ -865,7 +877,7 @@ const TP={
   start(){
     try{const s=JSON.parse(localStorage.getItem('pnd-tp')||'null');
       if(s){this.ns=s.ns||0;this.log=s.log||[];this.todayNs=s.todayNs||0;this.todayKey=s.todayKey||'';}}catch(e){}
-    const k=new Date().toISOString().slice(0,10);
+    const k=this._dayKey();
     if(this.todayKey!==k){this.todayKey=k;this.todayNs=0;}
     PM.sub(p=>this._onFix(p));
     this._lastT=Date.now();
@@ -922,7 +934,7 @@ const TP={
           this._addLog('✈ полёт · '+Math.round((t-f.t0)/60000)+' мин · '+this._fmtS(this.ns-f.ns0));
           this._flight=null;}}
       else this._flight.slow=0;}
-    const k2=new Date().toISOString().slice(0,10);
+    const k2=this._dayKey();
     if(k2!==this.todayKey){this._addLog('∑ '+this.todayKey+' · '+this._fmtS(this.todayNs));
       this.todayKey=k2;this.todayNs=0;}
     this._render();
@@ -941,6 +953,7 @@ const TP={
     let i=0;while(i<g.length&&(g[i]==='0'||g[i]===' '))i++;
     return{dim:sign+'0.'+g.slice(0,i),sig:g.slice(i),u:' с'};},
   _fmtS(ns){const q=this._fmtSParts(ns);return q.dim+q.sig+q.u;},
+  _dayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');},
   tint(a){const c=this.tintRGB;return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';},
   toggle(){const d=document.getElementById('tp-det');if(d)d.style.display=d.style.display==='none'?'block':'none';},
   _render(){
@@ -2639,7 +2652,8 @@ const SKY={
   },
   _tick(){
     if(document.hidden||this._busy)return;
-    if(!LV.air&&!(typeof AR!=='undefined'&&AR.act))return;
+    const arAct=(typeof AR!=='undefined'&&AR.act);
+    if(!arAct&&!(S.view==='map'&&LV.air))return; // сеть — только когда карта открыта или НАВЕСТИ активен
     const a=this._anchor();if(!a)return;
     this._busy=true;
     const urls=[
@@ -2670,6 +2684,489 @@ const SKY={
         .bindPopup('<div class="user-pop"><b>✈️ '+PO._esc(q.fl)+'</b>'+(q.typ?' · '+PO._esc(q.typ):'')+
           '<br><span style="font-size:.62rem;color:var(--td)">'+al+' · '+Math.round(q.gs)+' км/ч · ADS-B</span></div>');
     })).addTo(m);
+  }
+};
+
+/* ═══ СПУТНИКИ · только те, что отвечают на вопросы человека под небом ═══
+   «Что это за движущаяся звезда?» и «Когда выйти смотреть?»
+   Состав: МКС, Тяньгун, Hubble + свежий Starlink-поезд (первые дни
+   после запуска — жемчужная нить). Всё остальное — балласт.
+   TLE: CelesTrak (открыто). Счёт орбит: satellite.js (SGP4) в браузере,
+   грузится лениво. Проходы ≥10° на сутки вперёд; «ВИДИМА» = наблюдатель
+   в сумерках/ночи И аппарат освещён Солнцем (честная геометрия тени). ═══ */
+const SAT={
+  sats:[],passes:[],train:null,ready:false,_obs:null,_arC:{t:0,items:[]},
+  start(){setTimeout(()=>this._boot(),2600);setInterval(()=>this._boot(true),6*3600*1000);},
+  _lib(cb){
+    if(window.satellite){cb();return;}
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js';
+    s.onload=cb;
+    s.onerror=()=>{const s2=document.createElement('script');
+      s2.src='https://cdnjs.cloudflare.com/ajax/libs/satellite.js/4.1.3/satellite.min.js';
+      s2.onload=cb;document.head.appendChild(s2);};
+    document.head.appendChild(s);
+  },
+  _boot(refresh){
+    this._lib(()=>{
+      const get=u=>fetch(u).then(r=>r.text());
+      Promise.all([
+        get('https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=tle').catch(()=>''),
+        get('https://celestrak.org/NORAD/elements/gp.php?CATNR=48274&FORMAT=tle').catch(()=>''),
+        get('https://celestrak.org/NORAD/elements/gp.php?CATNR=20580&FORMAT=tle').catch(()=>''),
+        get('https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=tle').catch(()=>'')
+      ]).then(([iss,css,hst,fresh])=>{
+        this.sats=[];
+        const one=(txt,label)=>{const L=txt.trim().split(/\r?\n/);
+          if(L.length>=3)this.sats.push({label,rec:satellite.twoline2satrec(L[1],L[2])});
+          else if(L.length>=2)this.sats.push({label,rec:satellite.twoline2satrec(L[0],L[1])});};
+        one(iss,'МКС');one(css,'Тяньгун');one(hst,'Hubble');
+        this._train(fresh);
+        this.ready=true;
+        this._observer();
+        if(typeof PM!=='undefined')PM.sub(p=>this._observer(p));
+      }).catch(()=>{});
+    });
+  },
+  _train(txt){ // свежий Starlink-поезд из запусков за 30 дней
+    if(!txt)return;
+    const L=txt.trim().split(/\r?\n/),groups={};
+    for(let i=0;i+2<L.length;i+=3){
+      const nm=L[i].trim(),l1=L[i+1],l2=L[i+2];
+      if(!/^STARLINK/i.test(nm))continue;
+      const launch=l1.slice(9,14).trim(); // yyNNN международного обозначения
+      (groups[launch]=groups[launch]||[]).push({nm,l1,l2});
+    }
+    let best=null,bestKey=null;
+    for(const k in groups)
+      if(groups[k].length>=5&&(!bestKey||k>bestKey)){bestKey=k;best=groups[k];}
+    if(!best)return;
+    const lead=best[0];
+    const epY=2000+(+lead.l1.slice(18,20)),epD=+lead.l1.slice(20,32);
+    const ep=new Date(Date.UTC(epY,0,1)+(epD-1)*86400000);
+    this.train={count:best.length,age:Math.max(0,(Date.now()-ep.getTime())/86400000),
+      rec:satellite.twoline2satrec(lead.l1,lead.l2)};
+  },
+  _observer(p){
+    const base=p||((typeof PM!=='undefined'&&PM.last)||null)||{lat:CLUB.lat,lng:CLUB.lng};
+    if(this._obs&&TP._dist(base.lat,base.lng,this._obs.lat,this._obs.lng)<50000
+       &&Date.now()-this._obs.t<3*3600*1000)return;
+    this._obs={lat:base.lat,lng:base.lng,t:Date.now()};
+    this._computePasses();
+  },
+  _sunECI(d){const n=(d.getTime()/86400000)-10957.5,r=Math.PI/180;
+    const Lm=(280.460+0.9856474*n)%360,g=((357.528+0.9856003*n)%360)*r;
+    const lam=(Lm+1.915*Math.sin(g)+0.020*Math.sin(2*g))*r;
+    const eps=(23.439-4e-7*n)*r;
+    return{x:Math.cos(lam),y:Math.cos(eps)*Math.sin(lam),z:Math.sin(eps)*Math.sin(lam)};},
+  _sunlit(pos,d){const s=this._sunECI(d);
+    const dot=pos.x*s.x+pos.y*s.y+pos.z*s.z;
+    if(dot>0)return true;
+    const px=pos.x-dot*s.x,py=pos.y-dot*s.y,pz=pos.z-dot*s.z;
+    return Math.hypot(px,py,pz)>6371;},
+  _gmst(d){const j=satellite.jday(d.getUTCFullYear(),d.getUTCMonth()+1,d.getUTCDate(),
+    d.getUTCHours(),d.getUTCMinutes(),d.getUTCSeconds()+d.getUTCMilliseconds()/1000);
+    return satellite.gstime(j);},
+  _riseSec(rec,obs){ // секунды до всплытия над горизонтом + азимут восхода
+    const t0=new Date();let prev=null;
+    for(let t=0;t<=7200;t+=20){
+      const d=new Date(t0.getTime()+t*1000);
+      const pv=satellite.propagate(rec,d);if(!pv||!pv.position)return null;
+      const la=satellite.ecfToLookAngles(obs,satellite.eciToEcf(pv.position,this._gmst(d)));
+      const el=la.elevation*180/Math.PI;
+      if(prev!=null&&prev<0&&el>=0)return{sec:t,az:la.azimuth*180/Math.PI};
+      prev=el;}
+    return null;},
+  _computePasses(){
+    if(!this.ready||!this._obs)return;
+    const obsGd={longitude:this._obs.lng*Math.PI/180,latitude:this._obs.lat*Math.PI/180,height:0.04};
+    const start=new Date();const out=[];
+    const targets=this.sats.slice();
+    if(this.train)targets.push({label:'Starlink-поезд',rec:this.train.rec,train:1});
+    for(const s of targets){
+      let inP=false,cur=null,found=0;
+      for(let t=0;t<=86400&&found<3;t+=30){
+        const d=new Date(start.getTime()+t*1000);
+        const pv=satellite.propagate(s.rec,d);
+        if(!pv||!pv.position){break;}
+        const gmst=this._gmst(d);
+        const la=satellite.ecfToLookAngles(obsGd,satellite.eciToEcf(pv.position,gmst));
+        const el=la.elevation*180/Math.PI;
+        if(el>10){
+          if(!inP){inP=true;cur={s:s.label,start:new Date(d),maxEl:el,maxT:new Date(d),eci:pv.position};}
+          else if(el>cur.maxEl){cur.maxEl=el;cur.maxT=new Date(d);cur.eci=pv.position;}
+          cur.end=new Date(d);
+        }else if(inP){
+          inP=false;found++;
+          const sunEl=(typeof solarElevation==='function')?solarElevation(cur.maxT,this._obs.lat,this._obs.lng):-10;
+          cur.vis=(sunEl<-6)&&this._sunlit(cur.eci,cur.maxT);
+          out.push(cur);cur=null;
+        }
+      }
+    }
+    out.sort((a,b)=>a.start-b.start);
+    this.passes=out.slice(0,10);
+    this._renderCard();
+  },
+  _fmtT(d){const wd=['вс','пн','вт','ср','чт','пт','сб'][d.getDay()];
+    return wd+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');},
+  _renderCard(){
+    const card=document.getElementById('sat-card'),nx=document.getElementById('sat-next');
+    if(!card||!nx)return;
+    if(!this.sats.length&&!this.train){card.style.display='none';return;}
+    card.style.display='';
+    const vis=this.passes.find(q=>q.vis)||this.passes[0];
+    nx.textContent=vis?('🛰 '+vis.s+' · '+this._fmtT(vis.start)+' · до '+Math.round(vis.maxEl)+'°'+(vis.vis?' · ВИДИМА':'')):'проходов ≥10° в ближайшие сутки нет';
+    const det=document.getElementById('sat-det');
+    if(det){
+      let h=this.passes.map(q=>('🛰 '+q.s+' · '+this._fmtT(q.start)+' → '
+        +String(q.end.getHours()).padStart(2,'0')+':'+String(q.end.getMinutes()).padStart(2,'0')
+        +' · макс '+Math.round(q.maxEl)+'° · '+(q.vis?'<b style="color:var(--ng)">ВИДИМА</b>':'в тени/днём'))).join('<br>');
+      if(this.train)h+='<br>✨ Starlink-поезд: '+this.train.count+' шт · запуск '+Math.round(this.train.age)+' дн назад'
+        +(this.train.age<10?' · <b style="color:var(--nc)">нить ещё плотная — лови после заката</b>':' · нить уже растянулась');
+      h+='<br><span style="font-size:.58rem;opacity:.7">TLE CelesTrak · точность ±минуты · ВИДИМА = ты в сумерках, аппарат на солнце · пересчёт по позиции</span>';
+      det.innerHTML=h;
+    }
+  },
+  toggle(){const d=document.getElementById('sat-det');
+    if(d)d.style.display=d.style.display==='none'?'block':'none';},
+  ar(pos){ // метки для НАВЕСТИ, кэш 1 с
+    if(!this.ready)return[];
+    const now=Date.now();
+    if(now-this._arC.t<1000)return this._arC.items;
+    const d=new Date(),gmst=this._gmst(d);
+    const obs={longitude:pos.lng*Math.PI/180,latitude:pos.lat*Math.PI/180,
+      height:((pos.alt&&isFinite(pos.alt)?pos.alt:0)/1000)};
+    const items=[];
+    const targets=this.sats.slice();
+    if(this.train)targets.push({label:'Starlink-поезд',rec:this.train.rec});
+    for(const s of targets){
+      const pv=satellite.propagate(s.rec,d);if(!pv||!pv.position)continue;
+      const la=satellite.ecfToLookAngles(obs,satellite.eciToEcf(pv.position,gmst));
+      const el=la.elevation*180/Math.PI;
+      if(el<3){ // под горизонтом — сквозь Землю, со временем всплытия
+        if(el<-85)continue;
+        this._riseC=this._riseC||{};
+        let R=this._riseC[s.label];
+        if(!R||now-R.t>60000){R={t:now,o:this._riseSec(s.rec,obs)};this._riseC[s.label]=R;}
+        const left=R.o?Math.max(0,R.o.sec-(now-R.t)/1000):null;
+        items.push({emo:'🛰️',name:s.label+' · под тобой',d:la.rangeSat*1000,
+          b:la.azimuth*180/Math.PI,deep:1,elev:el,
+          sub:left!=null?('всплывёт через '+DEEP._fmtDur(left)+' · восход аз. '+Math.round(R.o.az)+'°')
+                        :'под горизонтом'});
+        continue;
+      }
+      const sunEl=(typeof solarElevation==='function')?solarElevation(d,pos.lat,pos.lng):-10;
+      const vis=(sunEl<-6)&&this._sunlit(pv.position,d);
+      items.push({emo:'🛰️',name:s.label,d:la.rangeSat*1000,
+        b:la.azimuth*180/Math.PI,air:1,elev:el,
+        sub:Math.round(el)+'° над горизонтом'+(vis?' · ВИДИМА':'')});
+    }
+    this._arC={t:now,items};
+    return items;
+  }
+};
+
+/* ═══ СКВОЗЬ ЗЕМЛЮ — планета становится прозрачной ═══
+   НАВЕСТИ достраивается до полной сферы: отрицательные углы места.
+   Солнце ночью под ногами, Луна за толщей, антипод, спутники под
+   горизонтом со временем всплытия.
+   Геометрия честная: хорда луча через шар = 2R·sin|δ|, глубочайшая
+   точка = R·(1−cos|δ|) → слой (мантия до 2890 км, внешнее ядро до
+   5150, глубже — внутреннее). Восход Солнца: порог −0.833° (рефракция
+   34′ + полудиск 16′), скан + бисекция. Луна: компактная теория Меёса,
+   точность ≈±1° — помечено в подписи. ═══ */
+const DEEP={
+  _c:{t:0,items:[]},_sun:{t:0},_moon:{t:0},_anti:null,
+  R:6371,
+  _layer(depth){return depth>5150?'внутреннее ядро':depth>2890?'внешнее ядро':'мантия';},
+  _chord(elDeg){const a=Math.abs(elDeg)*Math.PI/180;
+    return{chord:2*this.R*Math.sin(a),depth:this.R*(1-Math.cos(a))};},
+  _altAz(pos,sub){const r=Math.PI/180,f1=pos.lat*r,f2=sub.lat*r,dl=(sub.lng-pos.lng)*r;
+    const el=Math.asin(Math.sin(f1)*Math.sin(f2)+Math.cos(f1)*Math.cos(f2)*Math.cos(dl))/r;
+    return{el,az:AR._brg(pos.lat,pos.lng,sub.lat,sub.lng)};},
+  _moonSub(d){ // субселенная точка, Меёс (укороченный ряд, ±1°)
+    const n=(d.getTime()/86400000)-10957.5,r=Math.PI/180;
+    const Lm=(218.316+13.176396*n)%360,
+          Mm=((134.963+13.064993*n)%360)*r,
+          F =((93.272+13.229350*n)%360)*r;
+    const lam=(Lm+6.289*Math.sin(Mm))*r, bet=5.128*Math.sin(F)*r;
+    const eps=(23.439-4e-7*n)*r;
+    const dec=Math.asin(Math.sin(bet)*Math.cos(eps)+Math.cos(bet)*Math.sin(eps)*Math.sin(lam));
+    const ra=Math.atan2(Math.sin(lam)*Math.cos(eps)-Math.tan(bet)*Math.sin(eps),Math.cos(lam));
+    const gmst=((280.46061837+360.98564736629*n)%360+360)%360;
+    let lng=((ra/r+360)%360)-gmst;
+    lng=((lng+540)%360)-180;
+    return{lat:dec/r,lng};},
+  _fmtDur(s){s=Math.max(0,Math.round(s));
+    const h=Math.floor(s/3600),m=Math.floor(s%3600/60);
+    return h?h+'ч '+String(m).padStart(2,'0')+'м':m+'м '+String(s%60).padStart(2,'0')+'с';},
+  _nextRise(elevFn,thr){ // секунд до пересечения порога снизу вверх (скан 24ч + бисекция)
+    const t0=Date.now();let prev=elevFn(new Date(t0));
+    for(let t=120;t<=86400;t+=120){
+      const e=elevFn(new Date(t0+t*1000));
+      if(prev<thr&&e>=thr){
+        let a=t-120,b=t;
+        for(let i=0;i<14;i++){const m=(a+b)/2;
+          (elevFn(new Date(t0+m*1000))<thr)?(a=m):(b=m);}
+        return (a+b)/2;}
+      prev=e;}
+    return null;},
+  items(pos){
+    const now=Date.now();
+    if(now-this._c.t<1000)return this._c.items;
+    const d=new Date(),out=[];
+    // ── СОЛНЦЕ ──
+    const sa=this._altAz(pos,subsolarPoint(d));
+    if(now-this._sun.t>60000)
+      this._sun={t:now,rise:this._nextRise(t=>this._altAz(pos,subsolarPoint(t)).el,-0.833)};
+    if(sa.el>=-0.833){
+      out.push({emo:'☀️',name:'Солнце',d:1.496e11,b:sa.az,air:1,elev:sa.el,fs:24,
+        sub:Math.round(sa.el)+'° над горизонтом'});
+    }else{
+      const c=this._chord(sa.el);
+      out.push({emo:'☀️',name:'Солнце · сквозь планету',d:1.496e11,b:sa.az,deep:1,elev:sa.el,fs:24,
+        sub:'хорда '+Math.round(c.chord)+' км · глубина луча '+Math.round(c.depth)+' км ('+this._layer(c.depth)+')'
+          +(this._sun.rise!=null?' · восход через '+this._fmtDur(this._sun.rise-(now-this._sun.t)/1000):'')});
+    }
+    // ── ЛУНА ──
+    const ma=this._altAz(pos,this._moonSub(d));
+    const mdays=(typeof moonPhase==='function')?moonPhase(d):14.77;
+    const ph=mdays/29.53058867;
+    const illum=Math.round((1-Math.cos(ph*2*Math.PI))/2*100);
+    const memo=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'][Math.round(ph*8)%8];
+    if(now-this._moon.t>60000)
+      this._moon={t:now,rise:this._nextRise(t=>this._altAz(pos,this._moonSub(t)).el,0.125)};
+    if(ma.el>=0){
+      out.push({emo:memo,name:'Луна',d:3.84e8,b:ma.az,air:1,elev:ma.el,fs:22,
+        sub:Math.round(ma.el)+'° · освещена '+illum+'%'});
+    }else{
+      const c=this._chord(ma.el);
+      out.push({emo:memo,name:'Луна · сквозь планету',d:3.84e8,b:ma.az,deep:1,elev:ma.el,fs:22,
+        sub:'хорда '+Math.round(c.chord)+' км'
+          +(this._moon.rise!=null?' · восход через '+this._fmtDur(this._moon.rise-(now-this._moon.t)/1000):'')
+          +' · ±мин (модель)'});
+    }
+    // ── АНТИПОД ──
+    const aLng=pos.lng>0?pos.lng-180:pos.lng+180;
+    out.push({emo:'🌏',name:'антипод: '+this._antiName(pos),d:2*this.R*1000,b:0,
+      deep:1,anti:1,elev:-90,fs:18,
+      sub:(-pos.lat).toFixed(1)+'°, '+aLng.toFixed(1)+'° · сквозь центр '+Math.round(2*this.R)+' км'});
+    this._c={t:now,items:out};
+    return out;},
+  _antiName(pos){
+    if(this._anti)return this._anti;
+    const la=-pos.lat,ln=pos.lng>0?pos.lng-180:pos.lng+180;
+    let n;
+    if(la<-60)n='Южный океан';
+    else if(la>66)n='Северный Ледовитый океан';
+    else if(ln>=20&&ln<146)n='Индийский океан';
+    else if(ln>=-70&&ln<20)n='Атлантический океан';
+    else n='Тихий океан'+(la<0?' (юг)':' (север)');
+    if(la>-47&&la<-34&&ln>165&&ln<179)n='Новая Зеландия';
+    this._anti=n;return n;},
+};
+
+/* ═══ ИСТИННЫЙ ТРЕК — разрушение иллюзии покоя ═══
+   Пять движений, каждое честно в СВОЕЙ системе отсчёта (складывать
+   нельзя — и это само по себе урок физики):
+   1) вращение Земли — по эллипсоиду WGS-84, персонально для широты и
+      высоты пользователя, сидерические сутки 86164.0905 с;
+   2) орбита — НЕ константа: vis-viva v=√(GM(2/r−1/a)) по текущему
+      расстоянию до Солнца (29.29 у афелия … 30.29 у перигелия);
+   3) апекс Солнца: 19.4 км/с к Геркулесу (отн. соседних звёзд);
+   4) вокруг центра Галактики: ≈230 км/с, к Денебу, оборот ~230 млн лет;
+   5) диполь реликтового излучения: 369.8 км/с к Льву — самая
+      абсолютная рамка, что есть у физики (покой света Большого взрыва).
+   Заголовок карточки ведётся в реликтовой рамке. Все четыре вектора
+   наводимы в НАВЕСТИ — на них можно физически показать телефоном. ═══ */
+const TT={
+  V:{rot:0,orb:29.78,apex:19.4,gal:230,cmb:369.82},
+  _open:Date.now(),_t0:null,_arC:{t:0,items:[]},
+  start(){
+    const d=new Date();d.setHours(0,0,0,0);this._t0=d.getTime();
+    setInterval(()=>this._render(),1000);
+    this._render();
+  },
+  _rot(lat,alt){ // м/с вокруг земной оси, эллипсоид WGS-84
+    const a=6378137,b=6356752.314,f=lat*Math.PI/180;
+    const fc=Math.atan((b*b)/(a*a)*Math.tan(f)); // геоцентрическая широта
+    const R=Math.sqrt(
+      (Math.pow(a*a*Math.cos(f),2)+Math.pow(b*b*Math.sin(f),2))/
+      (Math.pow(a*Math.cos(f),2)+Math.pow(b*Math.sin(f),2)));
+    const p=(R+(alt||0))*Math.cos(fc); // расстояние до оси
+    return p*2*Math.PI/86164.0905;
+  },
+  _orb(d){ // км/с, vis-viva по текущему r
+    const n=(d.getTime()/86400000)-10957.5;
+    const g=((357.528+0.9856003*n)%360)*Math.PI/180;
+    const rAU=1.00014-0.01671*Math.cos(g)-0.00014*Math.cos(2*g);
+    const r=rAU*1.495978707e8,A=1.495978707e8,GM=1.32712440018e11;
+    return Math.sqrt(GM*(2/r-1/A));
+  },
+  _eq2aa(raD,decD,lat,lng,d){ // экваториальные → высота/азимут
+    const n=(d.getTime()/86400000)-10957.5;
+    const gmst=((280.46061837+360.98564736629*n)%360+360)%360;
+    const H=(((gmst+lng-raD)+540)%360-180)*Math.PI/180;
+    const f=lat*Math.PI/180,dd=decD*Math.PI/180;
+    const el=Math.asin(Math.sin(f)*Math.sin(dd)+Math.cos(f)*Math.cos(dd)*Math.cos(H))*180/Math.PI;
+    const az=(Math.atan2(Math.sin(H),Math.cos(H)*Math.sin(f)-Math.tan(dd)*Math.cos(f))*180/Math.PI+180+360)%360;
+    return{el,az};
+  },
+  _dirs(d){ // RA/Dec четырёх стрел движения
+    const n=(d.getTime()/86400000)-10957.5,r=Math.PI/180;
+    const g=((357.528+0.9856003*n)%360)*r;
+    const L=(280.460+0.9856474*n)%360;
+    const lamS=L+1.915*Math.sin(g)+0.020*Math.sin(2*g);
+    const lamA=((lamS-90)%360+360)%360; // апекс пути Земли: λ☉ − 90°
+    const eps=(23.439-4e-7*n)*r;
+    const ra=((Math.atan2(Math.sin(lamA*r)*Math.cos(eps),Math.cos(lamA*r))/r)+360)%360;
+    const dec=Math.asin(Math.sin(eps)*Math.sin(lamA*r))/r;
+    return[
+      {emo:'🌀',name:'вектор орбиты Земли',ra,dec,kms:this.V.orb,fr:'отн. Солнца'},
+      {emo:'✴️',name:'апекс Солнца',ra:271.0,dec:30.0,kms:19.4,fr:'отн. соседних звёзд · Геркулес'},
+      {emo:'🌌',name:'вокруг центра Галактики',ra:318.0,dec:48.3,kms:230,fr:'к Денебу · оборот ~230 млн лет'},
+      {emo:'🔆',name:'к реликтовому свету',ra:168.0,dec:-7.0,kms:369.8,fr:'диполь CMB · Лев'}];
+  },
+  ar(pos){ // стрелы для НАВЕСТИ, кэш 1 с
+    const now=Date.now();
+    if(now-this._arC.t<1000)return this._arC.items;
+    const d=new Date(),out=[];
+    for(const v of this._dirs(d)){
+      const aa=this._eq2aa(v.ra,v.dec,pos.lat,pos.lng,d);
+      const deep=aa.el<0;
+      out.push({emo:v.emo,name:v.name,d:5000,b:aa.az,elev:aa.el,fs:20,
+        air:deep?0:1,deep:deep?1:0,
+        sub:v.kms.toFixed(1)+' км/с · '+v.fr+(deep?' · сквозь Землю':'')});
+    }
+    this._arC={t:now,items:out};
+    return out;
+  },
+  _fmt(n){return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'\u2009');},
+  toggle(){const d=document.getElementById('tt-det');
+    if(d)d.style.display=d.style.display==='none'?'block':'none';},
+  _render(){
+    const m=document.getElementById('tt-main');if(!m)return;
+    if(Date.now()-this._t0>=86400000){ // перекат через местную полночь
+      const d2=new Date();d2.setHours(0,0,0,0);this._t0=d2.getTime();}
+    const pos=(typeof PM!=='undefined'&&PM.last)||{lat:45.08,lng:13.64,alt:30};
+    const alt=(typeof TP!=='undefined'&&TP.haveAlt)?TP.alt:(pos.alt||0);
+    this.V.rot=this._rot(pos.lat,alt);
+    this.V.orb=this._orb(new Date());
+    const sec=(Date.now()-this._t0)/1000;
+    m.textContent=this._fmt(this.V.cmb*sec)+' км';
+    const sess=this.V.cmb*(Date.now()-this._open)/1000;
+    const sb=document.getElementById('tt-sub');
+    if(sb)sb.textContent='отн. реликтового света · +'+this._fmt(sess)+' км за это открытие';
+    const det=document.getElementById('tt-det');
+    if(det&&det.style.display!=='none'){
+      const note=this.V.orb<29.5?' · у афелия — медленнее всего за год'
+                :(this.V.orb>30.05?' · у перигелия — быстрее всего за год':'');
+      det.innerHTML=
+        '🌍 вращение (отн. оси): <b>'+(this.V.rot*3.6).toFixed(0)+' км/ч</b> на восток · за сутки '
+          +this._fmt(this.V.rot*86.4)+' км<br>'
+        +'<span style="font-size:.56rem;opacity:.75">эллипсоид WGS-84 · твоя широта '
+          +pos.lat.toFixed(2)+'° · высота '+Math.round(alt)+' м · сидерические сутки</span><br>'
+        +'🌀 орбита (отн. Солнца): <b>'+this.V.orb.toFixed(2)+' км/с</b>'+note
+          +' · за сутки '+this._fmt(this.V.orb*86400)+' км<br>'
+        +'✴️ апекс (отн. соседних звёзд): <b>19.4 км/с</b> к Геркулесу · '
+          +this._fmt(19.4*86400)+' км<br>'
+        +'🌌 Галактика (отн. её центра): <b>≈230 км/с</b> к Денебу · '
+          +this._fmt(230*86400)+' км · оборот ~230 млн лет<br>'
+        +'🔆 реликт (диполь CMB): <b>369.8 км/с</b> к Льву · '
+          +this._fmt(369.82*86400)+' км<br>'
+        +'<span style="font-size:.58rem;opacity:.75">Системы отсчёта разные — складывать скорости нельзя; заголовок ведётся в реликтовой, самой абсолютной из доступных. Все четыре стрелы наводимы в НАВЕСТИ 🔭 — на них можно показать телефоном.</span>';
+    }
+  }
+};
+
+/* ═══ МОЛНИИ · Blitzortung — ЭКСПЕРИМЕНТАЛЬНЫЙ слой ═══
+   Сообщество гроз-приёмников; протокол вебсокета полуоткрыт и может
+   измениться без предупреждения — отсюда предохранители:
+   · выключен по умолчанию, включается кнопкой ⚡
+   · сокет живёт ТОЛЬКО пока открыта карта и вкладка видима
+   · вне карты >90 с или вкладка скрыта — авто-отключение, при
+     возврате на карту просыпается сам
+   · рисуются только удары в текущем окне карты (+запас)
+   · 4 неудачных подключения подряд — слой гаснет с честным тостом ═══ */
+const LT={
+  on:false,ws:null,_hosts:[1,3,7,8],_hi:0,_fails:0,_sleep:0,_dots:null,_init:false,
+  init(){
+    if(this._init)return;this._init=true;
+    setInterval(()=>this._watch(),15000);
+    setInterval(()=>this._prune(),30000);
+  },
+  toggle(){
+    this.on=!this.on;
+    document.getElementById('llt')?.classList.toggle('active',this.on);
+    if(this.on){this._fails=0;toast('Молнии: эксперимент — протокол сети может измениться');this._watch();}
+    else{this._disc();toast('Молнии выключены');}
+  },
+  _wantLive(){return this.on&&!document.hidden&&S.view==='map';},
+  _watch(){
+    if(this._wantLive()){this._sleep=0;if(!this._open())this._connect();}
+    else if(this._open()){
+      this._sleep+=15;
+      if(document.hidden||this._sleep>90)this._disc();
+    }
+  },
+  _open(){return this.ws&&this.ws.readyState===1;},
+  _connect(){
+    if(this.ws&&this.ws.readyState===0)return;
+    if(this._fails>=4){this.on=false;
+      document.getElementById('llt')?.classList.remove('active');
+      toast('Молнии: сеть недоступна — слой выключен');return;}
+    const h=this._hosts[this._hi%this._hosts.length];this._hi++;
+    try{this.ws=new WebSocket('wss://ws'+h+'.blitzortung.org/');}
+    catch(e){this._fails++;return;}
+    this.ws.onopen=()=>{this._fails=0;try{this.ws.send('{"a":111}');}catch(e){}};
+    this.ws.onmessage=ev=>this._msg(ev.data);
+    this.ws.onerror=()=>{};
+    this.ws.onclose=()=>{this.ws=null;
+      if(this._wantLive()){this._fails++;setTimeout(()=>this._connect(),3000);}};
+  },
+  _disc(){if(this.ws){try{this.ws.close();}catch(e){}this.ws=null;}},
+  _lzw(a){ // декодер их сжатия (классический LZW по строке)
+    if(!a)return'';const d={};let c=a.charAt(0),f=c;const e=[c];let h=256,b,k;
+    for(let i=1;i<a.length;i++){b=a.charCodeAt(i);
+      k=b<256?a.charAt(i):(d[b]!==undefined?d[b]:f+c);
+      e.push(k);c=k.charAt(0);d[h]=f+c;h++;f=k;}
+    return e.join('');},
+  _msg(raw){
+    let j=null;
+    try{j=JSON.parse(raw);}catch(e){try{j=JSON.parse(this._lzw(raw));}catch(e2){return;}}
+    if(!j||j.lat==null||j.lon==null)return;
+    const m=window._map;if(!m)return;
+    const b=m.getBounds().pad(0.6);
+    if(!b.contains([j.lat,j.lon]))return;
+    this._flash(j.lat,j.lon);
+  },
+  _flash(lat,lng){
+    const m=window._map;if(!m)return;
+    if(!this._dots)this._dots=L.layerGroup().addTo(m);
+    const mk=L.marker([lat,lng],{icon:L.divIcon({className:'',iconSize:[16,16],iconAnchor:[8,8],
+      html:'<div style="width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 20px 8px rgba(255,230,120,.95)"></div>'})}).addTo(m);
+    const el=mk.getElement();
+    if(el&&el.firstChild&&el.firstChild.animate)
+      el.firstChild.animate(
+        [{transform:'scale(.4)',opacity:1},{transform:'scale(2.6)',opacity:0}],
+        {duration:900,easing:'ease-out'});
+    setTimeout(()=>{m.removeLayer(mk);},900);
+    const dot=L.circleMarker([lat,lng],{radius:2.5,color:'#fbbf24',weight:1,
+      fillColor:'#fde68a',fillOpacity:.7,opacity:.8});
+    dot._lt=Date.now();this._dots.addLayer(dot);
+    if(PM.last){
+      const d=TP._dist(PM.last.lat,PM.last.lng,lat,lng);
+      if(d<30000&&Date.now()-(this._lastNear||0)>20000){
+        this._lastNear=Date.now();
+        toast('⚡ '+(d/1000).toFixed(1)+' км · гром через ~'+Math.round(d/343)+' с');
+      }
+    }
+  },
+  _prune(){
+    if(!this._dots)return;
+    const now=Date.now();
+    this._dots.eachLayer(l=>{if(now-(l._lt||0)>600000)this._dots.removeLayer(l);});
   }
 };
 
@@ -2856,6 +3353,28 @@ const AR={
       cx.shadowBlur=0;return;
     }
     const pitchShift=(45-(OM.pitch!=null?OM.pitch:45))*3.2;
+    const camPitch=(OM.pitch!=null?OM.pitch:90)-90; // наклон камеры над горизонтом, °
+    // ── линия горизонта + толща планеты ниже неё ──
+    const yHor=H/2+camPitch*(H/55);
+    if(yHor<H){
+      const gTop=Math.max(0,yHor);
+      const grd=cx.createLinearGradient(0,gTop,0,H);
+      grd.addColorStop(0,'rgba(40,24,8,0)');
+      grd.addColorStop(1,'rgba(40,24,8,0.45)');
+      cx.fillStyle=grd;cx.fillRect(0,gTop,W,H-gTop);
+      if(yHor>0){
+        cx.setLineDash([6,5]);
+        cx.strokeStyle='rgba(252,211,77,.5)';cx.lineWidth=1;
+        cx.beginPath();cx.moveTo(0,yHor);cx.lineTo(W,yHor);cx.stroke();
+        cx.setLineDash([]);
+        cx.fillStyle='rgba(252,211,77,.75)';cx.font='600 9px Rajdhani,sans-serif';
+        cx.textAlign='left';cx.fillText('ГОРИЗОНТ',8,yHor-5);cx.textAlign='center';
+      }
+      if(camPitch<-30){
+        cx.fillStyle='rgba(252,211,77,.85)';cx.font='600 11px Rajdhani,sans-serif';
+        cx.fillText('СКВОЗЬ ЗЕМЛЮ',W/2,58);
+      }
+    }
     const items=[];
     for(const c of PO.cams){
       const d=TP._dist(pos.lat,pos.lng,c.lat,c.lng);
@@ -2878,20 +3397,26 @@ const AR={
           air:1,elev,sub:(d/1000).toFixed(0)+' км · '+(pl.alt/1000).toFixed(1)+' км ↑'});
       }
     }
+    if(typeof DEEP!=='undefined')
+      for(const ci of DEEP.items(pos))items.push(ci);
+    if(typeof TT!=='undefined')
+      for(const ti of TT.ar(pos))items.push(ti);
+    if(typeof SAT!=='undefined'&&SAT.ready)
+      for(const sit of SAT.ar(pos))items.push(sit);
     items.sort((a,b)=>b.d-a.d); // дальние первыми — ближние поверх
     let drawn=0;
     for(const it of items){
       let diff=((it.b-head+540)%360)-180;
-      if(Math.abs(diff)>32)continue;
+      if(it.anti){if(camPitch>-55)continue;diff=0;}
+      else if(Math.abs(diff)>32)continue;
       if(++drawn>26)break;
       const x=(diff/64+0.5)*W;
       let y,fs,depth;
-      if(it.air){
-        depth=Math.min(1,it.d/60000);
-        const camPitch=(OM.pitch!=null?OM.pitch:90)-90; // наклон камеры над горизонтом
-        y=H/2-(it.elev-camPitch)*(H/55);                // угол места → вертикаль кадра
-        if(y<56)y=56;if(y>H-72)y=H-72;
-        fs=19-7*depth;
+      if(it.air||it.deep){
+        depth=it.air?Math.min(1,it.d/60000):Math.min(1,Math.abs(it.elev)/90);
+        y=H/2-(it.elev-camPitch)*(H/55); // угол места → вертикаль кадра (общий camPitch)
+        if(y<56)y=56;if(y>H-46)y=H-46;
+        fs=it.fs||(it.air?19-7*depth:18-5*depth);
       }else{
         depth=Math.min(1,it.d/(it.cam?8000:2200));
         y=H*0.30+depth*H*0.36+pitchShift;
@@ -2902,13 +3427,19 @@ const AR={
         cx.beginPath();cx.arc(x,y-fs*0.38,fs*0.95,0,Math.PI*2);
         cx.strokeStyle='rgba(244,63,94,.85)';cx.lineWidth=1.5;cx.stroke();
       }
+      if(it.deep){
+        cx.setLineDash([4,4]);
+        cx.beginPath();cx.arc(x,y-fs*0.38,fs*0.95,0,Math.PI*2);
+        cx.strokeStyle='rgba(252,211,77,.8)';cx.lineWidth=1.4;cx.stroke();
+        cx.setLineDash([]);
+      }
       cx.font=fs+'px sans-serif';
       cx.fillStyle='#fff';
       cx.fillText(it.emo,x,y);
       const nm=it.name?(it.name.length>18?it.name.slice(0,17)+'…':it.name):'';
       const dist=it.sub||(it.d<1000?Math.round(it.d)+' м':(it.d/1000).toFixed(1)+' км');
       cx.font='600 '+Math.max(9,Math.round(fs*0.55))+'px Rajdhani,sans-serif';
-      cx.fillStyle=it.cam?'rgba(255,170,182,.96)':(it.air?'rgba(160,235,255,.96)':'rgba(255,255,255,.93)');
+      cx.fillStyle=it.cam?'rgba(255,170,182,.96)':(it.deep?'rgba(253,224,130,.96)':(it.air?'rgba(160,235,255,.96)':'rgba(255,255,255,.93)'));
       cx.fillText((nm?nm+' · ':'')+dist,x,y+14);
       cx.globalAlpha=1;
     }
@@ -2938,6 +3469,9 @@ PO.init();
 CA.init();
 SR.init();
 SKY.start();
+SAT.start();
+LT.init();
+TT.start();
 </script>
 
 <!-- SPACE VIEW — 3D Globe -->
@@ -2948,7 +3482,7 @@ SKY.start();
   <div id="ar-err" style="display:none;position:absolute;top:46%;width:100%;text-align:center;z-index:4;color:rgba(255,255,255,.85);font-family:'Rajdhani',sans-serif;font-size:.85rem;padding:0 30px">Нет доступа к камере — разреши в настройках браузера.<br>Метки всё равно работают по компасу.</div>
   <button onclick="AR.close()" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;z-index:6;background:rgba(10,14,30,.55);backdrop-filter:blur(10px);border:1px solid var(--border2);color:#fff;border-radius:9999px;padding:8px 16px;font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.06em;font-size:.78rem">← КАРТА</button>
   <div style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);left:0;width:100%;text-align:center;z-index:5;pointer-events:none">
-    <span style="background:rgba(10,14,30,.55);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:9999px;padding:5px 14px;font-size:.58rem;letter-spacing:.12em;color:rgba(255,255,255,.75)">НАВЕДИ · МЕСТА · РАДАРЫ · САМОЛЁТЫ — ПРИВЯЗАНО К РЕАЛЬНОСТИ</span>
+    <span style="background:rgba(10,14,30,.55);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:9999px;padding:5px 14px;font-size:.58rem;letter-spacing:.12em;color:rgba(255,255,255,.75)">НАВЕДИ · ВЕСЬ ШАР: МЕСТА · САМОЛЁТЫ · СПУТНИКИ · СКВОЗЬ ЗЕМЛЮ</span>
   </div>
 </div>
 
