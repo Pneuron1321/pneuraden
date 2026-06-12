@@ -569,6 +569,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
         <div id="tt-sub" style="font-size:.6rem;color:var(--td);letter-spacing:.04em">относительно реликтового света Большого взрыва</div>
         <div id="tt-det" style="display:none;text-align:left;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;font-size:.64rem;color:var(--td);line-height:1.85"></div>
       </div>
+      <div onclick="SL.open()" style="margin-top:10px;padding:9px 16px;border:1px solid var(--border2);border-radius:14px;background:var(--glass);text-align:center;cursor:pointer;min-width:236px;font-size:.62rem;letter-spacing:.2em;color:var(--td);text-transform:uppercase">↑ &nbsp;Небо в разрезе</div>
     </div>
     <div class="stats">
       <div class="stat">
@@ -1175,14 +1176,14 @@ function go(v){
   if(v===S.view && v!=='map') return;
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(el=>el.classList.remove('active'));
-  const ids={home:'vh',map:'vm',events:'ve',profile:'vp',admin:'vad',space:'vspace',traffic:'vtraffic',ar:'var'};
+  const ids={home:'vh',map:'vm',events:'ve',profile:'vp',admin:'vad',space:'vspace',traffic:'vtraffic',ar:'var',slice:'vslice'};
   const el=document.getElementById(ids[v]);
   if(el) el.classList.add('active');
   const ni=document.querySelector(`.ni[data-v="${v}"]`);
   if(ni) ni.classList.add('active');
   S.view=v;
   const nav=document.getElementById('nav');
-  if(v==='map'||v==='space'||v==='traffic'||v==='ar'){nav.style.display='none';if(v==='map')initMap();}
+  if(v==='map'||v==='space'||v==='traffic'||v==='ar'||v==='slice'){nav.style.display='none';if(v==='map')initMap();}
   else nav.style.display='flex';
   if(v==='home' && _minimap) setTimeout(()=>_minimap.invalidateSize(),80);
   if(v==='events') renderEvents();
@@ -2653,7 +2654,7 @@ const SKY={
   _tick(){
     if(document.hidden||this._busy)return;
     const arAct=(typeof AR!=='undefined'&&AR.act);
-    if(!arAct&&!(S.view==='map'&&LV.air))return; // сеть — только когда карта открыта или НАВЕСТИ активен
+    if(!arAct&&S.view!=='slice'&&!(S.view==='map'&&LV.air))return; // сеть — карта/НАВЕСТИ/разрез
     const a=this._anchor();if(!a)return;
     this._busy=true;
     const urls=[
@@ -2965,6 +2966,337 @@ const DEEP={
     else n='Тихий океан'+(la<0?' (юг)':' (север)');
     if(la>-47&&la<-34&&ln>165&&ln<179)n='Новая Зеландия';
     this._anti=n;return n;},
+};
+
+/* ═══ СВЕТ КАК ВРЕМЯ — ночное небо как карта прошлого ═══
+   ~73 ярчайших звезды (RA/Dec J2000, блеск, расстояние в св. годах)
+   + Плеяды, M42, галактика Андромеды. Перевод в высоту/азимут —
+   звёздное время (_eq2aa, верифицирован Полярной). Активно после
+   заката (солнце < −3°). Все звёзды — точки по блеску; ПОЛНУЮ подпись
+   возраста света получает звезда под прицелом: имя, св. годы и год,
+   когда свет вышел. Смотришь не на небо — на слоёное прошлое. ═══ */
+const ST={
+  _c:{t:0,list:[]},
+  // [имя, RA°, Dec°, блеск, св.лет, dso(1=скопл/туман,2=галактика)]
+  CAT:[
+   ['Сириус',101.287,-16.716,-1.46,8.6],['Канопус',95.988,-52.696,-0.74,310],
+   ['Арктур',213.915,19.182,-0.05,36.7],['Альфа Центавра',219.902,-60.834,-0.27,4.4],
+   ['Вега',279.235,38.784,0.03,25],['Капелла',79.172,45.998,0.08,43],
+   ['Ригель',78.634,-8.202,0.13,860],['Процион',114.825,5.225,0.34,11.5],
+   ['Ахернар',24.429,-57.237,0.46,139],['Бетельгейзе',88.793,7.407,0.5,550],
+   ['Хадар',210.956,-60.373,0.61,390],['Альтаир',297.696,8.868,0.77,16.7],
+   ['Акрукс',186.650,-63.099,0.76,320],['Альдебаран',68.980,16.509,0.86,65],
+   ['Антарес',247.352,-26.432,0.96,550],['Спика',201.298,-11.161,0.97,250],
+   ['Поллукс',116.329,28.026,1.14,34],['Фомальгаут',344.413,-29.622,1.16,25],
+   ['Денеб',310.358,45.280,1.25,2600],['Мимоза',191.930,-59.689,1.25,280],
+   ['Регул',152.093,11.967,1.40,79],['Адара',104.656,-28.972,1.50,430],
+   ['Кастор',113.650,31.888,1.62,51],['Гакрукс',187.791,-57.113,1.64,89],
+   ['Шаула',263.402,-37.104,1.63,570],['Беллатрикс',81.283,6.350,1.64,250],
+   ['Эльнат',81.573,28.608,1.65,134],['Миаплацидус',138.300,-69.717,1.69,113],
+   ['Альнилам',84.053,-1.202,1.69,1300],['Альнаир',332.058,-46.961,1.74,101],
+   ['Альнитак',85.190,-1.943,1.77,1260],['Алиот',193.507,55.960,1.77,81],
+   ['Дубхе',165.932,61.751,1.79,123],['Мирфак',51.081,49.861,1.79,510],
+   ['Везен',107.098,-26.393,1.84,1600],['Каус Аустралис',276.043,-34.385,1.85,143],
+   ['Алькаид',206.885,49.313,1.86,104],['Саргас',264.330,-42.998,1.87,270],
+   ['Менкалинан',89.882,44.948,1.90,81],['Альхена',99.428,16.399,1.92,109],
+   ['Пикок',306.412,-56.735,1.94,180],['Полярная',37.955,89.264,1.98,433],
+   ['Мирзам',95.675,-17.956,1.98,500],['Альфард',141.897,-8.659,1.98,177],
+   ['Хамаль',31.793,23.462,2.00,66],['Дифда',10.897,-17.987,2.04,96],
+   ['Мицар',200.981,54.925,2.04,83],['Нунки',283.816,-26.297,2.06,228],
+   ['Альферац',2.097,29.090,2.06,97],['Мирах',17.433,35.621,2.05,197],
+   ['Кохаб',222.676,74.156,2.08,131],['Расальхаг',263.734,12.560,2.07,49],
+   ['Саиф',86.939,-9.670,2.09,650],['Денебола',177.265,14.572,2.13,36],
+   ['Алгол',47.042,40.956,2.12,90],['Этамин',269.152,51.489,2.23,154],
+   ['Шедар',10.127,56.537,2.24,228],['Минтака',83.002,-0.299,2.23,1200],
+   ['Гемма',233.672,26.715,2.23,75],['Садр',305.557,40.257,2.20,1800],
+   ['Каф',2.295,59.150,2.27,54],['Мерак',165.460,56.382,2.37,80],
+   ['Энф',326.046,9.875,2.39,690],['Шеат',345.944,28.083,2.42,196],
+   ['Сабик',257.595,-15.725,2.43,88],['Фекда',178.458,53.695,2.44,83],
+   ['Альдерамин',319.645,62.585,2.46,49],['Маркаб',346.190,15.205,2.49,133],
+   ['Альмах',30.975,42.330,2.26,350],['Мегрец',183.857,57.033,3.31,80],
+   ['Плеяды',56.750,24.117,1.6,444,1],
+   ['Туманность Ориона M42',83.822,-5.391,4.0,1300,1],
+   ['Галактика Андромеды',10.685,41.269,3.4,2537000,2]
+  ],
+  _fmtLy(ly){
+    if(ly>=1e6)return (ly/1e6).toFixed(1).replace('.0','')+' млн св. лет';
+    if(ly>=1000)return Math.round(ly/10)*10+' св. лет';
+    return ly+' св. лет';},
+  _age(name,ly){
+    if(ly>=1e6)return 'человечества ещё не было';
+    const yr=new Date().getFullYear()-Math.round(ly);
+    const era={'Бетельгейзе':' · старше открытия Америки','Антарес':' · старше открытия Америки',
+      'Полярная':' · до телескопа Галилея','Денеб':' · эпоха Пифагора','Ригель':' · эпоха викингов',
+      'Туманность Ориона M42':' · раннее средневековье','Плеяды':' · до Колумба'};
+    return 'свет вышел ≈ в '+yr+' г.'+(era[name]||'');},
+  draw(cx,W,H,pos,head,camPitch){
+    const d=new Date();
+    const sEl=(typeof solarElevation==='function')?solarElevation(d,pos.lat,pos.lng):-10;
+    if(sEl>-3)return; // звёзды — после заката
+    const now=Date.now();
+    if(now-this._c.t>1000){ // alt/az пересчёт раз в секунду
+      const list=[];
+      for(const s of this.CAT){
+        const aa=TT._eq2aa(s[1],s[2],pos.lat,pos.lng,d);
+        if(aa.el>2)list.push({n:s[0],mag:s[3],ly:s[4],el:aa.el,az:aa.az,dso:s[5]||0});
+      }
+      this._c={t:now,list};
+    }
+    let best=null,bd=46;
+    cx.save();
+    for(const st of this._c.list){
+      let diff=((st.az-head+540)%360)-180;
+      if(Math.abs(diff)>34)continue;
+      const x=(diff/64+0.5)*W;
+      const y=H/2-(st.el-camPitch)*(H/55);
+      if(y<62||y>H-62)continue;
+      st._x=x;st._y=y;
+      if(st.dso){
+        cx.font='14px sans-serif';cx.textAlign='center';
+        cx.shadowColor='rgba(0,0,0,.8)';cx.shadowBlur=4;
+        cx.fillText(st.dso===2?'🌌':'✨',x,y);
+      }else{
+        const r=Math.max(1.1,4.3-st.mag*0.85);
+        cx.shadowColor='rgba(180,210,255,.9)';cx.shadowBlur=st.mag<1?7:4;
+        cx.fillStyle='rgba(235,243,255,'+Math.max(0.35,0.95-st.mag*0.14).toFixed(2)+')';
+        cx.beginPath();cx.arc(x,y,r,0,Math.PI*2);cx.fill();
+      }
+      const dc=Math.hypot(x-W/2,y-H/2);
+      if(dc<bd){bd=dc;best=st;}
+      if((st.mag<=0.6||st.dso)&&dc>=46){ // ярчайшие коротко подписаны (кроме звезды под прицелом — у неё полная)
+        cx.shadowBlur=3;cx.font='600 9px Rajdhani,sans-serif';cx.textAlign='center';
+        cx.fillStyle='rgba(220,235,255,.8)';
+        cx.fillText(st.n,x,y+13);
+      }
+    }
+    if(best){ // под прицелом — полная подпись возраста света
+      cx.textAlign='center';
+      cx.shadowColor='rgba(0,0,0,.9)';cx.shadowBlur=5;
+      cx.font='700 11px Rajdhani,sans-serif';
+      cx.fillStyle='rgba(255,255,255,.97)';
+      cx.fillText(best.n,best._x,best._y-16);
+      cx.font='600 9.5px Rajdhani,sans-serif';
+      cx.fillStyle='rgba(190,225,255,.95)';
+      cx.fillText(this._fmtLy(best.ly)+' · '+this._age(best.n,best.ly),best._x,best._y+25);
+      cx.setLineDash([3,3]);cx.strokeStyle='rgba(190,225,255,.7)';
+      cx.beginPath();cx.arc(best._x,best._y-(best.dso?4:0),12,0,Math.PI*2);cx.stroke();
+      cx.setLineDash([]);
+    }
+    cx.restore();
+    cx.fillStyle='rgba(190,225,255,.6)';cx.font='600 9px Rajdhani,sans-serif';cx.textAlign='center';
+    cx.fillText('СВЕТ КАК ВРЕМЯ · наведи прицел на звезду',W/2,H-64);
+  }
+};
+
+/* ═══ НЕБО В РАЗРЕЗЕ — вертикальный рентген атмосферы над тобой ═══
+   13 барических уровней Open-Meteo (1000→30 гПа ≈ 0.1–24 км) с
+   ГЕОПОТЕНЦИАЛЬНЫМИ высотами — ось в метрах, честная.
+   Струйное течение = максимум ветра выше 5.5 км. Тропопауза
+   ВЫЧИСЛЯЕТСЯ: первый уровень, где падение T стихает ниже 2 K/км.
+   Нулевая изотерма (дождь→снег) — из модели. Сплавы: ✈ живой эфир
+   ADS-B на реальных высотах (метка «в струе»), полоса сияний дышит
+   реальным Kp, МКС — на текущей высоте из SGP4.
+   Шкала кусочно-сжата: 0–12 / 12–100 / 100–450 км — тропосфера крупно.
+   Честно: профиль модельный (час, ~0.1° сетка), не радиозонд. ═══ */
+const SL={
+  data:null,_t:0,_busy:false,
+  PLV:[1000,925,850,700,500,300,250,200,150,100,70,50,30],
+  init(){
+    setInterval(()=>{if(S.view==='slice')this.draw();},8000);
+    window.addEventListener('resize',()=>{if(S.view==='slice')this.draw();});
+  },
+  open(){
+    go('slice');
+    const pos=(typeof PM!=='undefined'&&PM.last)||{lat:CLUB.lat,lng:CLUB.lng};
+    if(!this.data||Date.now()-this._t>15*60000)this._fetch(pos);
+    this.draw();
+  },
+  _fetch(pos){
+    if(this._busy)return;this._busy=true;
+    const hv=this.PLV.map(l=>'geopotential_height_'+l+'hPa,temperature_'+l+'hPa,wind_speed_'+l+'hPa,wind_direction_'+l+'hPa').join(',')
+      +',freezing_level_height,cloud_cover_low,cloud_cover_mid,cloud_cover_high';
+    const url='https://api.open-meteo.com/v1/forecast?latitude='+(+pos.lat).toFixed(3)
+      +'&longitude='+(+pos.lng).toFixed(3)
+      +'&current=temperature_2m,wind_speed_10m,surface_pressure,cloud_cover'
+      +'&hourly='+hv+'&wind_speed_unit=ms&timezone=auto&forecast_days=1';
+    fetch(url).then(r=>r.json()).then(j=>{
+      const now=new Date();
+      const key=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'
+        +String(now.getDate()).padStart(2,'0')+'T'+String(now.getHours()).padStart(2,'0')+':00';
+      let idx=(j.hourly&&j.hourly.time)?j.hourly.time.indexOf(key):0;if(idx<0)idx=0;
+      const lev=[];
+      for(const l of this.PLV){
+        const hh=j.hourly&&j.hourly['geopotential_height_'+l+'hPa'];
+        if(!hh||hh[idx]==null)continue;
+        lev.push({p:l,h:hh[idx],
+          T:(j.hourly['temperature_'+l+'hPa']||[])[idx],
+          ws:(j.hourly['wind_speed_'+l+'hPa']||[])[idx]||0,
+          wd:(j.hourly['wind_direction_'+l+'hPa']||[])[idx]||0});
+      }
+      lev.sort((a,b)=>a.h-b.h);
+      this.data={lev,
+        frz:(j.hourly&&j.hourly.freezing_level_height)?j.hourly.freezing_level_height[idx]:null,
+        cl:(j.hourly&&j.hourly.cloud_cover_low)?j.hourly.cloud_cover_low[idx]:0,
+        cm:(j.hourly&&j.hourly.cloud_cover_mid)?j.hourly.cloud_cover_mid[idx]:0,
+        ch:(j.hourly&&j.hourly.cloud_cover_high)?j.hourly.cloud_cover_high[idx]:0,
+        cur:j.current||{}};
+      this._t=Date.now();this.draw();
+    }).catch(()=>{}).finally(()=>{this._busy=false;});
+  },
+  _jet(){if(!this.data)return null;let j=null;
+    for(const l of this.data.lev)if(l.h>5500&&(!j||l.ws>j.ws))j=l;return j;},
+  _y(h,H){ // кусочная шкала: тропосфера крупно, выше — сжатие
+    const top=64,bot=H-52,span=bot-top;
+    const seg=[[0,12000,0.52],[12000,100000,0.24],[100000,450000,0.24]];
+    let acc=0;
+    for(const s of seg){
+      if(h<=s[1])return bot-span*(acc+s[2]*Math.min(1,Math.max(0,(h-s[0])/(s[1]-s[0]))));
+      acc+=s[2];}
+    return top;},
+  draw(){
+    const cv=document.getElementById('slice-cv');if(!cv)return;
+    const dpr=Math.min(2,devicePixelRatio||1),W=innerWidth,H=innerHeight;
+    cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
+    const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);
+    const bg=c.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,'#02030a');bg.addColorStop(0.45,'#071226');bg.addColorStop(1,'#0e2236');
+    c.fillStyle=bg;c.fillRect(0,0,W,H);
+    const X0=62,X1=W-12;
+    c.textBaseline='middle';
+    // ось высот
+    const ticks=[0,1000,2000,3000,5000,8000,10000,12000,20000,35000,50000,100000,200000,400000];
+    c.font='600 9px Rajdhani,sans-serif';c.textAlign='right';
+    for(const t of ticks){const y=this._y(t,H);
+      c.strokeStyle='rgba(120,150,190,.13)';
+      c.beginPath();c.moveTo(X0,y);c.lineTo(X1,y);c.stroke();
+      c.fillStyle='rgba(150,180,220,.55)';
+      c.fillText(t>=1000?(t/1000)+' км':'0',X0-7,y);}
+    c.textAlign='left';
+    // заголовок
+    c.fillStyle='rgba(255,255,255,.94)';c.font='700 14px Orbitron,monospace';
+    c.fillText('НЕБО В РАЗРЕЗЕ',X0,28);
+    const pos=(typeof PM!=='undefined'&&PM.last)||{lat:45.08,lng:13.64};
+    c.font='600 9px Rajdhani,sans-serif';c.fillStyle='rgba(150,180,220,.7)';
+    c.fillText(pos.lat.toFixed(2)+'°, '+pos.lng.toFixed(2)+'° · вертикаль над тобой · сейчас',X0,44);
+    const band=(h1,h2,col)=>{const y1=this._y(h2,H),y2=this._y(h1,H);
+      c.fillStyle=col;c.fillRect(X0,y1,X1-X0,y2-y1);};
+    // озон
+    band(15000,35000,'rgba(168,85,247,0.07)');
+    c.fillStyle='rgba(196,150,255,.6)';
+    c.fillText('озоновый слой · максимум ≈22 км',X0+6,this._y(22000,H));
+    // сияния по Kp
+    const kp=(typeof ED!=='undefined'&&ED.kp)||0;
+    band(100000,300000,'rgba(52,211,153,'+(0.03+0.10*Math.min(1,kp/9)).toFixed(3)+')');
+    c.fillStyle='rgba(110,231,183,.6)';
+    c.fillText('сияния · 100–300 км · Kp '+(+kp).toFixed(1),X0+6,this._y(185000,H));
+    // Карман
+    const yK=this._y(100000,H);
+    c.setLineDash([6,5]);c.strokeStyle='rgba(251,191,36,.6)';
+    c.beginPath();c.moveTo(X0,yK);c.lineTo(X1,yK);c.stroke();c.setLineDash([]);
+    c.fillStyle='rgba(251,191,36,.85)';
+    c.fillText('линия Кармана · граница космоса · 100 км',X0+6,yK-9);
+    // Эверест
+    c.fillStyle='rgba(200,220,255,.5)';
+    c.fillText('⛰ Эверест 8 849 м',X1-112,this._y(8849,H));
+    const d=this.data;
+    if(d){
+      // облака
+      const cb=(h1,h2,cov,nm)=>{if(cov==null||cov<5)return;
+        band(h1,h2,'rgba(190,210,235,'+(0.05+0.0028*cov).toFixed(3)+')');
+        c.fillStyle='rgba(215,232,250,.85)';
+        c.fillText('☁ '+nm+' '+Math.round(cov)+'%',X0+6,this._y((h1+h2)/2,H));};
+      cb(500,3000,d.cl,'нижние');cb(3000,8000,d.cm,'средние');cb(8000,12000,d.ch,'верхние');
+      // 0°C
+      if(d.frz!=null){const y0=this._y(d.frz,H);
+        c.setLineDash([4,4]);c.strokeStyle='rgba(125,211,252,.75)';
+        c.beginPath();c.moveTo(X0,y0);c.lineTo(X1,y0);c.stroke();c.setLineDash([]);
+        c.fillStyle='rgba(170,226,255,.92)';
+        c.fillText('0°C · '+Math.round(d.frz)+' м — выше этой линии дождь становится снегом',X0+6,y0+11);}
+      // ветер
+      const jet=this._jet();
+      for(const l of d.lev){
+        const y=this._y(l.h,H),len=Math.min(140,(l.ws||0)*3.0);
+        const isJ=jet&&l===jet;
+        c.strokeStyle=isJ?'rgba(251,191,36,.95)':'rgba(34,211,238,.5)';
+        c.lineWidth=isJ?3:1.5;
+        c.beginPath();c.moveTo(X1-178,y);c.lineTo(X1-178+len,y);c.stroke();
+        c.fillStyle=isJ?'rgba(251,191,36,.95)':'rgba(160,220,240,.65)';
+        c.font='600 8.5px Rajdhani,sans-serif';
+        c.fillText(Math.round(l.ws)+' м/с',X1-176+len,y);
+      }
+      c.lineWidth=1;c.font='600 9px Rajdhani,sans-serif';
+      if(jet){const yj=this._y(jet.h,H);
+        c.fillStyle='rgba(251,191,36,.97)';c.font='700 11px Rajdhani,sans-serif';
+        c.fillText('СТРУЙНОЕ ТЕЧЕНИЕ · '+Math.round(jet.ws*3.6)+' км/ч · '+(jet.h/1000).toFixed(1)+' км · '+Math.round(jet.wd)+'°',X0+6,yj-11);
+        c.font='600 9px Rajdhani,sans-serif';}
+      // температура: кривая
+      const tx=t=>X0+28+Math.max(0,Math.min(1,(t+75)/110))*(X1-X0-238);
+      c.strokeStyle='rgba(244,114,182,.85)';c.beginPath();
+      let first=true;
+      const gAlt=(typeof TP!=='undefined'&&TP.haveAlt)?TP.alt:0;
+      if(d.cur&&d.cur.temperature_2m!=null){c.moveTo(tx(d.cur.temperature_2m),this._y(gAlt,H));first=false;}
+      for(const l of d.lev){if(l.T==null)continue;
+        const x=tx(l.T),y=this._y(l.h,H);
+        if(first){c.moveTo(x,y);first=false;}else c.lineTo(x,y);}
+      c.stroke();
+      c.fillStyle='rgba(244,160,200,.9)';
+      if(d.cur&&d.cur.temperature_2m!=null)
+        c.fillText(Math.round(d.cur.temperature_2m)+'°C у земли · ветер '+Math.round((d.cur.wind_speed_10m||0))+' м/с',X0+28,this._y(gAlt,H)-12);
+      // тропопауза — вычисленная
+      for(let i=0;i<d.lev.length-1;i++){
+        const a=d.lev[i],b2=d.lev[i+1];
+        if(a.T==null||b2.T==null)continue;
+        if(a.h>5000&&((a.T-b2.T)/((b2.h-a.h)/1000))<2){
+          const yt=this._y(a.h,H);
+          c.setLineDash([2,4]);c.strokeStyle='rgba(244,114,182,.55)';
+          c.beginPath();c.moveTo(X0,yt);c.lineTo(X1,yt);c.stroke();c.setLineDash([]);
+          c.fillText('тропопауза ≈'+(a.h/1000).toFixed(1)+' км — здесь стихает погода',X0+6,yt+11);
+          break;}}
+    }else{
+      c.fillStyle='rgba(255,255,255,.6)';c.textAlign='center';
+      c.fillText('гружу профиль атмосферы…',W/2,H/2);c.textAlign='left';
+    }
+    // живой эфир: самолёты на их высотах
+    if(typeof SKY!=='undefined'&&typeof PM!=='undefined'&&PM.last&&SKY.list.length){
+      const me=PM.last;let shown=0;
+      const jet=this._jet();
+      const pl=SKY.list.map(q=>({q,dd:TP._dist(me.lat,me.lng,q.lat,q.lng)}))
+        .filter(o=>o.dd<60000&&o.q.alt>50).sort((a,b)=>a.dd-b.dd);
+      for(const o of pl){
+        if(++shown>10)break;
+        const x=X0+28+(o.dd/60000)*(X1-X0-238);
+        const y=this._y(o.q.alt,H);
+        c.save();c.translate(x,y);c.rotate(((o.q.trk||0)-45)*Math.PI/180);
+        c.font='13px sans-serif';c.textAlign='center';c.fillText('✈️',0,0);c.restore();
+        const inJet=jet&&Math.abs(o.q.alt-jet.h)<1500&&o.q.gs>650;
+        c.font='600 8.5px Rajdhani,sans-serif';c.textAlign='center';
+        c.fillStyle=inJet?'rgba(251,191,36,.95)':'rgba(160,235,255,.85)';
+        c.fillText(o.q.fl+(inJet?' · в струе':''),x,y+12);
+        c.textAlign='left';
+      }
+      c.fillStyle='rgba(150,180,220,.5)';c.font='600 8.5px Rajdhani,sans-serif';
+      c.fillText('✈ живой эфир ADS-B · по горизонтали — удаление до 60 км',X0+6,this._y(13200,H));
+    }
+    // МКС на её текущей высоте
+    if(typeof SAT!=='undefined'&&SAT.ready&&window.satellite){
+      try{
+        const iss=SAT.sats.find(s=>s.label==='МКС');
+        if(iss){const dn=new Date();
+          const pv=satellite.propagate(iss.rec,dn);
+          if(pv&&pv.position){
+            const gd=satellite.eciToGeodetic(pv.position,SAT._gmst(dn));
+            let lo=gd.longitude*180/Math.PI;lo=((lo+540)%360)-180;
+            const yi=this._y(gd.height*1000,H);
+            c.font='12px sans-serif';c.fillText('🛰',X0+16,yi);
+            c.font='600 9px Rajdhani,sans-serif';c.fillStyle='rgba(255,255,255,.85)';
+            c.fillText('МКС · '+Math.round(gd.height)+' км · сейчас над '
+              +(gd.latitude*180/Math.PI).toFixed(0)+'°, '+lo.toFixed(0)+'°',X0+32,yi);}}
+      }catch(e){}
+    }
+    // честная сноска
+    c.fillStyle='rgba(150,180,220,.45)';c.font='600 8px Rajdhani,sans-serif';
+    c.fillText('профиль модельный (Open-Meteo, текущий час), не радиозонд · шкала кусочно-сжата: 0–12 · 12–100 · 100–450 км',X0,H-30);
+  }
 };
 
 /* ═══ ИСТИННЫЙ ТРЕК — разрушение иллюзии покоя ═══
@@ -3397,6 +3729,7 @@ const AR={
           air:1,elev,sub:(d/1000).toFixed(0)+' км · '+(pl.alt/1000).toFixed(1)+' км ↑'});
       }
     }
+    if(typeof ST!=='undefined')ST.draw(cx,W,H,pos,head,camPitch); // звёздное небо — под метками
     if(typeof DEEP!=='undefined')
       for(const ci of DEEP.items(pos))items.push(ci);
     if(typeof TT!=='undefined')
@@ -3472,9 +3805,19 @@ SKY.start();
 SAT.start();
 LT.init();
 TT.start();
+SL.init();
 </script>
 
 <!-- SPACE VIEW — 3D Globe -->
+<!-- ═══ НЕБО В РАЗРЕЗЕ · вертикальный рентген атмосферы ═══ -->
+<div id="vslice" class="view" style="background:#05070f">
+  <canvas id="slice-cv" style="position:absolute;inset:0"></canvas>
+  <button onclick="go('home')" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;z-index:6;background:rgba(10,14,30,.6);backdrop-filter:blur(10px);border:1px solid var(--border2);color:#fff;border-radius:9999px;padding:8px 16px;font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.06em;font-size:.78rem">← НАЗАД</button>
+  <div style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);left:0;width:100%;text-align:center;z-index:5;pointer-events:none">
+    <span style="background:rgba(10,14,30,.55);border:1px solid var(--border);border-radius:9999px;padding:4px 12px;font-size:.55rem;letter-spacing:.12em;color:rgba(255,255,255,.65)">ОТКРЫТЫЕ ДАННЫЕ: OPEN-METEO · ADS-B · CELESTRAK · NOAA</span>
+  </div>
+</div>
+
 <!-- ═══ НАВЕСТИ · дополненная реальность ═══ -->
 <div id="var" class="view" style="background:#000">
   <video id="ar-video" autoplay playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>
@@ -3482,7 +3825,7 @@ TT.start();
   <div id="ar-err" style="display:none;position:absolute;top:46%;width:100%;text-align:center;z-index:4;color:rgba(255,255,255,.85);font-family:'Rajdhani',sans-serif;font-size:.85rem;padding:0 30px">Нет доступа к камере — разреши в настройках браузера.<br>Метки всё равно работают по компасу.</div>
   <button onclick="AR.close()" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;z-index:6;background:rgba(10,14,30,.55);backdrop-filter:blur(10px);border:1px solid var(--border2);color:#fff;border-radius:9999px;padding:8px 16px;font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.06em;font-size:.78rem">← КАРТА</button>
   <div style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);left:0;width:100%;text-align:center;z-index:5;pointer-events:none">
-    <span style="background:rgba(10,14,30,.55);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:9999px;padding:5px 14px;font-size:.58rem;letter-spacing:.12em;color:rgba(255,255,255,.75)">НАВЕДИ · ВЕСЬ ШАР: МЕСТА · САМОЛЁТЫ · СПУТНИКИ · СКВОЗЬ ЗЕМЛЮ</span>
+    <span style="background:rgba(10,14,30,.55);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:9999px;padding:5px 14px;font-size:.58rem;letter-spacing:.12em;color:rgba(255,255,255,.75)">НАВЕДИ · ВЕСЬ ШАР: МЕСТА · САМОЛЁТЫ · СПУТНИКИ · СКВОЗЬ ЗЕМЛЮ · НОЧЬЮ — ЗВЁЗДЫ</span>
   </div>
 </div>
 
