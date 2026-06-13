@@ -2595,7 +2595,7 @@ const PO={
     this.ensureCams(c.lat,c.lng); // радары: любой зум, любая точка карты
     if(LV.o&&z>=16)this._fetchPoi(b,z);else this._clear('_poi');
     if(!LV.cam)this._clear('_camLayer');
-    else if(!this._camLayer)this._drawCams();
+    else this._drawCams();
   },
   _clear(k){if(this[k]&&window._map){window._map.removeLayer(this[k]);this[k]=null;}},
   /* ── РАДАРЫ: пакеты вокруг якорей, 75 км ── */
@@ -2618,7 +2618,7 @@ const PO={
           this.cams.push({id:e.id,lat:la,lng:lo,tags:e.tags||{}});
         });
         if(this.cams.length>1200)this.cams.length=1200;
-        if(add)this._drawCams();
+        this._drawCams(); // всегда перерисовать: камеры могли догрузиться к уже существующему слою
       }).catch(()=>{});
   },
   _drawCams(){
@@ -3830,7 +3830,9 @@ const NAV={
     // Сдвигаем ЦЕНТР так, чтобы пользователь был на 30% радиуса от центра
     // в сторону, ПРОТИВОПОЛОЖНУЮ цели (тогда цель уходит вперёд в обзор).
     const off=0.30*Math.min(sz.x,sz.y)/2;
-    const offsetPt=L.point(pc.x - vx*off, pc.y - vy*off);
+    // Центр сдвигаем В СТОРОНУ цели → ты оказываешься на 30% НИЖЕ середины,
+    // а цель раскрывается впереди по курсу. (В v2.4 знак был обратный.)
+    const offsetPt=L.point(pc.x + vx*off, pc.y + vy*off);
     const target=m.containerPointToLatLng(offsetPt);
     m.setView(target,m.getZoom(),{animate:false});
   }
@@ -3858,8 +3860,10 @@ const SR={
     const c=window._map?window._map.getCenter():((typeof PM!=='undefined'&&PM.last)||{lat:45.08,lng:13.64});
     // Nominatim — надёжный геокодер OSM (Photon-домен капризен с CORS).
     // Результат приводим к единому виду {geometry.coordinates,[lng,lat]; properties}.
-    const nom='https://nominatim.openstreetmap.org/search?format=jsonv2&accept-language=ru&limit=6&q='+encodeURIComponent(q);
-    fetch(nom,{headers:{'Accept':'application/json'}})
+    // accept-language в query (а не в заголовке) — заголовок провоцировал
+    // CORS-preflight, который Nominatim отклонял → поиск молчал.
+    const nom='https://nominatim.openstreetmap.org/search?format=jsonv2&accept-language=ru&addressdetails=1&limit=6&q='+encodeURIComponent(q);
+    fetch(nom)
       .then(r=>r.json()).then(arr=>{
         if(!Array.isArray(arr)||!arr.length)throw 0;
         const fs=arr.map(o=>{
@@ -3875,9 +3879,18 @@ const SR={
         // резерв: Photon
         fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(q)
           +'&limit=6&lang=ru&lat='+(+c.lat).toFixed(3)+'&lon='+(+c.lng).toFixed(3))
-          .then(r=>r.json()).then(d=>this._show(d.features||[]))
-          .catch(()=>this._show([]));
+          .then(r=>r.json()).then(d=>{
+            const f=d.features||[];
+            if(f.length)this._show(f);else this._empty();
+          })
+          .catch(()=>this._empty());
       });
+  },
+  _empty(){
+    const box=document.getElementById('srch-res');if(!box)return;
+    this._fs=[];
+    box.innerHTML='<div style="padding:12px 14px;font-size:.7rem;color:var(--td)">Ничего не найдено — попробуй иначе (город, улицу, ориентир)</div>';
+    box.style.display='block';
   },
   _show(fs){
     const box=document.getElementById('srch-res');if(!box)return;
