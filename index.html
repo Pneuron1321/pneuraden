@@ -3148,6 +3148,7 @@ const ST={
    Честно: профиль модельный (час, ~0.1° сетка), не радиозонд. ═══ */
 const SL={
   data:null,_t:0,_busy:false,
+  zoom:1,pan:0,_bound:false,_lab:[],
   PLV:[1000,925,850,700,500,300,250,200,150,100,70,50,30],
   init(){
     setInterval(()=>{if(S.view==='slice')this.draw();},8000);
@@ -3157,7 +3158,48 @@ const SL={
     go('slice');
     const pos=(typeof PM!=='undefined'&&PM.last)||{lat:CLUB.lat,lng:CLUB.lng};
     if(!this.data||Date.now()-this._t>15*60000)this._fetch(pos);
+    this.zoom=1;this.pan=0;
+    this._bind();
     this.draw();
+    if(!this._hintShown){this._hintShown=1;toast('Листай вверх/вниз · два пальца — зум');}
+  },
+  // высота холста виртуальная (множится зумом); pan — вертикальный сдвиг
+  _VH(){return innerHeight*this.zoom;},
+  _clampPan(){const max=this._VH()-innerHeight;if(this.pan<0)this.pan=0;if(this.pan>max)this.pan=max;},
+  _bind(){
+    if(this._bound)return;this._bound=true;
+    const cv=document.getElementById('slice-cv');if(!cv)return;
+    let drag=false,ly=0,pinch=false,pd0=0,z0=1,pcy=0,panAt=0;
+    const dist=(t)=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+    cv.addEventListener('touchstart',e=>{
+      if(e.touches.length===2){pinch=true;pd0=dist(e.touches);z0=this.zoom;
+        pcy=(e.touches[0].clientY+e.touches[1].clientY)/2;panAt=this.pan;}
+      else{drag=true;ly=e.touches[0].clientY;}
+    },{passive:true});
+    cv.addEventListener('touchmove',e=>{
+      if(pinch&&e.touches.length===2){
+        const k=dist(e.touches)/pd0;
+        const nz=Math.max(1,Math.min(6,z0*k));
+        // зум вокруг точки между пальцами — высота под пальцами остаётся на месте
+        const worldY=(panAt+pcy)/ (innerHeight*z0);
+        this.zoom=nz;
+        this.pan=worldY*(innerHeight*nz)-pcy;
+        this._clampPan();this.draw();e.preventDefault();
+      }else if(drag&&e.touches.length===1){
+        const y=e.touches[0].clientY;this.pan+=(ly-y);ly=y;
+        this._clampPan();this.draw();e.preventDefault();
+      }
+    },{passive:false});
+    cv.addEventListener('touchend',e=>{
+      if(e.touches.length===0){drag=false;pinch=false;}
+      else if(e.touches.length===1){pinch=false;drag=true;ly=e.touches[0].clientY;}
+    },{passive:true});
+    // десктоп: колесо = скролл, Ctrl+колесо = зум
+    cv.addEventListener('wheel',e=>{
+      if(e.ctrlKey){this.zoom=Math.max(1,Math.min(6,this.zoom*(e.deltaY<0?1.1:0.9)));}
+      else this.pan+=e.deltaY;
+      this._clampPan();this.draw();e.preventDefault();
+    },{passive:false});
   },
   _fetch(pos){
     if(this._busy)return;this._busy=true;
@@ -3193,14 +3235,15 @@ const SL={
   },
   _jet(){if(!this.data)return null;let j=null;
     for(const l of this.data.lev)if(l.h>5500&&(!j||l.ws>j.ws))j=l;return j;},
-  _y(h,H){ // кусочная шкала: тропосфера крупно, выше — сжатие
-    const top=64,bot=H-52,span=bot-top;
+  _y(h){ // кусочная шкала на ВИРТУАЛЬНОЙ высоте (зум) минус сдвиг pan
+    const VH=this._VH(),top=64*this.zoom,bot=VH-52*this.zoom,span=bot-top;
     const seg=[[0,12000,0.52],[12000,100000,0.24],[100000,450000,0.24]];
-    let acc=0;
+    let acc=0,yv=top;
     for(const s of seg){
-      if(h<=s[1])return bot-span*(acc+s[2]*Math.min(1,Math.max(0,(h-s[0])/(s[1]-s[0]))));
-      acc+=s[2];}
-    return top;},
+      if(h<=s[1]){yv=bot-span*(acc+s[2]*Math.min(1,Math.max(0,(h-s[0])/(s[1]-s[0]))));break;}
+      acc+=s[2];
+      if(s===seg[seg.length-1])yv=top;}
+    return yv-this.pan;},
   draw(){
     const cv=document.getElementById('slice-cv');if(!cv)return;
     const dpr=Math.min(2,devicePixelRatio||1),W=innerWidth,H=innerHeight;
@@ -3211,10 +3254,21 @@ const SL={
     c.fillStyle=bg;c.fillRect(0,0,W,H);
     const X0=62,X1=W-12;
     c.textBaseline='middle';
+    this._lab=[]; // занятые прямоугольники подписей (анти-наложение)
+    const X1c=W-12;
+    const clip=(s,x,maxR)=>{ // обрезать текст, чтобы не уходил за правый край
+      let t=s;while(t.length>3&&x+c.measureText(t).width>maxR)t=t.slice(0,-2);
+      return t.length<s.length?t+'…':t;};
+    const placeY=(yWant,h)=>{ // сдвинуть подпись по вертикали, если место занято
+      let y=yWant;
+      for(let i=0;i<24;i++){let hit=false;
+        for(const r of this._lab)if(Math.abs(r.y-y)<h&&r.x2>X0+2){hit=true;break;}
+        if(!hit)break;y+=h;}
+      return y;};
     // ось высот
     const ticks=[0,1000,2000,3000,5000,8000,10000,12000,20000,35000,50000,100000,200000,400000];
     c.font='600 9px Rajdhani,sans-serif';c.textAlign='right';
-    for(const t of ticks){const y=this._y(t,H);
+    for(const t of ticks){const y=this._y(t);
       c.strokeStyle='rgba(120,150,190,.13)';
       c.beginPath();c.moveTo(X0,y);c.lineTo(X1,y);c.stroke();
       c.fillStyle='rgba(150,180,220,.55)';
@@ -3226,36 +3280,36 @@ const SL={
     const pos=(typeof PM!=='undefined'&&PM.last)||{lat:45.08,lng:13.64};
     c.font='600 9px Rajdhani,sans-serif';c.fillStyle='rgba(150,180,220,.7)';
     c.fillText(pos.lat.toFixed(2)+'°, '+pos.lng.toFixed(2)+'° · вертикаль над тобой · сейчас',X0,44);
-    const band=(h1,h2,col)=>{const y1=this._y(h2,H),y2=this._y(h1,H);
+    const band=(h1,h2,col)=>{const y1=this._y(h2),y2=this._y(h1);
       c.fillStyle=col;c.fillRect(X0,y1,X1-X0,y2-y1);};
     // озон
     band(15000,35000,'rgba(168,85,247,0.07)');
     c.fillStyle='rgba(196,150,255,.6)';
-    c.fillText('озоновый слой · максимум ≈22 км',X0+6,this._y(22000,H));
+    c.fillText('озоновый слой · максимум ≈22 км',X0+6,this._y(22000));
     // сияния по Kp
     const kp=(typeof ED!=='undefined'&&ED.kp)||0;
     band(100000,300000,'rgba(52,211,153,'+(0.03+0.10*Math.min(1,kp/9)).toFixed(3)+')');
     c.fillStyle='rgba(110,231,183,.6)';
-    c.fillText('сияния · 100–300 км · Kp '+(+kp).toFixed(1),X0+6,this._y(185000,H));
+    c.fillText('сияния · 100–300 км · Kp '+(+kp).toFixed(1),X0+6,this._y(185000));
     // Карман
-    const yK=this._y(100000,H);
+    const yK=this._y(100000);
     c.setLineDash([6,5]);c.strokeStyle='rgba(251,191,36,.6)';
     c.beginPath();c.moveTo(X0,yK);c.lineTo(X1,yK);c.stroke();c.setLineDash([]);
     c.fillStyle='rgba(251,191,36,.85)';
     c.fillText('линия Кармана · граница космоса · 100 км',X0+6,yK-9);
     // Эверест
     c.fillStyle='rgba(200,220,255,.5)';
-    c.fillText('⛰ Эверест 8 849 м',X1-112,this._y(8849,H));
+    c.fillText('⛰ Эверест 8 849 м',X1-112,this._y(8849));
     const d=this.data;
     if(d){
       // облака
       const cb=(h1,h2,cov,nm)=>{if(cov==null||cov<5)return;
         band(h1,h2,'rgba(190,210,235,'+(0.05+0.0028*cov).toFixed(3)+')');
         c.fillStyle='rgba(215,232,250,.85)';
-        c.fillText('☁ '+nm+' '+Math.round(cov)+'%',X0+6,this._y((h1+h2)/2,H));};
+        c.fillText('☁ '+nm+' '+Math.round(cov)+'%',X0+6,this._y((h1+h2)/2));};
       cb(500,3000,d.cl,'нижние');cb(3000,8000,d.cm,'средние');cb(8000,12000,d.ch,'верхние');
       // 0°C
-      if(d.frz!=null){const y0=this._y(d.frz,H);
+      if(d.frz!=null){const y0=this._y(d.frz);
         c.setLineDash([4,4]);c.strokeStyle='rgba(125,211,252,.75)';
         c.beginPath();c.moveTo(X0,y0);c.lineTo(X1,y0);c.stroke();c.setLineDash([]);
         c.fillStyle='rgba(170,226,255,.92)';
@@ -3263,17 +3317,19 @@ const SL={
       // ветер
       const jet=this._jet();
       for(const l of d.lev){
-        const y=this._y(l.h,H),len=Math.min(140,(l.ws||0)*3.0);
+        const y=this._y(l.h),len=Math.min(140,(l.ws||0)*3.0);
         const isJ=jet&&l===jet;
         c.strokeStyle=isJ?'rgba(251,191,36,.95)':'rgba(34,211,238,.5)';
         c.lineWidth=isJ?3:1.5;
         c.beginPath();c.moveTo(X1-178,y);c.lineTo(X1-178+len,y);c.stroke();
         c.fillStyle=isJ?'rgba(251,191,36,.95)':'rgba(160,220,240,.65)';
         c.font='600 8.5px Rajdhani,sans-serif';
-        c.fillText(Math.round(l.ws)+' м/с',X1-176+len,y);
+        const wtxt=Math.round(l.ws)+' м/с';
+        let wx=X1-176+len+3; if(wx+c.measureText(wtxt).width>X1c)wx=X1c-c.measureText(wtxt).width;
+        c.fillText(wtxt,wx,y);
       }
       c.lineWidth=1;c.font='600 9px Rajdhani,sans-serif';
-      if(jet){const yj=this._y(jet.h,H);
+      if(jet){const yj=this._y(jet.h);
         c.fillStyle='rgba(251,191,36,.97)';c.font='700 11px Rajdhani,sans-serif';
         c.fillText('СТРУЙНОЕ ТЕЧЕНИЕ · '+Math.round(jet.ws*3.6)+' км/ч · '+(jet.h/1000).toFixed(1)+' км · '+Math.round(jet.wd)+'°',X0+6,yj-11);
         c.font='600 9px Rajdhani,sans-serif';}
@@ -3282,20 +3338,20 @@ const SL={
       c.strokeStyle='rgba(244,114,182,.85)';c.beginPath();
       let first=true;
       const gAlt=(typeof TP!=='undefined'&&TP.haveAlt)?TP.alt:0;
-      if(d.cur&&d.cur.temperature_2m!=null){c.moveTo(tx(d.cur.temperature_2m),this._y(gAlt,H));first=false;}
+      if(d.cur&&d.cur.temperature_2m!=null){c.moveTo(tx(d.cur.temperature_2m),this._y(gAlt));first=false;}
       for(const l of d.lev){if(l.T==null)continue;
-        const x=tx(l.T),y=this._y(l.h,H);
+        const x=tx(l.T),y=this._y(l.h);
         if(first){c.moveTo(x,y);first=false;}else c.lineTo(x,y);}
       c.stroke();
       c.fillStyle='rgba(244,160,200,.9)';
       if(d.cur&&d.cur.temperature_2m!=null)
-        c.fillText(Math.round(d.cur.temperature_2m)+'°C у земли · ветер '+Math.round((d.cur.wind_speed_10m||0))+' м/с',X0+28,this._y(gAlt,H)-12);
+        c.fillText(Math.round(d.cur.temperature_2m)+'°C у земли · ветер '+Math.round((d.cur.wind_speed_10m||0))+' м/с',X0+28,this._y(gAlt)-12);
       // тропопауза — вычисленная
       for(let i=0;i<d.lev.length-1;i++){
         const a=d.lev[i],b2=d.lev[i+1];
         if(a.T==null||b2.T==null)continue;
         if(a.h>5000&&((a.T-b2.T)/((b2.h-a.h)/1000))<2){
-          const yt=this._y(a.h,H);
+          const yt=this._y(a.h);
           c.setLineDash([2,4]);c.strokeStyle='rgba(244,114,182,.55)';
           c.beginPath();c.moveTo(X0,yt);c.lineTo(X1,yt);c.stroke();c.setLineDash([]);
           c.fillText('тропопауза ≈'+(a.h/1000).toFixed(1)+' км — здесь стихает погода',X0+6,yt+11);
@@ -3311,19 +3367,29 @@ const SL={
       const pl=SKY.list.map(q=>({q,dd:TP._dist(me.lat,me.lng,q.lat,q.lng)}))
         .filter(o=>o.dd<60000&&o.q.alt>50).sort((a,b)=>a.dd-b.dd);
       for(const o of pl){
-        if(++shown>10)break;
+        if(++shown>14)break;
         const x=X0+28+(o.dd/60000)*(X1-X0-238);
-        const y=this._y(o.q.alt,H);
+        const y=this._y(o.q.alt);
+        if(y<54||y>H-44)continue; // вне видимого окна — пропустить
         c.save();c.translate(x,y);c.rotate(((o.q.trk||0)-45)*Math.PI/180);
         c.font='13px sans-serif';c.textAlign='center';c.fillText('✈️',0,0);c.restore();
         const inJet=jet&&Math.abs(o.q.alt-jet.h)<1500&&o.q.gs>650;
-        c.font='600 8.5px Rajdhani,sans-serif';c.textAlign='center';
-        c.fillStyle=inJet?'rgba(251,191,36,.95)':'rgba(160,235,255,.85)';
-        c.fillText(o.q.fl+(inJet?' · в струе':''),x,y+12);
+        // подпись слева/справа от значка + развод по вертикали, чтобы не наезжали
+        const lbl=clip(o.q.fl+(inJet?' · струя':''),0,118);
+        c.font='600 8.5px Rajdhani,sans-serif';c.textAlign='left';
+        const w=c.measureText(lbl).width;
+        let lx=x+9; if(lx+w>X1c)lx=x-9-w;        // у правого края — подпись влево
+        const ly=placeY(y, 11);
+        // тонкий поводок, если подпись увели по вертикали
+        if(Math.abs(ly-y)>6){c.strokeStyle='rgba(160,235,255,.3)';c.lineWidth=.7;
+          c.beginPath();c.moveTo(x,y);c.lineTo(lx<x?lx+w:lx,ly);c.stroke();}
+        c.fillStyle=inJet?'rgba(251,191,36,.95)':'rgba(160,235,255,.9)';
+        c.fillText(lbl,lx,ly);
+        this._lab.push({y:ly,x2:lx+w});
         c.textAlign='left';
       }
       c.fillStyle='rgba(150,180,220,.5)';c.font='600 8.5px Rajdhani,sans-serif';
-      c.fillText('✈ живой эфир ADS-B · по горизонтали — удаление до 60 км',X0+6,this._y(13200,H));
+      c.fillText('✈ живой эфир ADS-B · по горизонтали — удаление до 60 км',X0+6,this._y(13200));
     }
     // МКС на её текущей высоте
     if(typeof SAT!=='undefined'&&SAT.ready&&window.satellite){
@@ -3334,7 +3400,7 @@ const SL={
           if(pv&&pv.position){
             const gd=satellite.eciToGeodetic(pv.position,SAT._gmst(dn));
             let lo=gd.longitude*180/Math.PI;lo=((lo+540)%360)-180;
-            const yi=this._y(gd.height*1000,H);
+            const yi=this._y(gd.height*1000);
             c.font='12px sans-serif';c.fillText('🛰',X0+16,yi);
             c.font='600 9px Rajdhani,sans-serif';c.fillStyle='rgba(255,255,255,.85)';
             c.fillText('МКС · '+Math.round(gd.height)+' км · сейчас над '
@@ -3631,7 +3697,7 @@ const NAV={
   start(){
     if(!this.dest){toast('Сначала найди место в поиске');return;}
     const m=window._map;if(!m)return;
-    m.closePopup();this.on=true;this._userTouch=false;this._fitted=false;
+    m.closePopup();this.on=true;this._userTouch=false;this._fitted=false;this._hd=null;
     if(SR._mk){m.removeLayer(SR._mk);SR._mk=null;}
     this._route();
     go('map');
@@ -3653,7 +3719,7 @@ const NAV={
     toast('Маршрут построен · касание карты — пауза вращения');
   },
   stop(){
-    this.on=false;this._userTouch=false;this._fitted=false;const m=window._map;
+    this.on=false;this._userTouch=false;this._fitted=false;this._hd=null;const m=window._map;
     [this.line,this.glow,this.wp].forEach(l=>{if(l&&m&&m.hasLayer(l))m.removeLayer(l);});
     this.line=this.glow=this.wp=null;
     const hud=document.getElementById('nav-hud');if(hud)hud.style.display='none';
@@ -3709,15 +3775,23 @@ const NAV={
     const m=window._map;
     if(this._last){
       const moved=TP._dist(this._last.lat,this._last.lng,p.lat,p.lng);
-      // движение возобновляет вращение, снятое касанием
+      const spd=(typeof TP!=='undefined')?TP.spd:0; // м/с из сглаженного источника
       if(moved>6&&this._userTouch)this._userTouch=false;
-      if(moved>4&&!this._userTouch){
-        const head=AR._brg(this._last.lat,this._last.lng,p.lat,p.lng);
-        const mc=document.getElementById('map-container');
-        if(mc)mc.style.transform='rotate('+(-head)+'deg)';
-        document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='rotate('+head+'deg)');
-        // радар следует за ТОБОЙ: центр держим на текущей позиции
-        if(m&&!this._userTouch)m.setView([p.lat,p.lng],m.getZoom(),{animate:false});
+      // Курс из GPS-смещения шумит, когда стоишь/идёшь медленно (фиксы дрожат) —
+      // карта дёргалась во все стороны. Решение: считать курс ТОЛЬКО при
+      // осмысленном шаге (>8 м И скорость >2 м/с), сглаживать по кругу,
+      // а в покое — заморозить поворот (карта стоит спокойно).
+      if(!this._userTouch){
+        if(moved>8&&spd>2){
+          const raw=AR._brg(this._last.lat,this._last.lng,p.lat,p.lng);
+          if(this._hd==null)this._hd=raw;
+          else{const dd=((raw-this._hd+540)%360)-180;this._hd=(this._hd+dd*0.35+360)%360;}
+          const mc=document.getElementById('map-container');
+          if(mc)mc.style.transform='rotate('+(-this._hd)+'deg)';
+          document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='rotate('+this._hd+'deg)');
+        }
+        // центр держим на тебе всегда в движении (даже если курс заморожен)
+        if(m&&moved>2)m.setView([p.lat,p.lng],m.getZoom(),{animate:false});
       }
     }
     if(this.line){
