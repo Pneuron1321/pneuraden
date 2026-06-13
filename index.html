@@ -2,7 +2,7 @@
 <html lang="ru" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>PNEURADEN</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -319,7 +319,7 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .map-back:hover{border-color:var(--np)}
 .map-search{flex:1;height:36px;border-radius:var(--r-p);border:1px solid var(--border);
   background:var(--glass);backdrop-filter:blur(10px);padding:0 14px;
-  color:var(--txt);font-size:.85rem;outline:none}
+  color:var(--txt);font-size:16px;outline:none}
 .map-layers{position:absolute;top:70px;right:12px;z-index:500;display:flex;flex-direction:column;gap:6px}
 .lbtn{width:36px;height:36px;border-radius:var(--r-s);border:1px solid var(--border2);
   background:var(--glass);backdrop-filter:blur(10px);display:flex;align-items:center;
@@ -498,6 +498,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
 #physics-whisper span{font-family:'Rajdhani',sans-serif;font-size:clamp(1rem,4vw,1.45rem);font-weight:500;color:rgba(255,218,130,0.95);line-height:1.65;text-shadow:0 0 40px rgba(251,191,36,0.65),0 0 80px rgba(255,140,40,0.3);letter-spacing:0.03em;max-width:420px;display:block;}
 /* ── Earth Glow — planetary ambient light in Space View ── */
 #vspace::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:2;mix-blend-mode:screen;background:radial-gradient(ellipse 140% 45% at 50% 112%,rgba(251,191,36,0.11) 0%,transparent 60%),radial-gradient(ellipse 80% 28% at 50% 122%,rgba(255,80,20,0.06) 0%,transparent 50%);}
+@keyframes napulse{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-3px) scale(1.12)}}
 </style>
 <script defer src="https://unpkg.com/three@0.148.0/build/three.min.js"></script>
 </head>
@@ -598,6 +599,14 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
     <button class="theme-btn" onclick="toggleTheme()" style="flex-shrink:0">🌓</button>
   </div>
   <div id="srch-res" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 60px);left:12px;right:12px;z-index:30;background:rgba(10,14,30,.93);backdrop-filter:blur(14px);border:1px solid var(--border2);border-radius:14px;overflow:hidden;max-height:46vh;overflow-y:auto"></div>
+  <div id="nav-hud" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 60px);left:12px;right:12px;z-index:26;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(20,16,4,.92),rgba(10,8,2,.92));backdrop-filter:blur(12px);border:1px solid rgba(255,214,10,.45);border-radius:14px;padding:9px 14px">
+    <div style="font-size:22px">🧭</div>
+    <div style="flex:1;min-width:0">
+      <div id="nav-name" style="font-family:Rajdhani,sans-serif;font-weight:700;font-size:.86rem;color:#FFD60A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Маршрут</div>
+      <div style="display:flex;gap:10px;font-size:.72rem;color:rgba(255,235,170,.9)"><span id="nav-dist" style="font-family:Orbitron,monospace;font-weight:700">—</span><span id="nav-eta">—</span></div>
+    </div>
+    <button onclick="NAV.stop()" style="background:rgba(255,214,10,.16);border:1px solid rgba(255,214,10,.5);color:#FFD60A;border-radius:9px;padding:7px 12px;font-family:Rajdhani,sans-serif;font-weight:700;font-size:.78rem;cursor:pointer">СТОП</button>
+  </div>
   <div id="cam-near" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 64px);left:50%;transform:translateX(-50%);z-index:25;background:var(--glass);border:1px solid var(--border2);border-radius:9999px;padding:5px 14px;font-family:'Orbitron',monospace;font-size:.72rem;letter-spacing:.06em;color:var(--txt)"></div>
   <div id="map-container"></div>
   <div class="map-layers">
@@ -1199,6 +1208,13 @@ function saveUserLocation(lat,lng){
 function go(v){
   // Утечка: уход из НАВЕСТИ через нижнюю навигацию (а не кнопкой ← КАРТА)
   // оставлял камеру включённой и RAF-цикл крутящимся. Глушим централизованно.
+  if(v!=='map'&&typeof NAV!=='undefined'&&NAV.on){
+    const mc=document.getElementById('map-container');if(mc)mc.style.transform='';
+    const hud=document.getElementById('nav-hud');if(hud)hud.style.display='none';
+  }
+  if(v==='map'&&typeof NAV!=='undefined'&&NAV.on){
+    const hud=document.getElementById('nav-hud');if(hud)hud.style.display='flex';
+  }
   if(v!=='ar'&&typeof AR!=='undefined'&&AR.act){
     AR.act=false;
     if(AR.raf)cancelAnimationFrame(AR.raf);
@@ -3609,6 +3625,90 @@ const CA={
   }
 };
 
+/* ═══ В ПУТЬ — навигация в стиле радара GTA Online ═══ */
+const NAV={
+  dest:null,on:false,line:null,glow:null,wp:null,_sub:null,_last:null,distM:0,durS:0,
+  start(){
+    if(!this.dest){toast('Сначала найди место в поиске');return;}
+    const m=window._map;if(!m)return;
+    m.closePopup();this.on=true;
+    if(SR._mk){m.removeLayer(SR._mk);SR._mk=null;}
+    this._route();
+    go('map');
+    this._sub=p=>this._tick(p);PM.sub(this._sub);
+    const hud=document.getElementById('nav-hud');if(hud)hud.style.display='flex';
+    toast('Маршрут построен');
+  },
+  stop(){
+    this.on=false;const m=window._map;
+    [this.line,this.glow,this.wp].forEach(l=>{if(l&&m&&m.hasLayer(l))m.removeLayer(l);});
+    this.line=this.glow=this.wp=null;
+    const hud=document.getElementById('nav-hud');if(hud)hud.style.display='none';
+    const mc=document.getElementById('map-container');if(mc)mc.style.transform='';
+  },
+  _route(){
+    const m=window._map;if(!m||!this.dest)return;
+    const from=(PM.last)||{lat:m.getCenter().lat,lng:m.getCenter().lng};
+    const url='https://router.project-osrm.org/route/v1/driving/'
+      +from.lng.toFixed(5)+','+from.lat.toFixed(5)+';'
+      +this.dest.lng.toFixed(5)+','+this.dest.lat.toFixed(5)+'?overview=full&geometries=geojson';
+    fetch(url).then(r=>r.json()).then(d=>{
+      if(!d.routes||!d.routes.length){this._straight(from);return;}
+      const r0=d.routes[0];
+      this._drawLine(r0.geometry.coordinates.map(c=>[c[1],c[0]]));
+      this.distM=r0.distance;this.durS=r0.duration;this._eta();
+    }).catch(()=>this._straight(from));
+  },
+  _straight(from){
+    this._drawLine([[from.lat,from.lng],[this.dest.lat,this.dest.lng]]);
+    this.distM=TP._dist(from.lat,from.lng,this.dest.lat,this.dest.lng);
+    this.durS=this.distM/13.9;this._eta();
+  },
+  _drawLine(pts){
+    const m=window._map;if(!m)return;
+    [this.line,this.glow,this.wp].forEach(l=>{if(l&&m.hasLayer(l))m.removeLayer(l);});
+    this.glow=L.polyline(pts,{color:'#1a1205',weight:13,opacity:.55,lineCap:'round',lineJoin:'round'}).addTo(m);
+    this.line=L.polyline(pts,{color:'#FFD60A',weight:6,opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(m);
+    this.line.bringToFront();
+    const dst=pts[pts.length-1];
+    this.wp=L.marker(dst,{icon:L.divIcon({className:'',iconSize:[30,30],iconAnchor:[15,30],
+      html:'<div style="font-size:26px;filter:drop-shadow(0 2px 5px rgba(255,214,10,.85));animation:napulse 1.2s ease-in-out infinite">📍</div>'})}).addTo(m);
+    try{m.fitBounds(this.line.getBounds().pad(0.18),{maxZoom:16});}catch(e){}
+  },
+  _eta(){
+    const hud=document.getElementById('nav-hud');if(!hud)return;
+    const km=this.distM>=1000?(this.distM/1000).toFixed(1)+' км':Math.round(this.distM)+' м';
+    const mn=Math.round(this.durS/60);
+    const arr=new Date(Date.now()+this.durS*1000);
+    const hh=String(arr.getHours()).padStart(2,'0')+':'+String(arr.getMinutes()).padStart(2,'0');
+    const dE=hud.querySelector('#nav-dist'),eE=hud.querySelector('#nav-eta'),nE=hud.querySelector('#nav-name');
+    if(dE)dE.textContent=km;
+    if(eE)eE.textContent=(mn>=60?Math.floor(mn/60)+'ч '+(mn%60)+'м':mn+' мин')+' · прибытие '+hh;
+    if(nE)nE.textContent=this.dest.name||'Маршрут';
+  },
+  _tick(p){
+    if(!this.on)return;
+    if(this._last){
+      const moved=TP._dist(this._last.lat,this._last.lng,p.lat,p.lng);
+      if(moved>4){const head=AR._brg(this._last.lat,this._last.lng,p.lat,p.lng);
+        const mc=document.getElementById('map-container');
+        if(mc)mc.style.transform='rotate('+(-head)+'deg)';
+        document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='rotate('+head+'deg)');}
+    }
+    if(this.line){
+      let near=1e9;const ll=this.line.getLatLngs();
+      for(const q of ll){const d=TP._dist(p.lat,p.lng,q.lat,q.lng);if(d<near)near=d;}
+      if(near>60){this._last=p;this._route();return;}
+    }
+    if(this.dest){
+      this.distM=TP._dist(p.lat,p.lng,this.dest.lat,this.dest.lng);
+      this.durS=this.distM/13.9;this._eta();
+      if(this.distM<35){toast('Ты на месте 🏁');this.stop();}
+    }
+    this._last=p;
+  }
+};
+
 /* ═══ ПОИСК МЕСТ — Photon (komoot) поверх OSM, весь мир, без ключей ═══ */
 const SR={
   _t:null,_fs:[],_mk:null,
@@ -3679,10 +3779,12 @@ const SR={
     const m=window._map;if(!m)return;
     m.flyTo([lat,lng],Math.max(m.getZoom(),16),{duration:0.9});
     if(this._mk)m.removeLayer(this._mk);
+    if(typeof NAV!=='undefined')NAV.dest={lat,lng,name:pr.name||'Место'};
     this._mk=L.marker([lat,lng]).addTo(m)
       .bindPopup('<div class="user-pop"><b>'+PO._esc(pr.name||'Место')+'</b><br>'
         +'<span style="font-size:.62rem;color:var(--td)">'
-        +PO._esc([pr.city,pr.country].filter(Boolean).join(', '))+'</span></div>');
+        +PO._esc([pr.city,pr.country].filter(Boolean).join(', '))+'</span>'
+        +'<br><button onclick="NAV.start()" style="margin-top:7px;width:100%;background:linear-gradient(90deg,#fbbf24,#f59e0b);border:0;color:#1a1205;border-radius:9px;padding:8px;font-family:Rajdhani,sans-serif;font-weight:700;letter-spacing:.05em;font-size:.8rem;cursor:pointer">🧭 В ПУТЬ</button></div>');
     setTimeout(()=>{if(this._mk)this._mk.openPopup();},950);
   }
 };
