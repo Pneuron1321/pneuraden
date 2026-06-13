@@ -599,14 +599,6 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
     <button class="theme-btn" onclick="toggleTheme()" style="flex-shrink:0">🌓</button>
   </div>
   <div id="srch-res" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 60px);left:12px;right:12px;z-index:1200;background:rgba(8,11,24,.98);backdrop-filter:blur(16px);border:1px solid var(--border2);border-radius:14px;overflow:hidden;max-height:60vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.6)"></div>
-  <div id="nav-hud" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 60px);left:12px;right:12px;z-index:26;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(20,16,4,.92),rgba(10,8,2,.92));backdrop-filter:blur(12px);border:1px solid rgba(255,214,10,.45);border-radius:14px;padding:9px 14px">
-    <div id="nav-arrow" style="font-size:26px;font-weight:800;color:#FFD60A;width:24px;text-align:center">↑</div>
-    <div style="flex:1;min-width:0">
-      <div id="nav-name" style="font-family:Rajdhani,sans-serif;font-weight:700;font-size:.86rem;color:#FFD60A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Маршрут</div>
-      <div style="display:flex;gap:10px;font-size:.72rem;color:rgba(255,235,170,.9)"><span id="nav-dist" style="font-family:Orbitron,monospace;font-weight:700">—</span><span id="nav-eta">—</span></div>
-    </div>
-    <button onclick="NAV.stop()" style="background:rgba(255,214,10,.16);border:1px solid rgba(255,214,10,.5);color:#FFD60A;border-radius:9px;padding:7px 12px;font-family:Rajdhani,sans-serif;font-weight:700;font-size:.78rem;cursor:pointer">СТОП</button>
-  </div>
   <div id="cam-near" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 64px);left:50%;transform:translateX(-50%);z-index:25;background:var(--glass);border:1px solid var(--border2);border-radius:9999px;padding:5px 14px;font-family:'Orbitron',monospace;font-size:.72rem;letter-spacing:.06em;color:var(--txt)"></div>
   <div id="map-container"></div>
   <div class="map-layers">
@@ -820,6 +812,7 @@ let _schumannOn=false;  // Schumann 7.83Hz display: off by default
    все потребители (карта, радар, Firebase) подписываются. ── */
 const PM={w:null,subs:[],last:null,
   sub(fn){this.subs.push(fn);if(this.last)fn(this.last);this.start();},
+  unsub(fn){const i=this.subs.indexOf(fn);if(i>=0)this.subs.splice(i,1);},
   start(){if(this.w!=null||!navigator.geolocation)return;
     this.w=navigator.geolocation.watchPosition(
       p=>{this.last={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy,
@@ -1209,13 +1202,6 @@ function saveUserLocation(lat,lng){
 function go(v){
   // Утечка: уход из НАВЕСТИ через нижнюю навигацию (а не кнопкой ← КАРТА)
   // оставлял камеру включённой и RAF-цикл крутящимся. Глушим централизованно.
-  if(v!=='map'&&typeof NAV!=='undefined'&&NAV.on){
-    const mc=document.getElementById('map-container');if(mc)mc.style.transform='';
-    const hud=document.getElementById('nav-hud');if(hud)hud.style.display='none';
-  }
-  if(v==='map'&&typeof NAV!=='undefined'&&NAV.on){
-    const hud=document.getElementById('nav-hud');if(hud)hud.style.display='flex';
-  }
   if(v!=='ar'&&typeof AR!=='undefined'&&AR.act){
     AR.act=false;
     if(AR.raf)cancelAnimationFrame(AR.raf);
@@ -1225,14 +1211,14 @@ function go(v){
   if(v===S.view && v!=='map') return;
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(el=>el.classList.remove('active'));
-  const ids={home:'vh',map:'vm',events:'ve',profile:'vp',admin:'vad',space:'vspace',traffic:'vtraffic',ar:'var',slice:'vslice'};
+  const ids={home:'vh',map:'vm',events:'ve',profile:'vp',admin:'vad',space:'vspace',traffic:'vtraffic',ar:'var',slice:'vslice',nav:'vnav'};
   const el=document.getElementById(ids[v]);
   if(el) el.classList.add('active');
   const ni=document.querySelector(`.ni[data-v="${v}"]`);
   if(ni) ni.classList.add('active');
   S.view=v;
   const nav=document.getElementById('nav');
-  if(v==='map'||v==='space'||v==='traffic'||v==='ar'||v==='slice'){nav.style.display='none';if(v==='map')initMap();}
+  if(v==='map'||v==='space'||v==='traffic'||v==='ar'||v==='slice'||v==='nav'){nav.style.display='none';if(v==='map')initMap();}
   else nav.style.display='flex';
   if(v==='home' && _minimap) setTimeout(()=>_minimap.invalidateSize(),80);
   if(v==='events') renderEvents();
@@ -1355,7 +1341,17 @@ function initMap(){
   const map=L.map('map-container',{center:[45.0811,13.6387],zoom:4,
     zoomControl:false,attributionControl:false});
   window._map=map;
-  // Долгое нажатие (или ПКМ на десктопе) — ручная метка цели, перетаскиваемая.
+  // Стрелка пользователя масштабируется с зумом: на дальнем зуме мельче,
+  // на ближнем крупнее, но в разумных пределах (не «огромная»).
+  const scaleArrow=()=>{const z=map.getZoom();
+    const s=Math.max(0.5,Math.min(1.15,0.5+(z-10)*0.09));
+    document.querySelectorAll('.user-arrow').forEach(el=>{
+      const base=el.style.transform.replace(/\s*scale\([^)]*\)/,'');
+      el.style.transform=base+' scale('+s.toFixed(2)+')';});};
+  map.on('zoomend',scaleArrow);
+  setTimeout(scaleArrow,300);
+  window._scaleArrow=scaleArrow;
+  // Ручная метка цели — кнопкой 🎯 (см. ниже), перетаскиваемая.
   // Тап по ней — «В ПУТЬ» к ней. Решает: поставить цель где угодно без поиска.
   window._pinMode=false;
   const dropTarget=(latlng)=>{
@@ -1495,18 +1491,21 @@ function makeCompassMarker(outerColor, innerColor, size, isAdmin, label){
 // Стрелка-указатель (нос вверх = текущий курс). Кольцо + треугольник + ядро.
 function arrowSVG(outer, inner, size=40, isAdmin=false){
   const ri=isAdmin?'#ef4444':inner;
+  // Менее острая «капля»-указатель: широкое основание, скруглённый нос
   return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="24" cy="24" r="21" fill="${outer}14" stroke="${outer}55" stroke-width="1.5"/>
-    <path d="M24 6 L34 38 L24 31 L14 38 Z" fill="${outer}" stroke="#0a0e1a" stroke-width="1.2" stroke-linejoin="round"/>
-    <circle cx="24" cy="27" r="4.2" fill="#0a0e1a"/>
-    <circle cx="24" cy="27" r="2.4" fill="${ri}"/>
+    <circle cx="24" cy="24" r="20" fill="${outer}18" stroke="${outer}50" stroke-width="1.5"/>
+    <path d="M24 10 L33 34 Q24 29 24 29 Q15 34 15 34 Z" fill="${outer}" stroke="#0a0e1a" stroke-width="1.4" stroke-linejoin="round"/>
+    <circle cx="24" cy="25" r="4.6" fill="#0a0e1a"/>
+    <circle cx="24" cy="25" r="2.6" fill="${ri}"/>
   </svg>`;
 }
 // Глобально поворачиваем стрелку пользователя по курсу (OM-компас или движение)
 window._userHdg=0;
 window.setUserHeading=function(h){
   if(h==null||isNaN(h))return;window._userHdg=h;
-  document.querySelectorAll('.user-arrow').forEach(el=>{el.style.transform='rotate('+h+'deg)';});
+  let s=1;
+  if(window._map){const z=window._map.getZoom();s=Math.max(0.5,Math.min(1.15,0.5+(z-10)*0.09));}
+  document.querySelectorAll('.user-arrow').forEach(el=>{el.style.transform='rotate('+h+'deg) scale('+s.toFixed(2)+')';});
 };
 
 function addUserMarker(map,lat,lng){
@@ -3758,156 +3757,141 @@ const NAV={
   dest:null,on:false,line:null,glow:null,wp:null,_sub:null,_last:null,distM:0,durS:0,
   start(){
     if(!this.dest){toast('Сначала найди место в поиске');return;}
-    const m=window._map;if(!m)return;
-    m.closePopup();this.on=true;this._userTouch=false;this._fitted=false;this._hd=null;
-    // Радары критичны в пути — форсируем слой 📸 видимым (запомним прежнее)
-    this._camWas=LV.cam;
-    if(!LV.cam){LV.cam=true;document.getElementById('lcam')?.classList.add('active');
-      if(typeof PO!=='undefined')PO.refresh();}
-    if(SR._mk){m.removeLayer(SR._mk);SR._mk=null;}
+    this.on=true;this._hd=null;
+    go('nav');
+    setTimeout(()=>this._initRadar(),60);
     this._route();
-    go('map');
-    // Касание карты = пауза вращения: карта встаёт севером и слушается пальца.
-    // Возобновление — когда отпустил и снова поехал (см. _tick).
-    if(!this._touchBound){this._touchBound=true;
-      const stopRot=()=>{this._userTouch=true;
-        const mc=document.getElementById('map-container');if(mc)mc.style.transform='';
-        document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='');};
-      m.on('dragstart zoomstart',stopRot);
-      const cont=m.getContainer();
-      if(cont)cont.addEventListener('touchstart',stopRot,{passive:true});
-    }
     this._sub=p=>this._tick(p);PM.sub(this._sub);
-    // первичная центровка — на ТЕБЯ (или на старт маршрута), не на середину линии
-    const f=(PM.last)||{lat:m.getCenter().lat,lng:m.getCenter().lng};
-    m.setView([f.lat,f.lng],16,{animate:false});
-    const hud=document.getElementById('nav-hud');if(hud)hud.style.display='flex';
-    toast('Маршрут построен · касание карты — пауза вращения');
+    toast('Маршрут построен');
   },
-  stop(){
-    this.on=false;this._userTouch=false;this._fitted=false;this._hd=null;const m=window._map;
-    [this.line,this.glow,this.wp].forEach(l=>{if(l&&m&&m.hasLayer(l))m.removeLayer(l);});
-    this.line=this.glow=this.wp=null;
-    const hud=document.getElementById('nav-hud');if(hud)hud.style.display='none';
-    const mc=document.getElementById('map-container');if(mc)mc.style.transform='';
-    document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='');
-    window.setUserHeading&&window.setUserHeading(window._userHdg||0);
-    // вернуть слой радаров к тому, что было до маршрута
-    if(this._camWas===false){LV.cam=false;document.getElementById('lcam')?.classList.remove('active');
-      if(typeof PO!=='undefined')PO.refresh();}
+  _rmap:null,_rline:null,_rglow:null,_rwp:null,_rme:null,_raf:null,
+  _initRadar(){
+    if(this._rmap){this._rmap.invalidateSize();this._draw3();return;}
+    const me=(PM.last)||{lat:CLUB.lat,lng:CLUB.lng};
+    this._rmap=L.map('vnav-map',{center:[me.lat,me.lng],zoom:15,
+      zoomControl:false,attributionControl:false,dragging:false,
+      doubleClickZoom:false,scrollWheelZoom:false,touchZoom:false,boxZoom:false,keyboard:false});
+    const turl=S.theme==='dark'
+      ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    L.tileLayer(turl,{maxZoom:19,subdomains:'abcd'}).addTo(this._rmap);
+    setTimeout(()=>this._rmap.invalidateSize(),120);
+    // цикл отрисовки наложения (стрелка/маяк/линия) + поворота окна
+    const loop=()=>{if(!this.on){this._raf=null;return;}this._draw3();this._raf=requestAnimationFrame(loop);};
+    loop();
   },
   _route(){
-    const m=window._map;if(!m||!this.dest)return;
-    const from=(PM.last)||{lat:m.getCenter().lat,lng:m.getCenter().lng};
+    if(!this.dest)return;
+    const from=(PM.last)||{lat:CLUB.lat,lng:CLUB.lng};
     const url='https://router.project-osrm.org/route/v1/driving/'
       +from.lng.toFixed(5)+','+from.lat.toFixed(5)+';'
       +this.dest.lng.toFixed(5)+','+this.dest.lat.toFixed(5)+'?overview=full&geometries=geojson';
     fetch(url).then(r=>r.json()).then(d=>{
       if(!d.routes||!d.routes.length){this._straight(from);return;}
       const r0=d.routes[0];
-      this._drawLine(r0.geometry.coordinates.map(c=>[c[1],c[0]]));
-      this.distM=r0.distance;this.durS=r0.duration;this._eta();
+      this.pts=r0.geometry.coordinates.map(c=>[c[1],c[0]]);
+      this.distM=r0.distance;this.durS=r0.duration;this._drawLine();this._eta();
     }).catch(()=>this._straight(from));
   },
   _straight(from){
-    this._drawLine([[from.lat,from.lng],[this.dest.lat,this.dest.lng]]);
+    this.pts=[[from.lat,from.lng],[this.dest.lat,this.dest.lng]];
     this.distM=TP._dist(from.lat,from.lng,this.dest.lat,this.dest.lng);
-    this.durS=this.distM/13.9;this._eta();
+    this.durS=this.distM/13.9;this._drawLine();this._eta();
   },
-  _drawLine(pts){
-    const m=window._map;if(!m)return;
-    [this.line,this.glow,this.wp].forEach(l=>{if(l&&m.hasLayer(l))m.removeLayer(l);});
-    this.glow=L.polyline(pts,{color:'#1a1205',weight:13,opacity:.55,lineCap:'round',lineJoin:'round'}).addTo(m);
-    this.line=L.polyline(pts,{color:'#FFD60A',weight:6,opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(m);
-    this.line.bringToFront();
-    const dst=pts[pts.length-1];
-    this.wp=L.marker(dst,{icon:L.divIcon({className:'',iconSize:[30,30],iconAnchor:[15,30],
+  _drawLine(){
+    const m=this._rmap;if(!m||!this.pts)return;
+    [this._rline,this._rglow,this._rwp].forEach(l=>{if(l&&m.hasLayer(l))m.removeLayer(l);});
+    this._rglow=L.polyline(this.pts,{color:'#1a1205',weight:13,opacity:.55,lineCap:'round',lineJoin:'round'}).addTo(m);
+    this._rline=L.polyline(this.pts,{color:'#FFD60A',weight:6,opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(m);
+    this._rline.bringToFront();
+    const dst=this.pts[this.pts.length-1];
+    this._rwp=L.marker(dst,{icon:L.divIcon({className:'',iconSize:[30,30],iconAnchor:[15,30],
       html:'<div style="font-size:26px;filter:drop-shadow(0 2px 5px rgba(255,214,10,.85));animation:napulse 1.2s ease-in-out infinite">📍</div>'})}).addTo(m);
-    // НЕ центрируемся на маршрут (раньше fitBounds прыгал на середину трассы).
-    // Радар центрирован на ТЕБЕ — как в GTA; маршрут просто уходит вперёд.
-    if(!this._fitted){this._fitted=true;
-      const me=(PM.last)||{lat:m.getCenter().lat,lng:m.getCenter().lng};
-      m.setView([me.lat,me.lng],16,{animate:false});}
   },
   _eta(){
-    const hud=document.getElementById('nav-hud');if(!hud)return;
+    const hud=document.getElementById('vnav-hud');if(!hud)return;
     const km=this.distM>=1000?(this.distM/1000).toFixed(1)+' км':Math.round(this.distM)+' м';
     const mn=Math.round(this.durS/60);
     const arr=new Date(Date.now()+this.durS*1000);
     const hh=String(arr.getHours()).padStart(2,'0')+':'+String(arr.getMinutes()).padStart(2,'0');
-    const dE=hud.querySelector('#nav-dist'),eE=hud.querySelector('#nav-eta'),nE=hud.querySelector('#nav-name');
+    const dE=hud.querySelector('#vnav-dist'),eE=hud.querySelector('#vnav-eta'),nE=hud.querySelector('#vnav-name'),aE=hud.querySelector('#vnav-arrow');
     if(dE)dE.textContent=km;
-    if(eE)eE.textContent=(mn>=60?Math.floor(mn/60)+'ч '+(mn%60)+'м':mn+' мин')+' · прибытие '+hh;
-    // Стрелка-указатель на цель ОТНОСИТЕЛЬНО твоего курса: куда поворачивать.
-    const aE=hud.querySelector('#nav-arrow');
+    if(eE)eE.textContent=(mn>=60?Math.floor(mn/60)+'ч '+(mn%60)+'м':mn+' мин')+' · '+hh;
     if(aE&&PM.last){
       const brg=AR._brg(PM.last.lat,PM.last.lng,this.dest.lat,this.dest.lng);
-      const rel=((brg-(this._hd!=null?this._hd:brg))+540)%360-180; // -180..180 относительно носа
+      const rel=((brg-(this._hd!=null?this._hd:brg))+540)%360-180;
       const A=['↑','↗','→','↘','↓','↙','←','↖'];
-      const idx=Math.round(((rel+360)%360)/45)%8;
-      aE.textContent=A[idx];
-      aE.style.transform='none';
+      aE.textContent=A[Math.round(((rel+360)%360)/45)%8];
       const turn=Math.abs(rel)<20?'прямо':(rel>0?'правее':'левее');
       if(nE)nE.textContent=(this.dest.name||'Маршрут')+' · '+turn;
     }else if(nE)nE.textContent=this.dest.name||'Маршрут';
   },
+  // Поворот окна: НОС = 70% «на цель» + 30% «курс телефона» (подмешивается)
+  _bearTarget(p){
+    if(!this.dest)return this._hd||0;
+    return AR._brg(p.lat,p.lng,this.dest.lat,this.dest.lng);
+  },
+  _mix(p){
+    const bt=this._bearTarget(p);
+    const ph=(typeof OM!=='undefined'&&OM.head!=null)?OM.head:bt;
+    // круговое смешение 70/30
+    const dd=((ph-bt+540)%360)-180;
+    return (bt+dd*0.30+360)%360;
+  },
   _tick(p){
-    if(!this.on)return;
-    const m=window._map;
-    if(this._last){
-      const moved=TP._dist(this._last.lat,this._last.lng,p.lat,p.lng);
-      const spd=(typeof TP!=='undefined')?TP.spd:0; // м/с из сглаженного источника
-      if(moved>6&&this._userTouch)this._userTouch=false;
-      // Курс из GPS-смещения шумит, когда стоишь/идёшь медленно (фиксы дрожат) —
-      // карта дёргалась во все стороны. Решение: считать курс ТОЛЬКО при
-      // осмысленном шаге (>8 м И скорость >2 м/с), сглаживать по кругу,
-      // а в покое — заморозить поворот (карта стоит спокойно).
-      if(!this._userTouch){
-        if(moved>8&&spd>2){
-          const raw=AR._brg(this._last.lat,this._last.lng,p.lat,p.lng);
-          if(this._hd==null)this._hd=raw;
-          else{const dd=((raw-this._hd+540)%360)-180;this._hd=(this._hd+dd*0.35+360)%360;}
-          const mc=document.getElementById('map-container');
-          if(mc)mc.style.transform='rotate('+(-this._hd)+'deg)';
-          // стрелка маркера смотрит по курсу; при повёрнутой карте компенсируем поворот контейнера,
-          // чтобы стрелка указывала «вверх» экрана (как в GTA — нос всегда вперёд)
-          window.setUserHeading&&window.setUserHeading(0);
-          document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='rotate('+this._hd+'deg)');
-        }
-        // (центровка со смещением к цели — единым вызовом в конце _tick)
-      }
-    }
-    if(this.line){
-      let near=1e9;const ll=this.line.getLatLngs();
-      for(const q of ll){const d=TP._dist(p.lat,p.lng,q.lat,q.lng);if(d<near)near=d;}
-      if(near>60){this._last=p;this._route();return;}
+    if(!this.on||!this._rmap)return;
+    // off-route reroute
+    if(this._rline){
+      let near=1e9;for(const q of this._rline.getLatLngs()){const d=TP._dist(p.lat,p.lng,q.lat,q.lng);if(d<near)near=d;}
+      if(near>60){this._route();}
     }
     if(this.dest){
       this.distM=TP._dist(p.lat,p.lng,this.dest.lat,this.dest.lng);
       this.durS=this.distM/13.9;this._eta();
-      if(this.distM<35){toast('Ты на месте 🏁');this.stop();}
+      if(this.distM<35){toast('Ты на месте 🏁');this.stop();return;}
     }
-    if(m)this._recenter(p);
+    // целевой угол окна сглаживаем
+    const want=this._mix(p);
+    if(this._hd==null)this._hd=want;
+    else{const dd=((want-this._hd+540)%360)-180;this._hd=(this._hd+dd*0.18+360)%360;}
+    // центр радара — на пользователе, со смещением 30% вперёд (к цели)
+    this._rmap.setView([p.lat,p.lng],this._rmap.getZoom(),{animate:false});
     this._last=p;
   },
-  _recenter(p){
-    const m=window._map;if(!m||!this.dest)return;
-    const sz=m.getSize();
-    // вектор «на цель» в ЭКРАННЫХ пикселях
-    const pc=m.latLngToContainerPoint([p.lat,p.lng]);
-    const dc=m.latLngToContainerPoint([this.dest.lat,this.dest.lng]);
-    let vx=dc.x-pc.x,vy=dc.y-pc.y;
-    const len=Math.hypot(vx,vy)||1;vx/=len;vy/=len;
-    // карта повёрнута CSS-ом на -_hd: экран тоже повёрнут, поэтому вектор
-    // к цели на экране совпадает с пиксельным (CSS крутит уже отрисованное).
-    // Сдвигаем ЦЕНТР так, чтобы пользователь был на 30% радиуса от центра
-    // в сторону, ПРОТИВОПОЛОЖНУЮ цели (тогда цель уходит вперёд в обзор).
-    const off=0.30*Math.min(sz.x,sz.y)/2;
-    // Центр сдвигаем В СТОРОНУ цели → ты оказываешься на 30% НИЖЕ середины,
-    // а цель раскрывается впереди по курсу. (В v2.4 знак был обратный.)
-    const offsetPt=L.point(pc.x + vx*off, pc.y + vy*off);
-    const target=m.containerPointToLatLng(offsetPt);
-    m.setView(target,m.getZoom(),{animate:false});
+  // Наложение: поворот окна + стрелка пользователя в центре + маяк-направление
+  _draw3(){
+    const wrap=document.getElementById('vnav-map');
+    const cv=document.getElementById('vnav-cv');
+    if(!wrap||!cv||!this._rmap)return;
+    const hd=this._hd||0;
+    const W=cv.clientWidth,H=cv.clientHeight;
+    // ПОЛОЖЕНИЕ СТРЕЛКИ: низко (72% высоты) — впереди по носу раскрывается цель.
+    const PIV=0.72;
+    // Карта повёрнута вокруг ТОЧКИ СТРЕЛКИ (а не центра): пользователь сидит
+    // в этой точке, «вперёд» = вверх окна, путь уходит в верхние 72% экрана.
+    wrap.style.transformOrigin='50% '+(PIV*100).toFixed(0)+'%';
+    wrap.style.transform='rotate('+(-hd)+'deg)';
+    const dpr=Math.min(2,devicePixelRatio||1);
+    if(cv.width!==W*dpr||cv.height!==H*dpr){cv.width=W*dpr;cv.height=H*dpr;}
+    const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
+    const cx=W/2,cy=H*PIV; // стрелка там же, где ось поворота карты
+    // стрелка пользователя — всегда носом ВВЕРХ (мир повёрнут под неё)
+    c.save();c.translate(cx,cy);
+    c.fillStyle='#22d3ee';c.strokeStyle='#0a0e1a';c.lineWidth=2;
+    c.beginPath();c.moveTo(0,-16);c.lineTo(11,14);c.quadraticCurveTo(0,8,0,8);c.quadraticCurveTo(0,8,-11,14);c.closePath();
+    c.fill();c.stroke();
+    c.beginPath();c.arc(0,6,4.5,0,Math.PI*2);c.fillStyle='#0a0e1a';c.fill();
+    c.restore();
+    // указатель на цель по краю круга (куда повернуть), относительно носа
+    if(PM.last&&this.dest){
+      const brg=AR._brg(PM.last.lat,PM.last.lng,this.dest.lat,this.dest.lng);
+      const rel=((brg-hd+540)%360-180)*Math.PI/180;
+      const R=Math.min(W,H)*0.42;
+      const ex=cx+Math.sin(rel)*R,ey=cy-Math.cos(rel)*R;
+      c.save();c.translate(ex,ey);c.rotate(rel);
+      c.fillStyle='#FFD60A';c.beginPath();c.moveTo(0,-11);c.lineTo(7,6);c.lineTo(-7,6);c.closePath();c.fill();
+      c.restore();
+    }
   }
 };
 
@@ -3937,7 +3921,9 @@ const SR={
     const dLat=1.1,dLng=1.1/Math.max(0.2,Math.cos(c.lat*Math.PI/180));
     const vb=(c.lng-dLng).toFixed(3)+','+(c.lat+dLat).toFixed(3)+','
             +(c.lng+dLng).toFixed(3)+','+(c.lat-dLat).toFixed(3);
-    const base='https://nominatim.openstreetmap.org/search?format=jsonv2&accept-language=ru&addressdetails=1&limit=10&q='+encodeURIComponent(q);
+    // dedupe=1 и расширенный лимит; улицы Nominatim отдаёт и без слова «улица»,
+    // но мы поднимаем их выше сортировкой по близости (ниже).
+    const base='https://nominatim.openstreetmap.org/search?format=jsonv2&accept-language=ru&addressdetails=1&dedupe=1&limit=12&q='+encodeURIComponent(q);
     // bounded=0: локальные сначала, но и дальние тоже придут (просто ниже)
     const nom=base+'&viewbox='+vb+'&bounded=0';
     const toFs=arr=>arr.map(o=>{
@@ -3991,15 +3977,19 @@ const SR={
       if(ref&&f.lat!=null){const dm=TP._dist(ref.lat,ref.lng,f.lat,f.lng);
         dist=dm<1000?Math.round(dm)+' м':(dm/1000).toFixed(dm<10000?1:0)+' км';}
       const tag=[tp,dist].filter(Boolean).join(' · ');
-      return '<div class="sr-it" data-i="'+ix+'" style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer">'
-        +'<b style="font-size:.78rem">'+emo+' '+nm+(tag?' <span style=\'font-size:.6rem;color:var(--nc);font-weight:600\'>· '+tag+'</span>':'')+'</b><br>'
-        +'<span style="font-size:.62rem;color:var(--td)">'+sub+'</span></div>';
+      // Цвета заданы ЯВНО (список всегда тёмный) — в светлой теме текст не сливался
+      return '<div class="sr-it" data-i="'+ix+'" style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer">'
+        +'<b style="font-size:.82rem;color:#eaf2ff">'+emo+' '+nm+(tag?' <span style=\'font-size:.62rem;color:#22d3ee;font-weight:600\'>· '+tag+'</span>':'')+'</b><br>'
+        +'<span style="font-size:.64rem;color:#8ba0c0">'+sub+'</span></div>';
     }).join('');
     box.style.display='block';
     box.querySelectorAll('.sr-it').forEach(el=>{
-      const pick=(ev)=>{ev.preventDefault();ev.stopPropagation();this._pick(+el.dataset.i);};
-      el.addEventListener('pointerdown',pick); // pointerdown срабатывает раньше blur поля
-      el.addEventListener('click',pick);});
+      let sy=0,moved=false;
+      el.addEventListener('pointerdown',e=>{sy=e.clientY;moved=false;});
+      el.addEventListener('pointermove',e=>{if(Math.abs(e.clientY-sy)>8)moved=true;}); // палец уехал = скролл
+      el.addEventListener('pointerup',e=>{ // выбор ТОЛЬКО если не скроллили
+        if(moved)return;
+        e.preventDefault();e.stopPropagation();this._pick(+el.dataset.i);});});
   },
   _pick(i){
     const f=this._fs[i];if(!f)return;
@@ -4239,6 +4229,27 @@ SL.init();
 </script>
 
 <!-- SPACE VIEW — 3D Globe -->
+<!-- ═══ В ПУТЬ · отдельный мини-радар (70% высоты), повёрнут на цель + 30% курс телефона ═══ -->
+<div id="vnav" class="view" style="background:#05070f">
+  <button onclick="NAV.stop()" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;z-index:30;background:rgba(255,214,10,.16);backdrop-filter:blur(10px);border:1px solid rgba(255,214,10,.5);color:#FFD60A;border-radius:9999px;padding:9px 18px;font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:.06em;font-size:.82rem">⏹ ЗАВЕРШИТЬ</button>
+  <!-- плашка цели/ETA сверху -->
+  <div id="vnav-hud" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:50%;transform:translateX(-50%);z-index:25;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(20,16,4,.94),rgba(10,8,2,.94));border:1px solid rgba(255,214,10,.45);border-radius:14px;padding:8px 14px;max-width:74vw">
+    <div id="vnav-arrow" style="font-size:24px;font-weight:800;color:#FFD60A;width:22px;text-align:center">↑</div>
+    <div style="min-width:0">
+      <div id="vnav-name" style="font-family:Rajdhani,sans-serif;font-weight:700;font-size:.84rem;color:#FFD60A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Маршрут</div>
+      <div style="display:flex;gap:9px;font-size:.7rem;color:rgba(255,235,170,.92)"><span id="vnav-dist" style="font-family:Orbitron,monospace;font-weight:700">—</span><span id="vnav-eta">—</span></div>
+    </div>
+  </div>
+  <!-- ОКНО-РАДАР: 70% высоты, отступ сверху 10%, снизу 20% -->
+  <div id="vnav-radar-wrap" style="position:absolute;left:50%;top:10%;transform:translateX(-50%);width:92vw;height:70%;border-radius:24px;overflow:hidden;border:1px solid rgba(255,214,10,.35);box-shadow:0 0 40px rgba(255,214,10,.12)">
+    <div id="vnav-map" style="position:absolute;inset:0;transform-origin:center"></div>
+    <canvas id="vnav-cv" style="position:absolute;inset:0;pointer-events:none;z-index:2"></canvas>
+  </div>
+  <div style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 6%);left:0;width:100%;text-align:center;z-index:5;pointer-events:none">
+    <span style="background:rgba(10,14,30,.6);border:1px solid var(--border);border-radius:9999px;padding:5px 14px;font-size:.58rem;letter-spacing:.1em;color:rgba(255,255,255,.7)">МИНИ-РАДАР · НОС = 70% ЦЕЛЬ + 30% КУРС ТЕЛЕФОНА</span>
+  </div>
+</div>
+
 <!-- ═══ НЕБО В РАЗРЕЗЕ · вертикальный рентген атмосферы ═══ -->
 <div id="vslice" class="view" style="background:#05070f">
   <canvas id="slice-cv" style="position:absolute;inset:0"></canvas>
