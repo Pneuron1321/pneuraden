@@ -1400,11 +1400,7 @@ function initMap(){
   // (драг шёл не туда при любом повороте) и подгрузку тайлов по углам;
   // а requestPermission() без жеста на iOS падал всегда — поворот был мёртв.
   // Теперь: общий OM (шлюз разрешения — оверлей радара), карта — подписчик.
-  OM.sub(h=>{
-    document.querySelectorAll('.cmarker-inner').forEach(el=>{
-      el.style.transform=`rotate(${h}deg)`;
-    });
-  });
+  OM.sub(h=>{ window.setUserHeading&&window.setUserHeading(h); });
 
   // Day/night terminator — real astronomy, always present at every zoom
   // Reality doesn't switch off. Proximity changes what you can see.
@@ -1470,25 +1466,36 @@ function initMap(){
 }
 
 function makeCompassMarker(outerColor, innerColor, size, isAdmin, label){
-  // GTA-стрелка курса: треугольник поверх маркера, вращается по _hdg (chevron'ом вверх по движению)
-  const html=`<div style="position:relative;width:${size}px;height:${size}px">
-    <div class="nav-chevron" style="position:absolute;left:50%;top:50%;width:0;height:0;
-      transform:translate(-50%,-50%) rotate(0deg);transform-origin:center;display:none">
-      <div style="position:absolute;left:-9px;top:-${Math.round(size*0.62)}px;width:0;height:0;
-        border-left:9px solid transparent;border-right:9px solid transparent;
-        border-bottom:14px solid ${outerColor};filter:drop-shadow(0 0 5px ${outerColor})"></div>
-    </div>
-    <div class="cmarker-inner" style="width:${size}px;height:${size}px">
-      ${compassSVG(outerColor,innerColor,size,isAdmin)}
-    </div>
+  // САМ маркер пользователя — стрелка в стиле радара GTA: всегда указывает
+  // направление (курс), поворачивается через .user-arrow по window._userHdg.
+  // Внутри — точка-ядро цвета пользователя; вокруг — мягкое кольцо-свечение.
+  const col=isAdmin?'#fbbf24':outerColor;
+  const html=`<div class="user-arrow" style="width:${size}px;height:${size}px;transform:rotate(${window._userHdg||0}deg);transform-origin:center;transition:transform .25s ease">
+    ${arrowSVG(col,innerColor,size,isAdmin)}
   </div>
   <style>
-    @keyframes cpulse{0%,100%{filter:drop-shadow(0 0 5px ${outerColor})}50%{filter:drop-shadow(0 0 14px ${outerColor})}}
-    .cmarker-inner{animation:cpulse 2s ease-in-out infinite}
+    @keyframes uapulse{0%,100%{filter:drop-shadow(0 0 4px ${col})}50%{filter:drop-shadow(0 0 12px ${col})}}
+    .user-arrow{animation:uapulse 2.2s ease-in-out infinite}
   </style>`;
   return L.divIcon({className:'',iconSize:[size,size],iconAnchor:[size/2,size/2],
     popupAnchor:[0,-size/2-4],html});
 }
+// Стрелка-указатель (нос вверх = текущий курс). Кольцо + треугольник + ядро.
+function arrowSVG(outer, inner, size=40, isAdmin=false){
+  const ri=isAdmin?'#ef4444':inner;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="24" cy="24" r="21" fill="${outer}14" stroke="${outer}55" stroke-width="1.5"/>
+    <path d="M24 6 L34 38 L24 31 L14 38 Z" fill="${outer}" stroke="#0a0e1a" stroke-width="1.2" stroke-linejoin="round"/>
+    <circle cx="24" cy="27" r="4.2" fill="#0a0e1a"/>
+    <circle cx="24" cy="27" r="2.4" fill="${ri}"/>
+  </svg>`;
+}
+// Глобально поворачиваем стрелку пользователя по курсу (OM-компас или движение)
+window._userHdg=0;
+window.setUserHeading=function(h){
+  if(h==null||isNaN(h))return;window._userHdg=h;
+  document.querySelectorAll('.user-arrow').forEach(el=>{el.style.transform='rotate('+h+'deg)';});
+};
 
 function addUserMarker(map,lat,lng){
   if(window._um) map.removeLayer(window._um);
@@ -3778,7 +3785,7 @@ const NAV={
     const hud=document.getElementById('nav-hud');if(hud)hud.style.display='none';
     const mc=document.getElementById('map-container');if(mc)mc.style.transform='';
     document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='');
-    document.querySelectorAll('.nav-chevron').forEach(el=>{el.style.display='none';});
+    window.setUserHeading&&window.setUserHeading(window._userHdg||0);
     // вернуть слой радаров к тому, что было до маршрута
     if(this._camWas===false){LV.cam=false;document.getElementById('lcam')?.classList.remove('active');
       if(typeof PO!=='undefined')PO.refresh();}
@@ -3856,11 +3863,10 @@ const NAV={
           else{const dd=((raw-this._hd+540)%360)-180;this._hd=(this._hd+dd*0.35+360)%360;}
           const mc=document.getElementById('map-container');
           if(mc)mc.style.transform='rotate('+(-this._hd)+'deg)';
+          // стрелка маркера смотрит по курсу; при повёрнутой карте компенсируем поворот контейнера,
+          // чтобы стрелка указывала «вверх» экрана (как в GTA — нос всегда вперёд)
+          window.setUserHeading&&window.setUserHeading(0);
           document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='rotate('+this._hd+'deg)');
-          // GTA-стрелка курса на маркере: показать и направить по ходу
-          document.querySelectorAll('.nav-chevron').forEach(el=>{
-            el.style.display='block';
-            el.style.transform='translate(-50%,-50%) rotate('+this._hd+'deg)';});
         }
         // (центровка со смещением к цели — единым вызовом в конце _tick)
       }
@@ -3966,13 +3972,22 @@ const SR={
     const box=document.getElementById('srch-res');if(!box)return;
     this._fs=fs;
     if(!fs.length){box.style.display='none';box.innerHTML='';return;}
+    const ref=(typeof PM!=='undefined'&&PM.last)||(window._map?{lat:window._map.getCenter().lat,lng:window._map.getCenter().lng}:null);
+    const TYP={road:'улица',residential:'улица',street:'улица',city:'город',town:'городок',
+      village:'село',hamlet:'село',suburb:'район',neighbourhood:'район',
+      house:'дом',building:'здание',administrative:'район'};
     box.innerHTML=fs.map((f,ix)=>{
       const pr=f.properties||{};
       const nm=PO._esc(pr.name||pr.street||'—');
       const sub=PO._esc([pr.city||pr.county,pr.state,pr.country].filter(Boolean).join(', '));
       const emo=PO._emo({[pr.osm_key||'x']:pr.osm_value});
+      const tp=TYP[pr.osm_value]||TYP[pr.osm_key]||'';
+      let dist='';
+      if(ref&&f.lat!=null){const dm=TP._dist(ref.lat,ref.lng,f.lat,f.lng);
+        dist=dm<1000?Math.round(dm)+' м':(dm/1000).toFixed(dm<10000?1:0)+' км';}
+      const tag=[tp,dist].filter(Boolean).join(' · ');
       return '<div class="sr-it" data-i="'+ix+'" style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer">'
-        +'<b style="font-size:.78rem">'+emo+' '+nm+'</b><br>'
+        +'<b style="font-size:.78rem">'+emo+' '+nm+(tag?' <span style=\'font-size:.6rem;color:var(--nc);font-weight:600\'>· '+tag+'</span>':'')+'</b><br>'
         +'<span style="font-size:.62rem;color:var(--td)">'+sub+'</span></div>';
     }).join('');
     box.style.display='block';
