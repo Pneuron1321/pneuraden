@@ -3536,24 +3536,24 @@ const TT={
    · рисуются только удары в текущем окне карты (+запас)
    · 4 неудачных подключения подряд — слой гаснет с честным тостом ═══ */
 const LT={
-  on:false,ws:null,_hosts:[1,3,7,8],_hi:0,_fails:0,_sleep:0,_dots:null,_init:false,_ring:[],MAX:140,LIFE:180000,
+  on:false,ws:null,_hosts:[1,3,7,8],_hi:0,_fails:0,_sleep:0,_dots:null,_init:false,_ring:[],MAX:140,LIFE:2000,
   init(){
     if(this._init)return;this._init=true;
     setInterval(()=>this._watch(),15000);
-    setInterval(()=>this._prune(),10000);
+    setInterval(()=>this._prune(),500);
   },
   toggle(){
     this.on=!this.on;
     document.getElementById('llt')?.classList.toggle('active',this.on);
     if(this.on){this._fails=0;toast('Молнии: эксперимент — протокол сети может измениться');this._watch();}
-    else{this._disc();toast('Молнии выключены');}
+    else{this._disc();this._clearDots();toast('Молнии выключены');}
   },
   _wantLive(){return this.on&&!document.hidden&&S.view==='map';},
   _watch(){
     if(this._wantLive()){this._sleep=0;if(!this._open())this._connect();}
     else if(this._open()){
       this._sleep+=15;
-      if(document.hidden||this._sleep>90)this._disc();
+      if(document.hidden||this._sleep>90){this._disc();this._clearDots();}
     }
   },
   _open(){return this.ws&&this.ws.readyState===1;},
@@ -3572,6 +3572,10 @@ const LT={
       if(this._wantLive()){this._fails++;setTimeout(()=>this._connect(),3000);}};
   },
   _disc(){if(this.ws){try{this.ws.close();}catch(e){}this.ws=null;}},
+  _clearDots(){ // смести все точки и слой начисто (выключение слоя/уход)
+    const m=window._map;
+    if(this._dots&&m){this._dots.clearLayers();m.removeLayer(this._dots);this._dots=null;}
+    this._ring=[];},
   _lzw(a){ // декодер их сжатия (классический LZW по строке)
     if(!a)return'';const d={};let c=a.charAt(0),f=c;const e=[c];let h=256,b,k;
     for(let i=1;i<a.length;i++){b=a.charCodeAt(i);
@@ -3598,8 +3602,8 @@ const LT={
       el.firstChild.animate(
         [{transform:'scale(.3)',opacity:1},{transform:'scale(3.2)',opacity:0}],
         {duration:850,easing:'ease-out'});
-    setTimeout(()=>{m.removeLayer(mk);},850);
-    // Затухающая точка: короче жизнь (3 мин) + ЖЁСТКИЙ потолок — старые вытесняются
+    setTimeout(()=>{if(m.hasLayer(mk))m.removeLayer(mk);},850);
+    // Короткий янтарный след (живёт LIFE=2с, гаснет) — ЕДИНСТВЕННЫЙ учёт в _ring.
     const dot=L.circleMarker([lat,lng],{radius:3,color:'#fbbf24',weight:1,
       fillColor:'#fde68a',fillOpacity:.75,opacity:.85});
     dot._lt=Date.now();this._dots.addLayer(dot);
@@ -3698,6 +3702,10 @@ const NAV={
     if(!this.dest){toast('Сначала найди место в поиске');return;}
     const m=window._map;if(!m)return;
     m.closePopup();this.on=true;this._userTouch=false;this._fitted=false;this._hd=null;
+    // Радары критичны в пути — форсируем слой 📸 видимым (запомним прежнее)
+    this._camWas=LV.cam;
+    if(!LV.cam){LV.cam=true;document.getElementById('lcam')?.classList.add('active');
+      if(typeof PO!=='undefined')PO.refresh();}
     if(SR._mk){m.removeLayer(SR._mk);SR._mk=null;}
     this._route();
     go('map');
@@ -3725,6 +3733,9 @@ const NAV={
     const hud=document.getElementById('nav-hud');if(hud)hud.style.display='none';
     const mc=document.getElementById('map-container');if(mc)mc.style.transform='';
     document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='');
+    // вернуть слой радаров к тому, что было до маршрута
+    if(this._camWas===false){LV.cam=false;document.getElementById('lcam')?.classList.remove('active');
+      if(typeof PO!=='undefined')PO.refresh();}
   },
   _route(){
     const m=window._map;if(!m||!this.dest)return;
@@ -3790,8 +3801,7 @@ const NAV={
           if(mc)mc.style.transform='rotate('+(-this._hd)+'deg)';
           document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='rotate('+this._hd+'deg)');
         }
-        // центр держим на тебе всегда в движении (даже если курс заморожен)
-        if(m&&moved>2)m.setView([p.lat,p.lng],m.getZoom(),{animate:false});
+        // (центровка со смещением к цели — единым вызовом в конце _tick)
       }
     }
     if(this.line){
@@ -3804,7 +3814,25 @@ const NAV={
       this.durS=this.distM/13.9;this._eta();
       if(this.distM<35){toast('Ты на месте 🏁');this.stop();}
     }
+    if(m)this._recenter(p);
     this._last=p;
+  },
+  _recenter(p){
+    const m=window._map;if(!m||!this.dest)return;
+    const sz=m.getSize();
+    // вектор «на цель» в ЭКРАННЫХ пикселях
+    const pc=m.latLngToContainerPoint([p.lat,p.lng]);
+    const dc=m.latLngToContainerPoint([this.dest.lat,this.dest.lng]);
+    let vx=dc.x-pc.x,vy=dc.y-pc.y;
+    const len=Math.hypot(vx,vy)||1;vx/=len;vy/=len;
+    // карта повёрнута CSS-ом на -_hd: экран тоже повёрнут, поэтому вектор
+    // к цели на экране совпадает с пиксельным (CSS крутит уже отрисованное).
+    // Сдвигаем ЦЕНТР так, чтобы пользователь был на 30% радиуса от центра
+    // в сторону, ПРОТИВОПОЛОЖНУЮ цели (тогда цель уходит вперёд в обзор).
+    const off=0.30*Math.min(sz.x,sz.y)/2;
+    const offsetPt=L.point(pc.x - vx*off, pc.y - vy*off);
+    const target=m.containerPointToLatLng(offsetPt);
+    m.setView(target,m.getZoom(),{animate:false});
   }
 };
 
