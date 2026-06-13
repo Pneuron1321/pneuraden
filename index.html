@@ -3854,54 +3854,64 @@ const NAV={
     const want=this._mix(p);
     if(this._hd==null)this._hd=want;
     else{const dd=((want-this._hd+540)%360)-180;this._hd=(this._hd+dd*0.18+360)%360;}
-    // Центр карты смещаем так, чтобы ПОЛЬЗОВАТЕЛЬ рисовался на 72% высоты (PIV),
-    // совпав со стрелкой и осью вращения — тогда карта честно крутится вокруг тебя,
-    // а цель раскрывается в верхних 72% окна.
-    this._centerOn(p);
+    // Карта НЕ вращается (как радар HOME — иначе торчат чёрные углы).
+    // Центр держим на пользователе; вращается только наложение на canvas.
+    this._rmap.setView([p.lat,p.lng],this._rmap.getZoom(),{animate:false});
     this._last=p;
   },
-  _centerOn(p){
-    const m=this._rmap;if(!m)return;
-    const el=document.getElementById('vnav-map');
-    const H=(el&&el.clientHeight)||300;
-    const PIV=0.72;
-    const z=m.getZoom();
-    const up=m.project([p.lat,p.lng],z);          // пиксель пользователя в мире
-    const centerProj=L.point(up.x, up.y-(PIV-0.5)*H); // центр выше на (PIV-0.5)*H
-    m.setView(m.unproject(centerProj,z),z,{animate:false});
-  },
-  // Наложение: поворот окна (вокруг точки стрелки) + стрелка + указатель цели
+  // Наложение по схеме радара HOME: карта статична, на canvas рисуем
+  // ПОВЁРНУТЫЙ по курсу мир — маршрут, стрелку, указатель. Круг всегда полон.
   _draw3(){
     const wrap=document.getElementById('vnav-map');
     const cv=document.getElementById('vnav-cv');
     if(!wrap||!cv||!this._rmap)return;
+    wrap.style.transform=''; // карта НЕ вращается — углы не торчат
     const hd=this._hd||0;
-    const W=cv.clientWidth,H=cv.clientHeight;
-    // ПОЛОЖЕНИЕ СТРЕЛКИ: низко (72% высоты) — впереди по носу раскрывается цель.
-    const PIV=0.72;
-    // Карта повёрнута вокруг ТОЧКИ СТРЕЛКИ (а не центра): пользователь сидит
-    // в этой точке, «вперёд» = вверх окна, путь уходит в верхние 72% экрана.
-    wrap.style.transformOrigin='50% '+(PIV*100).toFixed(0)+'%';
-    wrap.style.transform='rotate('+(-hd)+'deg)';
-    const dpr=Math.min(2,devicePixelRatio||1);
+    const W=cv.clientWidth,H=cv.clientHeight,dpr=Math.min(2,devicePixelRatio||1);
     if(cv.width!==W*dpr||cv.height!==H*dpr){cv.width=W*dpr;cv.height=H*dpr;}
     const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
-    const cx=W/2,cy=H*PIV; // стрелка там же, где ось поворота карты
-    // стрелка пользователя — всегда носом ВВЕРХ (мир повёрнут под неё)
+    const m=this._rmap,me=PM.last;
+    const PIV=0.72,cx=W/2,cy=H*PIV; // стрелка низко — цель раскрыта вверху
+    const R=(hd)*Math.PI/180;
+    // мир рисуем вокруг точки пользователя, повёрнутый на -курс (нос вверх).
+    // экранная позиция любой geo-точки = поворот вектора (её пиксель − пиксель юзера) на -hd, + (cx,cy)
+    const project=(lat,lng)=>{
+      if(!me)return null;
+      const pu=m.latLngToContainerPoint([me.lat,me.lng]);
+      const pp=m.latLngToContainerPoint([lat,lng]);
+      let dx=pp.x-pu.x, dy=pp.y-pu.y;
+      const ca=Math.cos(-R),sa=Math.sin(-R);
+      return {x:cx+(dx*ca-dy*sa), y:cy+(dx*sa+dy*ca)};
+    };
+    // ── маршрут (жёлтая линия со свечением) ──
+    if(this.pts&&this.pts.length>1&&me){
+      const draw=(col,w)=>{c.beginPath();let first=true;
+        for(const pt of this.pts){const s=project(pt[0],pt[1]);if(!s)continue;
+          if(first){c.moveTo(s.x,s.y);first=false;}else c.lineTo(s.x,s.y);}
+        c.strokeStyle=col;c.lineWidth=w;c.lineCap='round';c.lineJoin='round';c.stroke();};
+      draw('rgba(26,18,5,.85)',13); // подложка
+      draw('#FFD60A',6);            // линия
+      // маяк цели
+      const dst=this.pts[this.pts.length-1],sd=project(dst[0],dst[1]);
+      if(sd){c.font='24px sans-serif';c.textAlign='center';c.textBaseline='middle';
+        c.fillText('📍',sd.x,sd.y-10);}
+    }
+    // ── стрелка пользователя (всегда носом вверх, низко) ──
     c.save();c.translate(cx,cy);
     c.fillStyle='#22d3ee';c.strokeStyle='#0a0e1a';c.lineWidth=2;
-    c.beginPath();c.moveTo(0,-16);c.lineTo(11,14);c.quadraticCurveTo(0,8,0,8);c.quadraticCurveTo(0,8,-11,14);c.closePath();
-    c.fill();c.stroke();
-    c.beginPath();c.arc(0,6,4.5,0,Math.PI*2);c.fillStyle='#0a0e1a';c.fill();
+    c.beginPath();c.moveTo(0,-15);c.lineTo(11,13);c.quadraticCurveTo(0,7,0,7);
+    c.quadraticCurveTo(0,7,-11,13);c.closePath();c.fill();c.stroke();
+    c.beginPath();c.arc(0,5,4.2,0,Math.PI*2);c.fillStyle='#0a0e1a';c.fill();
+    c.beginPath();c.arc(0,5,2.3,0,Math.PI*2);c.fillStyle='#22d3ee';c.fill();
     c.restore();
-    // указатель на цель по краю круга (куда повернуть), относительно носа
-    if(PM.last&&this.dest){
-      const brg=AR._brg(PM.last.lat,PM.last.lng,this.dest.lat,this.dest.lng);
+    // ── указатель на цель по краю круга (куда повернуть) ──
+    if(me&&this.dest){
+      const brg=AR._brg(me.lat,me.lng,this.dest.lat,this.dest.lng);
       const rel=((brg-hd+540)%360-180)*Math.PI/180;
-      const R=Math.min(W,H)*0.42;
-      const ex=cx+Math.sin(rel)*R,ey=cy-Math.cos(rel)*R;
+      const rr=Math.min(W,H)*0.40;
+      const ex=cx+Math.sin(rel)*rr,ey=cy-Math.cos(rel)*rr;
       c.save();c.translate(ex,ey);c.rotate(rel);
-      c.fillStyle='#FFD60A';c.beginPath();c.moveTo(0,-11);c.lineTo(7,6);c.lineTo(-7,6);c.closePath();c.fill();
+      c.fillStyle='#FFD60A';c.beginPath();c.moveTo(0,-12);c.lineTo(8,7);c.lineTo(-8,7);c.closePath();c.fill();
       c.restore();
     }
   }
