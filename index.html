@@ -3631,20 +3631,34 @@ const NAV={
   start(){
     if(!this.dest){toast('Сначала найди место в поиске');return;}
     const m=window._map;if(!m)return;
-    m.closePopup();this.on=true;
+    m.closePopup();this.on=true;this._userTouch=false;this._fitted=false;
     if(SR._mk){m.removeLayer(SR._mk);SR._mk=null;}
     this._route();
     go('map');
+    // Касание карты = пауза вращения: карта встаёт севером и слушается пальца.
+    // Возобновление — когда отпустил и снова поехал (см. _tick).
+    if(!this._touchBound){this._touchBound=true;
+      const stopRot=()=>{this._userTouch=true;
+        const mc=document.getElementById('map-container');if(mc)mc.style.transform='';
+        document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='');};
+      m.on('dragstart zoomstart',stopRot);
+      const cont=m.getContainer();
+      if(cont)cont.addEventListener('touchstart',stopRot,{passive:true});
+    }
     this._sub=p=>this._tick(p);PM.sub(this._sub);
+    // первичная центровка — на ТЕБЯ (или на старт маршрута), не на середину линии
+    const f=(PM.last)||{lat:m.getCenter().lat,lng:m.getCenter().lng};
+    m.setView([f.lat,f.lng],16,{animate:false});
     const hud=document.getElementById('nav-hud');if(hud)hud.style.display='flex';
-    toast('Маршрут построен');
+    toast('Маршрут построен · касание карты — пауза вращения');
   },
   stop(){
-    this.on=false;const m=window._map;
+    this.on=false;this._userTouch=false;this._fitted=false;const m=window._map;
     [this.line,this.glow,this.wp].forEach(l=>{if(l&&m&&m.hasLayer(l))m.removeLayer(l);});
     this.line=this.glow=this.wp=null;
     const hud=document.getElementById('nav-hud');if(hud)hud.style.display='none';
     const mc=document.getElementById('map-container');if(mc)mc.style.transform='';
+    document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='');
   },
   _route(){
     const m=window._map;if(!m||!this.dest)return;
@@ -3673,7 +3687,11 @@ const NAV={
     const dst=pts[pts.length-1];
     this.wp=L.marker(dst,{icon:L.divIcon({className:'',iconSize:[30,30],iconAnchor:[15,30],
       html:'<div style="font-size:26px;filter:drop-shadow(0 2px 5px rgba(255,214,10,.85));animation:napulse 1.2s ease-in-out infinite">📍</div>'})}).addTo(m);
-    try{m.fitBounds(this.line.getBounds().pad(0.18),{maxZoom:16});}catch(e){}
+    // НЕ центрируемся на маршрут (раньше fitBounds прыгал на середину трассы).
+    // Радар центрирован на ТЕБЕ — как в GTA; маршрут просто уходит вперёд.
+    if(!this._fitted){this._fitted=true;
+      const me=(PM.last)||{lat:m.getCenter().lat,lng:m.getCenter().lng};
+      m.setView([me.lat,me.lng],16,{animate:false});}
   },
   _eta(){
     const hud=document.getElementById('nav-hud');if(!hud)return;
@@ -3688,12 +3706,19 @@ const NAV={
   },
   _tick(p){
     if(!this.on)return;
+    const m=window._map;
     if(this._last){
       const moved=TP._dist(this._last.lat,this._last.lng,p.lat,p.lng);
-      if(moved>4){const head=AR._brg(this._last.lat,this._last.lng,p.lat,p.lng);
+      // движение возобновляет вращение, снятое касанием
+      if(moved>6&&this._userTouch)this._userTouch=false;
+      if(moved>4&&!this._userTouch){
+        const head=AR._brg(this._last.lat,this._last.lng,p.lat,p.lng);
         const mc=document.getElementById('map-container');
         if(mc)mc.style.transform='rotate('+(-head)+'deg)';
-        document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='rotate('+head+'deg)');}
+        document.querySelectorAll('.cmarker-inner').forEach(el=>el.style.transform='rotate('+head+'deg)');
+        // радар следует за ТОБОЙ: центр держим на текущей позиции
+        if(m&&!this._userTouch)m.setView([p.lat,p.lng],m.getZoom(),{animate:false});
+      }
     }
     if(this.line){
       let near=1e9;const ll=this.line.getLatLngs();
