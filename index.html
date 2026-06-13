@@ -3759,12 +3759,21 @@ const NAV={
     if(!this.dest){toast('Сначала найди место в поиске');return;}
     this.on=true;this._hd=null;
     go('nav');
-    setTimeout(()=>this._initRadar(),60);
+    // окно раскрывается не мгновенно — даём layout случиться, потом радар+цикл
+    setTimeout(()=>{this._initRadar();
+      if(this._rmap)this._rmap.invalidateSize();
+      this._kick();},120);
+    setTimeout(()=>{if(this._rmap)this._rmap.invalidateSize();},400);
     this._route();
     this._sub=p=>this._tick(p);PM.sub(this._sub);
     toast('Маршрут построен');
   },
-  _rmap:null,_rline:null,_rglow:null,_rwp:null,_rme:null,_raf:null,
+  _kick(){ // гарантированно (пере)запустить цикл отрисовки
+    if(this._raf)cancelAnimationFrame(this._raf);
+    const loop=()=>{if(!this.on){this._raf=null;return;}this._draw3();this._raf=requestAnimationFrame(loop);};
+    loop();
+  },
+  _rmap:null,_raf:null,pts:null,
   _initRadar(){
     if(this._rmap){this._rmap.invalidateSize();this._draw3();return;}
     const me=(PM.last)||{lat:CLUB.lat,lng:CLUB.lng};
@@ -3776,9 +3785,6 @@ const NAV={
       :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
     L.tileLayer(turl,{maxZoom:19,subdomains:'abcd'}).addTo(this._rmap);
     setTimeout(()=>this._rmap.invalidateSize(),120);
-    // цикл отрисовки наложения (стрелка/маяк/линия) + поворота окна
-    const loop=()=>{if(!this.on){this._raf=null;return;}this._draw3();this._raf=requestAnimationFrame(loop);};
-    loop();
   },
   _route(){
     if(!this.dest)return;
@@ -3799,14 +3805,9 @@ const NAV={
     this.durS=this.distM/13.9;this._drawLine();this._eta();
   },
   _drawLine(){
-    const m=this._rmap;if(!m||!this.pts)return;
-    [this._rline,this._rglow,this._rwp].forEach(l=>{if(l&&m.hasLayer(l))m.removeLayer(l);});
-    this._rglow=L.polyline(this.pts,{color:'#1a1205',weight:13,opacity:.55,lineCap:'round',lineJoin:'round'}).addTo(m);
-    this._rline=L.polyline(this.pts,{color:'#FFD60A',weight:6,opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(m);
-    this._rline.bringToFront();
-    const dst=this.pts[this.pts.length-1];
-    this._rwp=L.marker(dst,{icon:L.divIcon({className:'',iconSize:[30,30],iconAnchor:[15,30],
-      html:'<div style="font-size:26px;filter:drop-shadow(0 2px 5px rgba(255,214,10,.85));animation:napulse 1.2s ease-in-out infinite">📍</div>'})}).addTo(m);
+    // Линия/маяк рисуются на canvas в _draw3 (повёрнуто по курсу), НЕ слоями Leaflet —
+    // иначе была бы вторая, невращающаяся линия. Тут только триггерим перерисовку.
+    if(this._rmap)this._draw3();
   },
   _eta(){
     const hud=document.getElementById('vnav-hud');if(!hud)return;
@@ -3840,10 +3841,10 @@ const NAV={
   },
   _tick(p){
     if(!this.on||!this._rmap)return;
-    // off-route reroute
-    if(this._rline){
-      let near=1e9;for(const q of this._rline.getLatLngs()){const d=TP._dist(p.lat,p.lng,q.lat,q.lng);if(d<near)near=d;}
-      if(near>60){this._route();}
+    // off-route reroute — по сохранённым точкам маршрута (this.pts)
+    if(this.pts&&this.pts.length){
+      let near=1e9;for(const q of this.pts){const d=TP._dist(p.lat,p.lng,q[0],q[1]);if(d<near)near=d;}
+      if(near>60)this._route();
     }
     if(this.dest){
       this.distM=TP._dist(p.lat,p.lng,this.dest.lat,this.dest.lng);
@@ -3867,8 +3868,13 @@ const NAV={
     if(!wrap||!cv||!this._rmap)return;
     wrap.style.transform=''; // карта НЕ вращается — углы не торчат
     const hd=this._hd||0;
-    const W=cv.clientWidth,H=cv.clientHeight,dpr=Math.min(2,devicePixelRatio||1);
-    if(cv.width!==W*dpr||cv.height!==H*dpr){cv.width=W*dpr;cv.height=H*dpr;}
+    // Размер берём из родителя-обёртки (canvas inset:0 может дать 0 в момент открытия экрана)
+    const box=cv.parentElement;
+    const W=cv.clientWidth||box.clientWidth||box.offsetWidth||300;
+    const H=cv.clientHeight||box.clientHeight||box.offsetHeight||300;
+    const dpr=Math.min(2,devicePixelRatio||1);
+    if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);}
+    cv.style.width=W+'px';cv.style.height=H+'px';
     const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
     const m=this._rmap,me=PM.last;
     const PIV=0.72,cx=W/2,cy=H*PIV; // стрелка низко — цель раскрыта вверху
