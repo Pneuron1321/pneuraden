@@ -827,12 +827,24 @@ const PM={w:null,subs:[],last:null,
    Раньше карта звала requestPermission() при инициализации БЕЗ жеста
    пользователя — на iOS это всегда падало, и поворот не работал никогда.
    Теперь единый шлюз: радарный оверлей = единственная точка запроса. ── */
-const OM={subs:[],on:false,head:null,pitch:45,
+const OM={subs:[],on:false,head:null,raw:null,pitch:45,off:0,
   sub(fn){this.subs.push(fn);if(this.head!=null)fn(this.head);},
-  _h(e){if(e.beta!=null)OM.pitch=e.beta;
-    const h=e.webkitCompassHeading!=null?e.webkitCompassHeading
+  _wrap(d){return ((d+540)%360)-180;},
+  setOff(o){this.off=Math.max(-25,Math.min(25,o));
+    try{localStorage.setItem('pnd-headoff',String(this.off));}catch(e){}},
+  _h(e){
+    // тангаж: сглаживание (сырой beta дрожит на градусы)
+    if(e.beta!=null)OM.pitch=OM.pitch+(e.beta-OM.pitch)*0.3;
+    const h0=e.webkitCompassHeading!=null?e.webkitCompassHeading
       :(e.alpha!=null?(360-e.alpha)%360:null);
-    if(h==null)return;OM.head=h;OM.subs.forEach(f=>f(h));},
+    if(h0==null)return;
+    // курс: круговое сглаживание сырого + ГЛОБАЛЬНАЯ поправка.
+    // webkitCompassHeading — МАГНИТНЫЙ север (в Истрии ≈ +4° от истинного),
+    // плюс личный сдвиг компаса конкретного айфона. Поправка off лечит
+    // оба разом — выставляется калибровкой ⌖ по Солнцу/Луне/Полярной.
+    OM.raw=OM.raw==null?h0:(OM.raw+OM._wrap(h0-OM.raw)*0.25+360)%360;
+    OM.head=(OM.raw+OM.off+360)%360;
+    OM.subs.forEach(f=>f(OM.head));},
   attach(){if(this.on)return;this.on=true;
     // Android Chrome: absolute-вариант привязан к сторонам света
     if('ondeviceorientationabsolute' in window)
@@ -844,6 +856,7 @@ const OM={subs:[],on:false,head:null,pitch:45,
         .then(p=>{if(p==='granted')this.attach();return p;});}
     this.attach();return Promise.resolve('granted');}
 };
+try{OM.off=Math.max(-25,Math.min(25,parseFloat(localStorage.getItem('pnd-headoff'))||0));}catch(e){}
 
 /* ── Уравнение времени (Spencer 1971): подсолнечная точка и терминатор
    раньше считались по среднему солнцу — ошибка до ~4° долготы (≈16 мин). ── */
@@ -873,7 +886,7 @@ function _eotMin(d){
 const TP={
   G:9.80665,C2:8.987551787e16,
   ns:0,todayNs:0,todayKey:'',alt:0,spd:0,haveAlt:false,nsd:0,
-  _lastFix:null,_lastT:null,_flight:null,log:[],_vbuf:[],
+  _lastFix:null,_lastT:null,_flight:null,log:[],_vbuf:[],_anchor:null,_still:false,
   tintRGB:[168,85,247],omega:0,_ang:0,
   start(){
     try{const s=JSON.parse(localStorage.getItem('pnd-tp')||'null');
@@ -891,9 +904,17 @@ const TP={
     // Высота: только фиксы с хорошей вертикальной точностью, медленная EMA
     if(p.alt!=null&&isFinite(p.alt)&&(p.altAcc==null||p.altAcc<35)&&(p.acc==null||p.acc<60)){
       this.alt=this.haveAlt?this.alt*0.9+p.alt*0.1:p.alt;this.haveAlt=true;}
-    // Скорость: доплеровская от чипа в приоритете; запасной расчёт по фиксам
-    // засчитывает движение ТОЛЬКО если смещение вышло за пузырь точности GPS —
-    // дрожание ±10 м в покое раньше превращалось в фантомные 8–12 км/ч.
+    // ЯКОРЬ ПОКОЯ: пока все фиксы сидят внутри пузыря точности вокруг якоря
+    // дольше 20 с — мы стоим, и это ВЕТО даже на доплеровскую скорость чипа
+    // (iPhone в помещении шумит 1–2 м/с → ложные «6 км/ч» в покое).
+    // Реальное движение рвёт якорь первым же фиксом за пузырём.
+    if(!this._anchor)this._anchor={lat:p.lat,lng:p.lng,acc:p.acc||30,t};
+    const dA=this._dist(this._anchor.lat,this._anchor.lng,p.lat,p.lng);
+    const gA=Math.max(12,p.acc||30,this._anchor.acc||30);
+    if(dA>gA){this._anchor={lat:p.lat,lng:p.lng,acc:p.acc||30,t};this._still=false;}
+    else if(t-this._anchor.t>20000)this._still=true;
+    // Скорость: доплер чипа в приоритете, но под вето якоря; запасной расчёт
+    // по фиксам — только при смещении за пузырь точности.
     let v=(p.spd!=null&&isFinite(p.spd)&&p.spd>=0)?p.spd:null;
     if(v==null&&this._lastFix){
       const dt=(t-this._lastFix.t)/1000;
@@ -903,6 +924,7 @@ const TP={
         v=d>gate?Math.min(d/dt,340):0;
       }
     }
+    if(this._still)v=0; // вето покоя сильнее любого источника
     if(v!=null){
       this._vbuf.push(v);if(this._vbuf.length>5)this._vbuf.shift();
       const m=[...this._vbuf].sort((a,b)=>a-b)[Math.floor(this._vbuf.length/2)]; // медиана глушит выбросы
@@ -3629,9 +3651,42 @@ const SR={
    телефона. Наводишь телефон на улицу — метки висят над реальностью,
    привязанные к сторонам света. Ни одной новой библиотеки. ═══ */
 const AR={
-  act:false,stream:null,raf:null,
+  act:false,stream:null,raf:null,_calib:0,
+  // Фильтры меток НАВЕСТИ (хранятся между сессиями)
+  F:(function(){const d={poi:1,cam:1,air:1,sat:1,deep:1,tt:1,star:1};
+    try{return Object.assign(d,JSON.parse(localStorage.getItem('pnd-arf')||'{}'));}
+    catch(e){return d;}})(),
+  tgl(k){this.F[k]=this.F[k]?0:1;
+    try{localStorage.setItem('pnd-arf',JSON.stringify(this.F));}catch(e){}
+    this._syncF();},
+  _syncF(){for(const k in this.F){const b=document.getElementById('arf-'+k);
+    if(b)b.style.opacity=this.F[k]?'1':'0.3';}},
+  // ⌖ Калибровка компаса по небу: Солнце/Луна/Полярная — их истинные
+  // азимуты мы знаем до долей градуса. Лечит магнитное склонение И
+  // личный сдвиг компаса телефона одной поправкой, глобально (радар тоже).
+  calib(){
+    const pos=(typeof PM!=='undefined'&&PM.last);
+    if(!pos){toast('Жду GPS…');return;}
+    if(!this._calib){this._calib=1;
+      toast('Наведи прицел ТОЧНО на ☀️ / 🌙 / Полярную и тапни ⌖ ещё раз');return;}
+    this._calib=0;
+    const d=new Date(),cand=[];
+    const sa=DEEP._altAz(pos,subsolarPoint(d));
+    if(sa.el>3)cand.push({az:sa.az,n:'Солнцу'});
+    const ma=DEEP._altAz(pos,DEEP._moonSub(d));
+    if(ma.el>3)cand.push({az:ma.az,n:'Луне'});
+    const pa=TT._eq2aa(37.955,89.264,pos.lat,pos.lng,d);
+    if(pa.el>3)cand.push({az:pa.az,n:'Полярной'});
+    if(!cand.length){toast('Нет опорных целей над горизонтом');return;}
+    let best=null;
+    for(const c of cand){const df=OM._wrap(c.az-OM.head);
+      if(!best||Math.abs(df)<Math.abs(best.df))best={az:c.az,n:c.n,df};}
+    if(Math.abs(best.df)>30){toast('Слишком далеко от опоры — наведись точнее');return;}
+    OM.setOff(OM.off+best.df);
+    toast('Компас откалиброван по '+best.n+': поправка '+(OM.off>=0?'+':'')+OM.off.toFixed(1)+'°');
+  },
   async open(){
-    go('ar');this.act=true;
+    go('ar');this.act=true;this._syncF();
     try{await OM.request();}catch(e){}
     const v=document.getElementById('ar-video');
     try{
@@ -3708,17 +3763,17 @@ const AR={
       }
     }
     const items=[];
-    for(const c of PO.cams){
+    if(this.F.cam)for(const c of PO.cams){
       const d=TP._dist(pos.lat,pos.lng,c.lat,c.lng);
       if(d<8000)items.push({emo:'📸',name:'радар',d,
         b:this._brg(pos.lat,pos.lng,c.lat,c.lng),cam:1});
     }
-    for(const p2 of PO.lastPois){
+    if(this.F.poi)for(const p2 of PO.lastPois){
       const d=TP._dist(pos.lat,pos.lng,p2.lat,p2.lng);
       if(d<2200)items.push({emo:PO._emo(p2.tags),name:p2.tags.name||'',d,
         b:this._brg(pos.lat,pos.lng,p2.lat,p2.lng)});
     }
-    if(typeof SKY!=='undefined'&&LV.air){
+    if(this.F.air&&typeof SKY!=='undefined'){
       const ua=(pos.alt!=null&&isFinite(pos.alt))?pos.alt:((typeof TP!=='undefined'&&TP.haveAlt)?TP.alt:0);
       for(const pl of SKY.list){
         const d=TP._dist(pos.lat,pos.lng,pl.lat,pl.lng);
@@ -3729,12 +3784,12 @@ const AR={
           air:1,elev,sub:(d/1000).toFixed(0)+' км · '+(pl.alt/1000).toFixed(1)+' км ↑'});
       }
     }
-    if(typeof ST!=='undefined')ST.draw(cx,W,H,pos,head,camPitch); // звёздное небо — под метками
-    if(typeof DEEP!=='undefined')
+    if(this.F.star&&typeof ST!=='undefined')ST.draw(cx,W,H,pos,head,camPitch); // звёздное небо — под метками
+    if(this.F.deep&&typeof DEEP!=='undefined')
       for(const ci of DEEP.items(pos))items.push(ci);
-    if(typeof TT!=='undefined')
+    if(this.F.tt&&typeof TT!=='undefined')
       for(const ti of TT.ar(pos))items.push(ti);
-    if(typeof SAT!=='undefined'&&SAT.ready)
+    if(this.F.sat&&typeof SAT!=='undefined'&&SAT.ready)
       for(const sit of SAT.ar(pos))items.push(sit);
     items.sort((a,b)=>b.d-a.d); // дальние первыми — ближние поверх
     let drawn=0;
@@ -3822,6 +3877,16 @@ SL.init();
 <div id="var" class="view" style="background:#000">
   <video id="ar-video" autoplay playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>
   <canvas id="ar-canvas" style="position:absolute;inset:0;z-index:3"></canvas>
+  <div id="ar-filters" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 62px);right:8px;z-index:7;display:flex;flex-direction:column;gap:6px">
+    <button id="arf-poi"  onclick="AR.tgl('poi')"  title="Места"            style="width:34px;height:34px;border-radius:50%;background:rgba(10,14,30,.55);backdrop-filter:blur(8px);border:1px solid var(--border2);font-size:15px;padding:0">📍</button>
+    <button id="arf-cam"  onclick="AR.tgl('cam')"  title="Радары"           style="width:34px;height:34px;border-radius:50%;background:rgba(10,14,30,.55);backdrop-filter:blur(8px);border:1px solid var(--border2);font-size:15px;padding:0">📸</button>
+    <button id="arf-air"  onclick="AR.tgl('air')"  title="Самолёты"         style="width:34px;height:34px;border-radius:50%;background:rgba(10,14,30,.55);backdrop-filter:blur(8px);border:1px solid var(--border2);font-size:15px;padding:0">✈️</button>
+    <button id="arf-sat"  onclick="AR.tgl('sat')"  title="Спутники"         style="width:34px;height:34px;border-radius:50%;background:rgba(10,14,30,.55);backdrop-filter:blur(8px);border:1px solid var(--border2);font-size:15px;padding:0">🛰️</button>
+    <button id="arf-deep" onclick="AR.tgl('deep')" title="Сквозь Землю"     style="width:34px;height:34px;border-radius:50%;background:rgba(10,14,30,.55);backdrop-filter:blur(8px);border:1px solid var(--border2);font-size:15px;padding:0">🌍</button>
+    <button id="arf-tt"   onclick="AR.tgl('tt')"   title="Стрелы движения"  style="width:34px;height:34px;border-radius:50%;background:rgba(10,14,30,.55);backdrop-filter:blur(8px);border:1px solid var(--border2);font-size:15px;padding:0">🧭</button>
+    <button id="arf-star" onclick="AR.tgl('star')" title="Звёзды"           style="width:34px;height:34px;border-radius:50%;background:rgba(10,14,30,.55);backdrop-filter:blur(8px);border:1px solid var(--border2);font-size:15px;padding:0">✨</button>
+    <button onclick="AR.calib()" title="Калибровка компаса по небу" style="width:34px;height:34px;border-radius:50%;background:rgba(251,191,36,.18);backdrop-filter:blur(8px);border:1px solid rgba(251,191,36,.55);font-size:15px;padding:0">⌖</button>
+  </div>
   <div id="ar-err" style="display:none;position:absolute;top:46%;width:100%;text-align:center;z-index:4;color:rgba(255,255,255,.85);font-family:'Rajdhani',sans-serif;font-size:.85rem;padding:0 30px">Нет доступа к камере — разреши в настройках браузера.<br>Метки всё равно работают по компасу.</div>
   <button onclick="AR.close()" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;z-index:6;background:rgba(10,14,30,.55);backdrop-filter:blur(10px);border:1px solid var(--border2);color:#fff;border-radius:9999px;padding:8px 16px;font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.06em;font-size:.78rem">← КАРТА</button>
   <div style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);left:0;width:100%;text-align:center;z-index:5;pointer-events:none">
