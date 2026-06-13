@@ -598,7 +598,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
     <input id="srch-in" class="map-search" placeholder="Поиск места…" type="text" autocomplete="off">
     <button class="theme-btn" onclick="toggleTheme()" style="flex-shrink:0">🌓</button>
   </div>
-  <div id="srch-res" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 60px);left:12px;right:12px;z-index:30;background:rgba(10,14,30,.93);backdrop-filter:blur(14px);border:1px solid var(--border2);border-radius:14px;overflow:hidden;max-height:46vh;overflow-y:auto"></div>
+  <div id="srch-res" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 60px);left:12px;right:12px;z-index:1200;background:rgba(8,11,24,.98);backdrop-filter:blur(16px);border:1px solid var(--border2);border-radius:14px;overflow:hidden;max-height:60vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.6)"></div>
   <div id="nav-hud" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 60px);left:12px;right:12px;z-index:26;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(20,16,4,.92),rgba(10,8,2,.92));backdrop-filter:blur(12px);border:1px solid rgba(255,214,10,.45);border-radius:14px;padding:9px 14px">
     <div id="nav-arrow" style="font-size:26px;font-weight:800;color:#FFD60A;width:24px;text-align:center">↑</div>
     <div style="flex:1;min-width:0">
@@ -619,6 +619,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
     <div class="lbtn active" id="lair" onclick="toggleL('air')" title="Самолёты · ADS-B live">✈️</div>
     <div class="lbtn" id="llt" onclick="LT.toggle()" title="Молнии · Blitzortung (эксперимент)">⚡</div>
     <div class="lbtn" onclick="openTraffic()" title="Пробки · Waze Live (Google)">🚦</div>
+    <div class="lbtn" id="pin-btn" onclick="togglePinMode()" title="Поставить метку цели на карте">🎯</div>
     <div class="lbtn" onclick="openAR()" title="Навести · дополненная реальность">🔭</div>
     <div class="lbtn active" id="lsnd" onclick="CA.toggle()" title="Звук радаров">🔔</div>
   </div>
@@ -1356,7 +1357,7 @@ function initMap(){
   window._map=map;
   // Долгое нажатие (или ПКМ на десктопе) — ручная метка цели, перетаскиваемая.
   // Тап по ней — «В ПУТЬ» к ней. Решает: поставить цель где угодно без поиска.
-  let _lpT=null;
+  window._pinMode=false;
   const dropTarget=(latlng)=>{
     if(typeof NAV==='undefined')return;
     if(NAV._manual){map.removeLayer(NAV._manual);NAV._manual=null;}
@@ -1372,10 +1373,21 @@ function initMap(){
       if(NAV.on){NAV._route();}});
   };
   map.on('contextmenu',e=>{dropTarget(e.latlng);});
-  map.on('touchstart mousedown',e=>{
-    if(e.originalEvent&&e.originalEvent.touches&&e.originalEvent.touches.length>1)return;
-    _lpT=setTimeout(()=>dropTarget(e.latlng),600);});
-  map.on('touchend mouseup dragstart movestart zoomstart',()=>{if(_lpT){clearTimeout(_lpT);_lpT=null;}});
+  // Режим метки: тап по кнопке 📍 → следующий тап по карте ставит цель.
+  // (long-press конфликтовал с панорамированием — палец дёргался, таймер рвался.)
+  map.on('click',e=>{
+    if(!window._pinMode)return;
+    window._pinMode=false;
+    document.getElementById('pin-btn')?.classList.remove('active');
+    document.getElementById('map-container')?.style.removeProperty('cursor');
+    dropTarget(e.latlng);
+  });
+  window.togglePinMode=()=>{
+    window._pinMode=!window._pinMode;
+    const b=document.getElementById('pin-btn');
+    if(b)b.classList.toggle('active',window._pinMode);
+    toast(window._pinMode?'Тапни на карту — поставлю метку цели':'Режим метки выключен');
+  };
   const turl=S.theme==='dark'
     ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
     :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
@@ -1513,14 +1525,8 @@ function addUserMarker(map,lat,lng){
     </div>`;
     saveUserLocation(lat,lng);
   } else {
-    // Guest: pulsing red dot, no compass
-    icon=L.divIcon({className:'',iconSize:[24,24],iconAnchor:[12,12],popupAnchor:[0,-16],
-      html:`<div style="width:24px;height:24px;position:relative">
-        <div style="position:absolute;inset:0;border-radius:50%;background:#ef444440;animation:gp 1.5s ease-in-out infinite"></div>
-        <div style="position:absolute;inset:6px;border-radius:50%;background:#ef4444"></div>
-      </div>
-      <style>@keyframes gp{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.6);opacity:.2}}</style>`
-    });
+    // Гость: та же СТРЕЛКА-указатель GTA (красная), а не точка
+    icon=makeCompassMarker('#ef4444','#b91c1c',40,false);
     popHtml=`<div class="user-pop">
       <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:8px">👤 Гость</div>
       <div style="font-size:.68rem;color:var(--pnd);line-height:1.5">Зарегистрируйтесь — получите уникальный компас и возможность скрывать метки других пользователей</div>
@@ -3917,10 +3923,9 @@ const SR={
     });
     i.addEventListener('keydown',e=>{
       if(e.key==='Enter'){clearTimeout(this._t);this._go(i.value.trim());i.blur();}});
-    i.addEventListener('blur',()=>setTimeout(()=>{
-      const b=document.getElementById('srch-res');
-      if(b&&b.matches(':hover'))return; // палец на подсказке — не закрываем
-      if(b)this._show([]);},400));
+    // НЕ закрываем список по blur автоматически (на мобиле blur срабатывает
+    // раньше тапа по подсказке). Список закроется при выборе или очистке поля.
+    i.addEventListener('input',()=>{if(!i.value.trim())this._show([]);});
   },
   _go(q){
     if(q.length<2)return;
@@ -3992,7 +3997,9 @@ const SR={
     }).join('');
     box.style.display='block';
     box.querySelectorAll('.sr-it').forEach(el=>{
-      el.onclick=()=>this._pick(+el.dataset.i);});
+      const pick=(ev)=>{ev.preventDefault();ev.stopPropagation();this._pick(+el.dataset.i);};
+      el.addEventListener('pointerdown',pick); // pointerdown срабатывает раньше blur поля
+      el.addEventListener('click',pick);});
   },
   _pick(i){
     const f=this._fs[i];if(!f)return;
