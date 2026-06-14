@@ -62,23 +62,8 @@ input,select,textarea{font-family:inherit}
 
 #app{width:100vw;height:100vh;height:100dvh;position:relative;overflow:hidden}
 
-.vbg{position:fixed;inset:0;pointer-events:none;z-index:0}
-[data-theme="dark"] .vbg{
-  background:
-    radial-gradient(ellipse 70% 50% at 15% 85%,rgba(168,85,247,0.07) 0%,transparent 70%),
-    radial-gradient(ellipse 50% 35% at 85% 15%,rgba(34,211,238,0.05) 0%,transparent 70%),
-    linear-gradient(rgba(168,85,247,0.10) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(168,85,247,0.10) 1px,transparent 1px);
-  background-size:auto,auto,48px 48px,48px 48px}
-[data-theme="light"] .vbg{
-  background:
-    radial-gradient(ellipse 70% 50% at 15% 85%,rgba(79,70,229,0.06) 0%,transparent 70%),
-    radial-gradient(ellipse 50% 35% at 85% 15%,rgba(14,165,233,0.04) 0%,transparent 70%),
-    linear-gradient(rgba(79,70,229,0.05) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(79,70,229,0.05) 1px,transparent 1px);
-  background-size:auto,auto,48px 48px,48px 48px}
+#depth-tunnel{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none}
 
-#depth-tunnel{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
 .view{position:absolute;inset:0;display:none;flex-direction:column}
 .view.active{display:flex}
 #vh{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 84px)}
@@ -286,10 +271,7 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   background:transparent;cursor:pointer;transition:all var(--t-f)}
 .zpill.active{background:var(--nm);border-color:var(--nm);box-shadow:0 0 6px rgba(52,211,153,.6);width:14px;border-radius:3px}
 .home-main::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
-  background:radial-gradient(ellipse 62% 52% at 50% 38%,
-    rgba(136 238 255/var(--aura-a1,.20)) 0%,
-    rgba(168 85 247/var(--aura-a2,.17)) 48%,
-    transparent 72%);
+  background:none;
 }
 .home-title{font-family:'Orbitron',monospace;font-size:clamp(1.8rem,7vw,2.6rem);
   font-weight:900;letter-spacing:.2em;text-align:center;transform:translateZ(22px)}
@@ -553,11 +535,10 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
   <div class="gyro-tap">Коснитесь для запуска</div>
 </div>
 <div id="app">
-<div class="vbg"></div>
+<canvas id="depth-tunnel"></canvas>
 
 <!-- ═══ HOME ═══ -->
 <div id="vh" class="view active">
-  <canvas id="depth-tunnel"></canvas>
   <div id="ptr"><div class="ptr-arc"></div></div>
   <div class="topbar">
     <span class="logo">PNEURADEN</span>
@@ -1247,6 +1228,57 @@ function saveUserLocation(lat,lng){
 }
 
 /* ── Navigation ─────────────────────────────────────────── */
+// ═══ 3D-ВОРОНКА ИЗ ПЛИТОК на HOME (глобальная, статичная — рисуется один раз) ═══
+// helper: прямоугольник со скруглёнными углами (форма айфона)
+window._roundRect=function(c,x,y,w,h,r){
+  r=Math.min(r,w/2,h/2);
+  c.beginPath();
+  c.moveTo(x+r,y);
+  c.arcTo(x+w,y,x+w,y+h,r);
+  c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r);
+  c.arcTo(x,y,x+w,y,r);
+  c.closePath();
+};
+window.drawDepthTunnel=function(){
+  const cv=document.getElementById('depth-tunnel');if(!cv)return;
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const W=cv.clientWidth||window.innerWidth, H=cv.clientHeight||window.innerHeight;
+  if(!W||!H)return;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);
+  c.clearRect(0,0,W,H);
+  // фон-бездна
+  c.fillStyle='#05060d';c.fillRect(0,0,W,H);
+  const cx=W/2, cy=H*0.42;          // точка схода — под радаром
+  // Концентрические ПРЯМОУГОЛЬНЫЕ плитки (форма айфона), каждая глубже к центру.
+  // Внешняя — больше экрана, внутренняя — крошечная у центра. Мелкий шаг = много плиток.
+  const TILES=26;                    // количество вложенных рамок (мельче шаг)
+  const outerW=W*1.5, outerH=H*1.5;  // внешняя плитка крупнее экрана
+  const aspect=outerH/outerW;
+  for(let i=TILES;i>=0;i--){         // от внешней (i=TILES) к внутренней (i=0)
+    const t=i/TILES;                 // 1 снаружи … 0 в центре
+    // нелинейная глубина: к центру плитки сходятся быстрее (перспектива)
+    const scale=Math.pow(t,1.35);
+    const w=outerW*scale, h=outerH*scale;
+    const x=cx-w/2, y=cy-h/2;
+    const r=Math.max(6, w*0.14);     // скругление пропорционально (форма айфона)
+    const depth=1-t;                 // 0 снаружи … 1 в центре (глубоко)
+    window._roundRect(c,x,y,w,h,r);
+    // каждая плитка глубже = темнее к центру; лёгкий холодный тон
+    const lum=0.05+Math.pow(t,1.5)*0.10;          // внешние светлее, центр темнее
+    c.fillStyle='rgba('+Math.round(20+t*35)+','+Math.round(26+t*48)+','+Math.round(48+t*90)+','+lum+')';
+    c.fill();
+    // тонкий шов-контур — ярче снаружи, тает к центру (сюда потечёт свет в заходе 2)
+    c.strokeStyle='rgba(130,160,235,'+(0.06+Math.pow(t,1.4)*0.30)+')';
+    c.lineWidth=1;c.stroke();
+  }
+};
+window.addEventListener('resize',function(){clearTimeout(window._dtT);window._dtT=setTimeout(window.drawDepthTunnel,200);});
+window.addEventListener('load',function(){setTimeout(window.drawDepthTunnel,400);});
+document.addEventListener('DOMContentLoaded',function(){setTimeout(window.drawDepthTunnel,200);});
+setTimeout(function(){if(window.drawDepthTunnel)window.drawDepthTunnel();},800);
+
 function go(v){
   // Утечка: уход из НАВЕСТИ через нижнюю навигацию (а не кнопкой ← КАРТА)
   // оставлял камеру включённой и RAF-цикл крутящимся. Глушим централизованно.
@@ -1404,41 +1436,7 @@ function initMap(){
   // Тап по ней — «В ПУТЬ» к ней. Решает: поставить цель где угодно без поиска.
   window._pinMode=false;
   window._followUser=false;window._followSub=null;
-  // ═══ ЗАХОД 1: 3D-ВОРОНКА ИЗ ПЛИТОК (статичная, рисуется один раз — батарею не жрёт) ═══
-  window.drawDepthTunnel=()=>{
-    const cv=document.getElementById('depth-tunnel');if(!cv)return;
-    const dpr=Math.min(2,window.devicePixelRatio||1);
-    const W=cv.clientWidth,H=cv.clientHeight;
-    if(!W||!H)return;
-    cv.width=W*dpr;cv.height=H*dpr;
-    const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);
-    c.clearRect(0,0,W,H);
-    const cx=W/2, cy=H*0.42;
-    const RINGS=14, CELLS=24;
-    const Rmax=Math.max(W,H)*0.95, Rmin=18;
-    // без заливки-диска (она давала светлое пятно под радаром) — глубину дают сами плитки
-    const ringR=(i)=>{const t=i/RINGS;return Rmin+(Rmax-Rmin)*Math.pow(t,1.7);};
-    for(let i=0;i<RINGS;i++){
-      const r0=ringR(i), r1=ringR(i+1);
-      const depth=i/RINGS;
-      // ярче и контрастнее, чтобы воронку было ВИДНО (глубина — через рост яркости к краю)
-      const lum=0.10+depth*0.32, stroke=0.18+depth*0.42;
-      for(let j=0;j<CELLS;j++){
-        const a0=(j/CELLS)*Math.PI*2, a1=((j+1)/CELLS)*Math.PI*2;
-        const x0=cx+Math.cos(a0)*r0, y0=cy+Math.sin(a0)*r0;
-        const x1=cx+Math.cos(a1)*r0, y1=cy+Math.sin(a1)*r0;
-        const x2=cx+Math.cos(a1)*r1, y2=cy+Math.sin(a1)*r1;
-        const x3=cx+Math.cos(a0)*r1, y3=cy+Math.sin(a0)*r1;
-        c.beginPath();c.moveTo(x0,y0);c.lineTo(x1,y1);c.lineTo(x2,y2);c.lineTo(x3,y3);c.closePath();
-        c.fillStyle='rgba('+Math.round(30+depth*50)+','+Math.round(38+depth*70)+','+Math.round(70+depth*130)+','+lum+')';
-        c.fill();
-        c.strokeStyle='rgba(140,170,240,'+stroke+')';
-        c.lineWidth=1.2;c.stroke();
-      }
-    }
-  };
-  window.addEventListener('resize',()=>{clearTimeout(window._dtT);window._dtT=setTimeout(drawDepthTunnel,200);});
-  setTimeout(drawDepthTunnel,300);
+
   // Шторка «Легенда»: открытие/закрытие + синхронизация кнопки «добавить ивент»
   window.toggleLegend=()=>{
     const leg=document.getElementById('mleg');if(!leg)return;
