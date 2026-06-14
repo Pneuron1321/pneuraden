@@ -78,6 +78,7 @@ input,select,textarea{font-family:inherit}
     linear-gradient(90deg,rgba(79,70,229,0.05) 1px,transparent 1px);
   background-size:auto,auto,48px 48px,48px 48px}
 
+#depth-tunnel{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
 .view{position:absolute;inset:0;display:none;flex-direction:column}
 .view.active{display:flex}
 #vh{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 84px)}
@@ -186,6 +187,10 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   background:linear-gradient(90deg,#ff0080,#ff8c00,#ffed00,#00ff88,#00b3ff,#8b5cf6,#ff0080);
   background-size:300% 100%;animation:prismFlow 4s linear infinite;
   box-shadow:0 0 9px rgba(139,92,246,.5)}
+.nav::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2.5px;
+  background:linear-gradient(90deg,#ff0080,#ff8c00,#ffed00,#00ff88,#00b3ff,#8b5cf6,#ff0080);
+  background-size:300% 100%;animation:prismFlow 4s linear infinite;
+  box-shadow:0 0 9px rgba(139,92,246,.5)}
 .ni{display:flex;flex-direction:column;align-items:center;gap:3px;
   padding:6px 16px;border-radius:var(--r-m);cursor:pointer;
   transition:all var(--t-f);border:1px solid transparent;
@@ -240,10 +245,9 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .radar-wrap{position:relative;width:280px;height:280px;cursor:pointer;
   user-select:none;-webkit-user-select:none;border-radius:50%;
   box-shadow:
-    0 0 0 2px rgba(52,211,153,.55),
-    0 0 60px 20px rgba(52,211,153,.38),
-    0 0 140px 70px rgba(52,211,153,.16)}
-.radar-wrap:hover #radar{filter:brightness(1.15) drop-shadow(0 0 22px rgba(0,200,80,.55))}
+    0 0 40px 12px rgba(10,14,30,.55),
+    0 0 90px 40px rgba(10,14,30,.30)}
+.radar-wrap:hover #radar{filter:brightness(1.12)}
 .radar-wrap::after{content:'';position:absolute;inset:-4px;border-radius:50%;z-index:2;
   pointer-events:none;
   background:conic-gradient(
@@ -553,6 +557,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
 
 <!-- ═══ HOME ═══ -->
 <div id="vh" class="view active">
+  <canvas id="depth-tunnel"></canvas>
   <div id="ptr"><div class="ptr-arc"></div></div>
   <div class="topbar">
     <span class="logo">PNEURADEN</span>
@@ -1260,6 +1265,7 @@ function go(v){
   const ni=document.querySelector(`.ni[data-v="${v}"]`);
   if(ni) ni.classList.add('active');
   S.view=v;
+  if(v==='home'&&typeof drawDepthTunnel==='function')setTimeout(drawDepthTunnel,60); // воронка под радаром
   const nav=document.getElementById('nav');
   if(v==='map'||v==='space'||v==='traffic'||v==='ar'||v==='slice'||v==='nav'){nav.style.display='none';if(v==='map')initMap();}
   else nav.style.display='flex';
@@ -1398,6 +1404,42 @@ function initMap(){
   // Тап по ней — «В ПУТЬ» к ней. Решает: поставить цель где угодно без поиска.
   window._pinMode=false;
   window._followUser=false;window._followSub=null;
+  // ═══ ЗАХОД 1: 3D-ВОРОНКА ИЗ ПЛИТОК (статичная, рисуется один раз — батарею не жрёт) ═══
+  window.drawDepthTunnel=()=>{
+    const cv=document.getElementById('depth-tunnel');if(!cv)return;
+    const dpr=Math.min(2,window.devicePixelRatio||1);
+    const W=cv.clientWidth,H=cv.clientHeight;
+    if(!W||!H)return;
+    cv.width=W*dpr;cv.height=H*dpr;
+    const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);
+    c.clearRect(0,0,W,H);
+    const cx=W/2, cy=H*0.42;
+    const RINGS=14, CELLS=24;
+    const Rmax=Math.max(W,H)*0.95, Rmin=18;
+    const bg=c.createRadialGradient(cx,cy,Rmin,cx,cy,Rmax);
+    bg.addColorStop(0,'#05060c');bg.addColorStop(1,'rgba(8,10,20,0)');
+    c.fillStyle=bg;c.fillRect(0,0,W,H);
+    const ringR=(i)=>{const t=i/RINGS;return Rmin+(Rmax-Rmin)*Math.pow(t,1.7);};
+    for(let i=0;i<RINGS;i++){
+      const r0=ringR(i), r1=ringR(i+1);
+      const depth=i/RINGS;
+      const lum=0.06+depth*0.16, stroke=0.10+depth*0.22;
+      for(let j=0;j<CELLS;j++){
+        const a0=(j/CELLS)*Math.PI*2, a1=((j+1)/CELLS)*Math.PI*2;
+        const x0=cx+Math.cos(a0)*r0, y0=cy+Math.sin(a0)*r0;
+        const x1=cx+Math.cos(a1)*r0, y1=cy+Math.sin(a1)*r0;
+        const x2=cx+Math.cos(a1)*r1, y2=cy+Math.sin(a1)*r1;
+        const x3=cx+Math.cos(a0)*r1, y3=cy+Math.sin(a0)*r1;
+        c.beginPath();c.moveTo(x0,y0);c.lineTo(x1,y1);c.lineTo(x2,y2);c.lineTo(x3,y3);c.closePath();
+        c.fillStyle='rgba('+Math.round(20+depth*30)+','+Math.round(24+depth*40)+','+Math.round(40+depth*70)+','+lum+')';
+        c.fill();
+        c.strokeStyle='rgba(120,140,200,'+(stroke*0.5)+')';
+        c.lineWidth=1;c.stroke();
+      }
+    }
+  };
+  window.addEventListener('resize',()=>{clearTimeout(window._dtT);window._dtT=setTimeout(drawDepthTunnel,200);});
+  setTimeout(drawDepthTunnel,300);
   // Шторка «Легенда»: открытие/закрытие + синхронизация кнопки «добавить ивент»
   window.toggleLegend=()=>{
     const leg=document.getElementById('mleg');if(!leg)return;
