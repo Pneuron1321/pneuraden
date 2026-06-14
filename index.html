@@ -3773,7 +3773,18 @@ const NAV={
     const loop=()=>{if(!this.on){this._raf=null;return;}this._draw3();this._raf=requestAnimationFrame(loop);};
     loop();
   },
-  _rmap:null,_raf:null,pts:null,
+  stop(){
+    this.on=false;this._hd=null;
+    if(this._raf){cancelAnimationFrame(this._raf);this._raf=null;}
+    // убрать слои маршрута с карты
+    const m=this._rmap;
+    [this._rline,this._rglow,this._rwp].forEach(l=>{if(l&&m&&m.hasLayer(l))m.removeLayer(l);});
+    this._rline=this._rglow=this._rwp=null;this.pts=null;
+    const vmap=document.getElementById('vnav-map');if(vmap)vmap.style.transform='';
+    if(this._sub&&typeof PM!=='undefined'&&PM.unsub)PM.unsub(this._sub);
+    go('map');
+  },
+  _rmap:null,_raf:null,pts:null,_rline:null,_rglow:null,_rwp:null,
   _initRadar(){
     if(this._rmap){this._rmap.invalidateSize();this._draw3();return;}
     const me=(PM.last)||{lat:CLUB.lat,lng:CLUB.lng};
@@ -3805,9 +3816,15 @@ const NAV={
     this.durS=this.distM/13.9;this._drawLine();this._eta();
   },
   _drawLine(){
-    // Линия/маяк рисуются на canvas в _draw3 (повёрнуто по курсу), НЕ слоями Leaflet —
-    // иначе была бы вторая, невращающаяся линия. Тут только триггерим перерисовку.
-    if(this._rmap)this._draw3();
+    // Маршрут — СЛОЙ на карте (в той же системе координат, ляжет на дороги точно).
+    // Карту крутим целиком в _draw3, поэтому линия едет ВМЕСТЕ с дорогами — как GTA.
+    const m=this._rmap;if(!m||!this.pts)return;
+    [this._rline,this._rglow,this._rwp].forEach(l=>{if(l&&m.hasLayer(l))m.removeLayer(l);});
+    this._rglow=L.polyline(this.pts,{color:'#1a1205',weight:14,opacity:.6,lineCap:'round',lineJoin:'round'}).addTo(m);
+    this._rline=L.polyline(this.pts,{color:'#FFD60A',weight:7,opacity:.97,lineCap:'round',lineJoin:'round'}).addTo(m);
+    const dst=this.pts[this.pts.length-1];
+    this._rwp=L.marker(dst,{icon:L.divIcon({className:'',iconSize:[34,34],iconAnchor:[17,34],
+      html:'<div style="font-size:30px;filter:drop-shadow(0 2px 6px rgba(255,214,10,.9));animation:napulse 1.2s ease-in-out infinite">📍</div>'})}).addTo(m);
   },
   _eta(){
     const hud=document.getElementById('vnav-hud');if(!hud)return;
@@ -3855,55 +3872,49 @@ const NAV={
     const want=this._mix(p);
     if(this._hd==null)this._hd=want;
     else{const dd=((want-this._hd+540)%360)-180;this._hd=(this._hd+dd*0.18+360)%360;}
-    // Карта НЕ вращается (как радар HOME — иначе торчат чёрные углы).
-    // Центр держим на пользователе; вращается только наложение на canvas.
-    this._rmap.setView([p.lat,p.lng],this._rmap.getZoom(),{animate:false});
+    // Центр карты смещаем так, чтобы пользователь оказался на PIV (72% — низко),
+    // и цель раскрывалась впереди. Смещение в НЕповёрнутых координатах: вверх по экрану
+    // на (PIV-0.5)*H, но т.к. карта вращается, сместить нужно вдоль текущего курса.
+    const m=this._rmap,el=document.getElementById('vnav-radar-wrap');
+    const H=(el&&el.clientHeight)||300;
+    const off=(0.72-0.5)*H*1.44; // *1.44 — карта увеличена на 144%, компенсируем масштаб
+    const z=m.getZoom();
+    const up=m.project([p.lat,p.lng],z);
+    // смещаем центр вдоль направления курса (вверх экрана = вперёд по носу)
+    const rad=(this._hd||0)*Math.PI/180;
+    const cp=L.point(up.x - Math.sin(rad)*off, up.y - Math.cos(rad)*off);
+    m.setView(m.unproject(cp,z),z,{animate:false});
     this._last=p;
   },
   // Наложение по схеме радара HOME: карта статична, на canvas рисуем
   // ПОВЁРНУТЫЙ по курсу мир — маршрут, стрелку, указатель. Круг всегда полон.
   _draw3(){
     const cv=document.getElementById('vnav-cv');
-    const wrap=document.getElementById('vnav-map');
+    const vmap=document.getElementById('vnav-map');
     const radar=document.getElementById('vnav-radar-wrap');
-    if(!cv||!radar||!this._rmap)return;
-    if(wrap)wrap.style.transform='';
-    // Размер берём из ОКНА-РАДАРА (vnav-radar-wrap: 92vw×70% — никогда не 0).
+    if(!cv||!radar||!vmap||!this._rmap)return;
     const W=radar.clientWidth||radar.offsetWidth;
     const H=radar.clientHeight||radar.offsetHeight;
     if(!W||!H)return;
+    const hd=this._hd||0;
+    // КРУТИМ КАРТУ ЦЕЛИКОМ по курсу — маршрут (слой на карте) едет вместе с дорогами.
+    // Карта на 144% больше окна, поэтому углы при повороте всегда перекрыты (нет чёрных клиньев).
+    vmap.style.transform='rotate('+(-hd)+'deg)';
+    // На canvas — ТОЛЬКО стрелка пользователя и указатель цели (они не привязаны к географии).
     const dpr=Math.min(2,devicePixelRatio||1);
     if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);}
     cv.style.width=W+'px';cv.style.height=H+'px';
     const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
-    const me=PM.last,m=this._rmap;
-    const hd=this._hd||0,PIV=0.72,cx=W/2,cy=H*PIV,R=hd*Math.PI/180;
-    const project=(lat,lng)=>{
-      if(!me)return null;
-      const pu=m.latLngToContainerPoint([me.lat,me.lng]);
-      const pp=m.latLngToContainerPoint([lat,lng]);
-      let dx=pp.x-pu.x,dy=pp.y-pu.y;
-      const ca=Math.cos(-R),sa=Math.sin(-R);
-      return {x:cx+(dx*ca-dy*sa),y:cy+(dx*sa+dy*ca)};
-    };
-    // маршрут (подложка + жёлтая линия), повёрнут по курсу
-    if(this.pts&&this.pts.length>1&&me){
-      const drawL=(col,w)=>{c.beginPath();let f=true;
-        for(const pt of this.pts){const s=project(pt[0],pt[1]);if(!s)continue;
-          if(f){c.moveTo(s.x,s.y);f=false;}else c.lineTo(s.x,s.y);}
-        c.strokeStyle=col;c.lineWidth=w;c.lineCap='round';c.lineJoin='round';c.stroke();};
-      drawL('rgba(26,18,5,.9)',13);drawL('#FFD60A',6);
-      const dst=this.pts[this.pts.length-1],sd=project(dst[0],dst[1]);
-      if(sd){c.font='26px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('📍',sd.x,sd.y-12);}
-    }
-    // стрелка пользователя — низко (PIV), носом вверх
+    const me=PM.last;
+    const PIV=0.72,cx=W/2,cy=H*PIV;
+    // стрелка пользователя — низко (PIV), носом вверх (карта повёрнута под неё)
     c.save();c.translate(cx,cy);
     c.fillStyle='#22d3ee';c.strokeStyle='#0a0e1a';c.lineWidth=2.4;
     c.beginPath();c.moveTo(0,-17);c.lineTo(12,15);c.quadraticCurveTo(0,8,0,8);c.quadraticCurveTo(0,8,-12,15);c.closePath();c.fill();c.stroke();
     c.beginPath();c.arc(0,6,4.6,0,Math.PI*2);c.fillStyle='#0a0e1a';c.fill();
     c.beginPath();c.arc(0,6,2.5,0,Math.PI*2);c.fillStyle='#22d3ee';c.fill();
     c.restore();
-    // указатель на цель по краю круга
+    // указатель на цель по краю круга (куда повернуть) — относительно курса
     if(me&&this.dest){
       const brg=AR._brg(me.lat,me.lng,this.dest.lat,this.dest.lng);
       const rel=((brg-hd+540)%360-180)*Math.PI/180;
@@ -4261,7 +4272,7 @@ SL.init();
   </div>
   <!-- ОКНО-РАДАР: 70% высоты, отступ сверху 10%, снизу 20% -->
   <div id="vnav-radar-wrap" style="position:absolute;left:50%;top:10%;transform:translateX(-50%);width:92vw;height:70%;border-radius:24px;overflow:hidden;border:1px solid rgba(255,214,10,.35);box-shadow:0 0 40px rgba(255,214,10,.12)">
-    <div id="vnav-map" style="position:absolute;inset:0;transform-origin:center"></div>
+    <div id="vnav-map" style="position:absolute;top:-22%;left:-22%;width:144%;height:144%;transform-origin:center"></div>
     <canvas id="vnav-cv" style="position:absolute;inset:0;pointer-events:none;z-index:650"></canvas>
   </div>
   <div style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 6%);left:0;width:100%;text-align:center;z-index:5;pointer-events:none">
