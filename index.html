@@ -357,6 +357,10 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.3)}
 .map-focus:active{transform:scale(.92)}
 .map-focus.on{border-color:#22d3ee;background:rgba(34,211,238,.22);box-shadow:0 0 14px rgba(34,211,238,.45)}
+.map-cal{position:absolute;top:124px;right:12px;z-index:500;display:flex;align-items:center;gap:2px;
+  background:var(--glass);backdrop-filter:blur(10px);border:1px solid var(--border2);border-radius:9999px;padding:3px 5px}
+.map-cal button{width:30px;height:30px;border:0;background:none;color:#22d3ee;font-size:16px;font-weight:700;cursor:pointer}
+.map-cal span{font-size:8px;letter-spacing:.08em;color:var(--td)}
 .ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 /* Leaflet */
 .leaflet-container{font-family:'Rajdhani',sans-serif;background:#0a0a14}
@@ -611,6 +615,12 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
   <div id="map-container"></div>
   <div class="map-focus" onclick="focusUser()" title="Показать меня">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.2"><circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="2.5" fill="#22d3ee" stroke="none"/></svg>
+  </div>
+  <!-- калибровка курса на карте: едешь прямо по центру полосы — жми ◀/▶ -->
+  <div class="map-cal">
+    <button onclick="OM.setOff(OM.off-2);toast('Курс '+(OM.off>=0?'+':'')+OM.off.toFixed(0)+'°')" title="Курс левее">◀</button>
+    <span>КУРС</span>
+    <button onclick="OM.setOff(OM.off+2);toast('Курс '+(OM.off>=0?'+':'')+OM.off.toFixed(0)+'°')" title="Курс правее">▶</button>
   </div>
   <div class="map-legend" id="mleg">
     <div class="leg-tog" onclick="document.getElementById('mleg').classList.toggle('open')">☰</div>
@@ -3863,17 +3873,24 @@ const NAV={
   },
   _zoom(d){
     if(!this._rmap)return;
-    const z=Math.max(11,Math.min(19,this._rmap.getZoom()+d));
+    const z=Math.max(9,Math.min(19,this._rmap.getZoom()+d)); // ниже 11→9: отдаляет дальше
     this._rmap.setZoom(z);
   },
+  _cal(delta){
+    if(typeof OM==='undefined')return;
+    OM.setOff(OM.off+delta);
+    toast('Курс '+(OM.off>=0?'+':'')+OM.off.toFixed(0)+'°');
+  },
+  _tileUrl(){
+    return S.theme==='dark'
+      ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  },
   _theme(){
-    if(typeof toggleTheme==='function')toggleTheme();
-    if(this._rmap&&this._tile)this._rmap.removeLayer(this._tile);
+    if(typeof toggleTheme==='function')toggleTheme(); // меняет S.theme + всё приложение
     if(this._rmap){
-      const turl=S.theme==='dark'
-        ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-        :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-      this._tile=L.tileLayer(turl,{maxZoom:19,subdomains:'abcd'}).addTo(this._rmap);
+      if(this._tile)this._rmap.removeLayer(this._tile);
+      this._tile=L.tileLayer(this._tileUrl(),{maxZoom:19,subdomains:'abcd'}).addTo(this._rmap);
       this._tile.bringToBack();
     }
   },
@@ -3884,10 +3901,8 @@ const NAV={
       zoomControl:false,attributionControl:false,dragging:false,
       doubleClickZoom:false,scrollWheelZoom:false,touchZoom:false,boxZoom:false,keyboard:false,
       zoomAnimation:false,fadeAnimation:false});
-    const turl=S.theme==='dark'
-      ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-    L.tileLayer(turl,{maxZoom:19,subdomains:'abcd'}).addTo(this._rmap);
+    // Тайлы по текущей теме (кнопка 🌓 переключает её на лету)
+    this._tile=L.tileLayer(this._tileUrl(),{maxZoom:19,subdomains:'abcd'}).addTo(this._rmap);
     setTimeout(()=>this._rmap.invalidateSize(),140);
     setTimeout(()=>this._rmap.invalidateSize(),600);
   },
@@ -3991,9 +4006,12 @@ const NAV={
     if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);}
     cv.style.width=W+'px';cv.style.height=H+'px';
     const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
-    // Стрелка пользователя — В ЦЕНТРЕ окна, РУБИНОВО-КРАСНАЯ.
+    // Стрелка пользователя — В ЦЕНТРЕ окна, РУБИНОВО-КРАСНАЯ. Масштаб по зуму:
+    // на дальнем зуме мельче, на ближнем крупнее (иначе «огромная» при отдалении).
     const cx=W/2,cy=H/2,me=PM.last;
-    c.save();c.translate(cx,cy);
+    const zNow=this._rmap.getZoom();
+    const aS=Math.max(0.5,Math.min(1.2,0.5+(zNow-9)*0.07));
+    c.save();c.translate(cx,cy);c.scale(aS,aS);
     c.fillStyle='#e0115f';c.strokeStyle='#1a0008';c.lineWidth=2.6;
     c.beginPath();c.moveTo(0,-18);c.lineTo(13,16);c.quadraticCurveTo(0,9,0,9);c.quadraticCurveTo(0,9,-13,16);c.closePath();c.fill();c.stroke();
     c.beginPath();c.arc(0,7,5,0,Math.PI*2);c.fillStyle='#1a0008';c.fill();
@@ -4437,7 +4455,12 @@ SL.init();
 <!-- ═══ В ПУТЬ · отдельный мини-радар (70% высоты), повёрнут на цель + 30% курс телефона ═══ -->
 <div id="vnav" class="view" style="background:#05070f">
   <button onclick="NAV.stop()" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;z-index:30;background:rgba(255,214,10,.16);backdrop-filter:blur(10px);border:1px solid rgba(255,214,10,.5);color:#FFD60A;border-radius:9999px;padding:9px 18px;font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:.06em;font-size:.82rem">⏹ ЗАВЕРШИТЬ</button>
-  <button onclick="NAV._theme()" title="Светлая / тёмная" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;z-index:660;width:44px;height:44px;border-radius:50%;background:rgba(10,14,30,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,214,10,.4);color:#FFD60A;font-size:20px;cursor:pointer">🌓</button>
+  <div style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;z-index:660;display:flex;gap:6px;align-items:center;background:rgba(10,14,30,.85);backdrop-filter:blur(8px);border:1px solid rgba(34,211,238,.4);border-radius:9999px;padding:4px 6px">
+    <button onclick="NAV._cal(-2)" title="Курс левее" style="width:34px;height:34px;border-radius:50%;background:none;border:0;color:#22d3ee;font-size:20px;font-weight:700;cursor:pointer">◀</button>
+    <span style="font-size:9px;letter-spacing:.1em;color:rgba(255,255,255,.6)">КУРС</span>
+    <button onclick="NAV._cal(2)" title="Курс правее" style="width:34px;height:34px;border-radius:50%;background:none;border:0;color:#22d3ee;font-size:20px;font-weight:700;cursor:pointer">▶</button>
+  </div>
+  <button onclick="NAV._theme()" title="Светлая / тёмная" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 66px);right:12px;z-index:660;width:44px;height:44px;border-radius:50%;background:rgba(10,14,30,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,214,10,.4);color:#FFD60A;font-size:20px;cursor:pointer">🌓</button>
   <!-- плашка цели/ETA сверху -->
   <div id="vnav-hud" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:50%;transform:translateX(-50%);z-index:25;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(20,16,4,.94),rgba(10,8,2,.94));border:1px solid rgba(255,214,10,.45);border-radius:14px;padding:8px 14px;max-width:74vw">
     <div id="vnav-arrow" style="font-size:24px;font-weight:800;color:#FFD60A;width:22px;text-align:center">↑</div>
@@ -4452,7 +4475,7 @@ SL.init();
   </div>
   <!-- ОКНО-РАДАР: 70% высоты, отступ сверху 10%, снизу 20% -->
   <div id="vnav-radar-wrap" style="position:absolute;left:50%;top:10%;transform:translateX(-50%);width:92vw;height:70%;border-radius:24px;overflow:hidden;border:1px solid rgba(255,214,10,.35);box-shadow:0 0 40px rgba(255,214,10,.12)">
-    <div id="vnav-map" style="position:absolute;top:-22%;left:-22%;width:144%;height:144%;transform-origin:center"></div>
+    <div id="vnav-map" style="position:absolute;top:-55%;left:-55%;width:210%;height:210%;transform-origin:center"></div>
     <canvas id="vnav-cv" style="position:absolute;inset:0;pointer-events:none;z-index:650"></canvas>
   </div>
   <!-- кнопки зума радара -->
@@ -4467,15 +4490,15 @@ SL.init();
     </div>
     <div style="background:rgba(10,14,30,.88);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:13px;padding:7px 12px;text-align:center;min-width:58px">
       <div id="vnav-spd" style="font-family:Orbitron,monospace;font-weight:700;font-size:1rem;color:#22d3ee;line-height:1">0</div>
-      <div style="font-size:.5rem;letter-spacing:.12em;color:var(--td);margin-top:2px">КМ/Ч</div>
+      <div style="font-size:.5rem;letter-spacing:.12em;color:rgba(255,255,255,.55);margin-top:2px">КМ/Ч</div>
     </div>
     <div style="background:rgba(10,14,30,.88);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:13px;padding:7px 12px;text-align:center;min-width:58px">
       <div id="vnav-comp" style="font-family:Orbitron,monospace;font-weight:700;font-size:1rem;color:#fff;line-height:1">—</div>
-      <div id="vnav-compd" style="font-size:.5rem;letter-spacing:.12em;color:var(--td);margin-top:2px">КОМПАС</div>
+      <div id="vnav-compd" style="font-size:.5rem;letter-spacing:.12em;color:rgba(255,255,255,.55);margin-top:2px">КОМПАС</div>
     </div>
     <div style="background:rgba(10,14,30,.88);backdrop-filter:blur(10px);border:1px solid rgba(255,214,10,.4);border-radius:13px;padding:7px 12px;text-align:center;min-width:74px">
       <div id="vnav-cam" style="font-weight:700;font-size:.74rem;color:#FFD60A;line-height:1.3">нет рядом</div>
-      <div style="font-size:.5rem;letter-spacing:.12em;color:var(--td);margin-top:2px">2 РАДАРА</div>
+      <div style="font-size:.5rem;letter-spacing:.12em;color:rgba(255,255,255,.55);margin-top:2px">2 РАДАРА</div>
     </div>
   </div>
 </div>
