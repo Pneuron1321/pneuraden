@@ -179,9 +179,13 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .nav{position:fixed;bottom:0;left:0;right:0;z-index:100;display:flex;
   align-items:center;justify-content:space-around;
   padding:8px 16px max(16px,env(safe-area-inset-bottom));
-  background:var(--glass);border-top:1px solid rgba(255,255,255,.10);
+  background:var(--glass);border-top:0;
   backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);
   box-shadow:0 -1px 0 rgba(255,255,255,.04),0 -28px 52px rgba(0,0,0,.28)}
+.nav::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px;
+  background:linear-gradient(90deg,#ff0080,#ff8c00,#ffed00,#00ff88,#00b3ff,#8b5cf6,#ff0080);
+  background-size:300% 100%;animation:prismFlow 4s linear infinite;
+  box-shadow:0 0 9px rgba(139,92,246,.5)}
 .ni{display:flex;flex-direction:column;align-items:center;gap:3px;
   padding:6px 16px;border-radius:var(--r-m);cursor:pointer;
   transition:all var(--t-f);border:1px solid transparent;
@@ -219,7 +223,7 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 [data-theme="light"] #vh::before{
   background:radial-gradient(ellipse 70% 45% at 50% 0%,
     rgba(99,102,241,.10) 0%,rgba(168,85,247,.06) 60%,transparent 100%)}
-[data-theme="light"] .radar-wrap{
+[data-theme="light"] .radar-wrap{position:relative;
   box-shadow:
     0 0 0 2px rgba(99,102,241,.50),
     0 0 60px 20px rgba(99,102,241,.25),
@@ -251,6 +255,17 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   mask:radial-gradient(circle at 50% 50%,transparent 91%,black 92%);
   animation:sweepRing 3.5s linear infinite}
 @keyframes sweepRing{to{transform:rotate(360deg)}}
+/* ── Переливающийся текущий градиент (как полоска загрузки Firefox) ── */
+@keyframes prismFlow{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+.prism-grad{background:linear-gradient(90deg,#ff0080,#ff8c00,#ffed00,#00ff88,#00b3ff,#8b5cf6,#ff0080);background-size:300% 100%;animation:prismFlow 4s linear infinite}
+/* 1. Полоса вверху экрана */
+#top-prism{position:fixed;top:0;left:0;right:0;height:3px;z-index:9999;pointer-events:none;
+  box-shadow:0 0 10px rgba(255,255,255,.35),0 1px 6px rgba(139,92,246,.5)}
+/* 3. Свечение-обводка вокруг радара HOME — переливается по кругу */
+@keyframes prismSpin{to{transform:rotate(360deg)}}
+.radar-prism{position:absolute;inset:-6px;border-radius:50%;z-index:-1;
+  background:conic-gradient(from 0deg,#ff0080,#ff8c00,#ffed00,#00ff88,#00b3ff,#8b5cf6,#ff0080);
+  animation:prismSpin 6s linear infinite;filter:blur(7px);opacity:.75}
 #radar-minimap{position:absolute;top:0;left:0;width:280px;height:280px;
   border-radius:50%;overflow:hidden;z-index:0}
 #radar{position:absolute;top:0;left:0;width:280px;height:280px;border-radius:50%;
@@ -551,6 +566,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
   </div>
   <div class="home-main">
     <div class="radar-wrap" id="rwrap" onclick="goMap()">
+      <div class="radar-prism"></div>
       <div id="radar-minimap"></div>
       <canvas id="radar" width="560" height="560"></canvas>
       <div class="radar-hint">нажми · открыть карту</div>
@@ -712,6 +728,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
 </div>
 
 <!-- NAV -->
+<div id="top-prism" class="prism-grad"></div>
 <nav class="nav" id="nav">
   <button class="ni active" data-v="home" onclick="go('home')">
     <span class="ni-icon">◎</span><span class="ni-lbl">Радар</span>
@@ -4082,8 +4099,19 @@ const NAV={
       // множество "маршрутных" камер и их дистанция вдоль маршрута (для подписи)
       const routeMap=new Map();
       onR.forEach((item,idx)=>routeMap.set(item.cam,{idx,along:item.along,lim:item.lim}));
-      // кандидаты: все камеры в 30 км, вне кадра
-      const cand=PO.cams.filter(c=>TP._dist(me.lat,me.lng,c.lat,c.lng)<=30000 && !bounds.contains([c.lat,c.lng]));
+      // кандидаты: камеры в 30 км, вне кадра. ЛИМИТ 4 значка (договорённость 3–4),
+      // приоритет — маршрутные, затем ближайшие по прямой. Иначе экран превращается в кашу.
+      const cand=PO.cams
+        .filter(c=>TP._dist(me.lat,me.lng,c.lat,c.lng)<=30000 && !bounds.contains([c.lat,c.lng]))
+        .map(c=>({cam:c, r:routeMap.get(c), d:TP._dist(me.lat,me.lng,c.lat,c.lng)}))
+        .sort((a,b)=>{
+          const am=a.r?0:1, bm=b.r?0:1;                    // маршрутные вперёд
+          if(am!==bm)return am-bm;
+          const ad=a.r?a.r.along:a.d, bd=b.r?b.r.along:b.d;
+          return ad-bd;                                     // затем по дистанции
+        })
+        .slice(0,4)                                         // максимум 4 значка
+        .map(x=>x.cam);
       cand.forEach(cam=>{
         const r=routeMap.get(cam);
         const top2=r&&r.idx<2;                             // 2 ближайших по маршруту
