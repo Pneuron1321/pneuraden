@@ -3847,13 +3847,7 @@ const NAV={
       if(nE)nE.textContent=(this.dest.name||'Маршрут')+' · '+turn;
     }else if(nE)nE.textContent=this.dest.name||'Маршрут';
   },
-  _mix(p){
-    // НОС = 70% «на цель» + 30% «курс телефона»
-    const bt=this.dest?AR._brg(p.lat,p.lng,this.dest.lat,this.dest.lng):(this._hd||0);
-    const ph=(typeof OM!=='undefined'&&OM.head!=null)?OM.head:bt;
-    const dd=((ph-bt+540)%360)-180;
-    return (bt+dd*0.30+360)%360;
-  },
+
   _tick(p){
     if(!this.on||!this._rmap)return;
     // off-route: дальше 60 м от линии — пересчёт
@@ -3866,12 +3860,12 @@ const NAV={
       this.durS=this.distM/13.9;this._eta();
       if(this.distM<35){toast('Ты на месте 🏁');this.stop();return;}
     }
-    // курс окна (сглажен)
-    const want=this._mix(p);
-    if(this._hd==null)this._hd=want;
-    else{const dd=((want-this._hd+540)%360)-180;this._hd=(this._hd+dd*0.18+360)%360;}
-    // КАРТА ЦЕНТРИРОВАНА НА ПОЛЬЗОВАТЕЛЕ — просто setView, без смещений вдоль курса.
-    // Пользователь = геометрический центр карты = ось вращения = точка стрелки. Всё совпадает.
+    // КУРС КАРТЫ = чистый компас (OM.head), ровно как радар HOME — там всегда точно.
+    // Смесь 70/30 (цель+телефон) НЕ применяем к карте: она крутила карту не по курсу.
+    // OM.head уже сглажен по кругу и откалиброван (поправка off). Берём как есть.
+    if(typeof OM!=='undefined'&&OM.head!=null)this._hd=OM.head;
+    // КАРТА ЦЕНТРИРОВАНА НА ПОЛЬЗОВАТЕЛЕ — просто setView.
+    // Пользователь = центр карты = ось вращения = точка стрелки. Всё совпадает.
     this._rmap.setView([p.lat,p.lng],this._rmap.getZoom(),{animate:false});
   },
   _draw3(){
@@ -3882,6 +3876,8 @@ const NAV={
     const W=radar.clientWidth||radar.offsetWidth;
     const H=radar.clientHeight||radar.offsetHeight;
     if(!W||!H)return;
+    // Курс — чистый компас (как HOME). Обновляем каждый кадр, даже без движения.
+    if(typeof OM!=='undefined'&&OM.head!=null)this._hd=OM.head;
     const hd=this._hd||0;
     // Карта вращается вокруг СВОЕГО ЦЕНТРА (transform-origin:center в CSS).
     // Пользователь в центре карты → остаётся на месте, маршрут едет вокруг него.
