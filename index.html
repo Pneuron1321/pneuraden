@@ -1553,12 +1553,12 @@ function makeCompassMarker(outerColor, innerColor, size, isAdmin, label){
 // Стрелка-указатель (нос вверх = текущий курс). Кольцо + треугольник + ядро.
 function arrowSVG(outer, inner, size=40, isAdmin=false){
   const ri=isAdmin?'#ef4444':inner;
-  // Менее острая «капля»-указатель: широкое основание, скруглённый нос
+  // Остроносая стрелка-указатель как в режиме «В ПУТЬ» (нравится больше капли).
   return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="24" cy="24" r="20" fill="${outer}18" stroke="${outer}50" stroke-width="1.5"/>
-    <path d="M24 10 L33 34 Q24 29 24 29 Q15 34 15 34 Z" fill="${outer}" stroke="#0a0e1a" stroke-width="1.4" stroke-linejoin="round"/>
-    <circle cx="24" cy="25" r="4.6" fill="#0a0e1a"/>
-    <circle cx="24" cy="25" r="2.6" fill="${ri}"/>
+    <circle cx="24" cy="24" r="20" fill="${outer}1f" stroke="${outer}55" stroke-width="1.5"/>
+    <path d="M24 6 L37 40 Q24 33 24 33 Q11 40 11 40 Z" fill="${outer}" stroke="#1a0008" stroke-width="1.6" stroke-linejoin="round"/>
+    <circle cx="24" cy="31" r="5" fill="#1a0008"/>
+    <circle cx="24" cy="31" r="2.7" fill="${ri}"/>
   </svg>`;
 }
 // Глобально поворачиваем стрелку пользователя по курсу (OM-компас или движение)
@@ -1574,9 +1574,8 @@ function addUserMarker(map,lat,lng){
   if(window._um) map.removeLayer(window._um);
   let icon,popHtml;
   if(S.user){
-    const {o,i}=getUserColorObj();
     const isAdmin=S.user.role==='admin';
-    icon=makeCompassMarker(o,i,40,isAdmin);
+    icon=makeCompassMarker('#ff0033','#ff3355',40,isAdmin);
     const name=S.user.name||S.user.email.split('@')[0];
     const msg=S.user.statusMsg||'';
     popHtml=`<div class="user-pop">
@@ -1587,7 +1586,7 @@ function addUserMarker(map,lat,lng){
     saveUserLocation(lat,lng);
   } else {
     // Гость: та же СТРЕЛКА-указатель GTA (красная), а не точка
-    icon=makeCompassMarker('#ef4444','#b91c1c',40,false);
+    icon=makeCompassMarker('#ff0033','#ff3355',40,false);
     popHtml=`<div class="user-pop">
       <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:8px">👤 Гость</div>
       <div style="font-size:.68rem;color:var(--pnd);line-height:1.5">Зарегистрируйтесь — получите уникальный компас и возможность скрывать метки других пользователей</div>
@@ -3817,7 +3816,7 @@ const NAV={
   // (слой на карте) всегда совпадают со стрелкой при любом повороте. Линия выходит из-под неё.
   // "Цель впереди" даём лёгким вертикальным сдвигом ВСЕГО окна-радара вверх (CSS), не трогая ось.
   dest:null,on:false,_sub:null,_hd:null,distM:0,durS:0,pts:null,
-  _rmap:null,_raf:null,_rline:null,_rglow:null,_rwp:null,_camLayer:null,_tile:null,
+  _rmap:null,_raf:null,_rline:null,_rglow:null,_rwp:null,_camLayer:null,_tile:null,_mline:null,_mglow:null,_mwp:null,
   start(){
     if(!this.dest){toast('Сначала найди место в поиске');return;}
     this.on=true;this._hd=null;
@@ -3866,6 +3865,7 @@ const NAV={
     const m=this._rmap;
     [this._rline,this._rglow,this._rwp,this._camLayer].forEach(l=>{if(l&&m&&m.hasLayer(l))m.removeLayer(l);});
     this._rline=this._rglow=this._rwp=this._camLayer=null;this.pts=null;
+    this._clearMain();
     const vmap=document.getElementById('vnav-map');if(vmap)vmap.style.transform='';
     if(this._sub&&typeof PM!=='undefined'&&PM.unsub)PM.unsub(this._sub);
     const b=document.getElementById('back-to-nav');if(b)b.style.display='none';
@@ -3941,7 +3941,6 @@ const NAV={
     this.durS=this.distM/13.9;this._drawLine();this._eta();
   },
   _drawLine(){
-    // Маршрут — слой Leaflet на карте: лежит на дорогах точно, едет с картой при повороте.
     const m=this._rmap;if(!m||!this.pts)return;
     [this._rline,this._rglow,this._rwp].forEach(l=>{if(l&&m.hasLayer(l))m.removeLayer(l);});
     this._rglow=L.polyline(this.pts,{color:'#1a1205',weight:14,opacity:.6,lineCap:'round',lineJoin:'round'}).addTo(m);
@@ -3950,6 +3949,21 @@ const NAV={
     this._rwp=L.marker(dst,{icon:L.divIcon({className:'',iconSize:[34,34],iconAnchor:[17,34],
       html:'<div style="font-size:30px;filter:drop-shadow(0 2px 6px rgba(255,214,10,.9));animation:napulse 1.2s ease-in-out infinite">📍</div>'})}).addTo(m);
     this._drawCamsNav();
+    this._drawLineMain();
+  },
+  _drawLineMain(){
+    const mm=window._map;if(!mm||!this.pts)return;
+    [this._mline,this._mglow,this._mwp].forEach(l=>{if(l&&mm.hasLayer(l))mm.removeLayer(l);});
+    this._mglow=L.polyline(this.pts,{color:'#1a1205',weight:11,opacity:.55,lineCap:'round',lineJoin:'round'}).addTo(mm);
+    this._mline=L.polyline(this.pts,{color:'#FFD60A',weight:5.5,opacity:.95,lineCap:'round',lineJoin:'round'}).addTo(mm);
+    const dst=this.pts[this.pts.length-1];
+    this._mwp=L.marker(dst,{icon:L.divIcon({className:'',iconSize:[30,30],iconAnchor:[15,30],
+      html:'<div style="font-size:26px;filter:drop-shadow(0 2px 5px rgba(255,214,10,.9));animation:napulse 1.2s ease-in-out infinite">📍</div>'})}).addTo(mm);
+  },
+  _clearMain(){
+    const mm=window._map;
+    [this._mline,this._mglow,this._mwp].forEach(l=>{if(l&&mm&&mm.hasLayer(l))mm.removeLayer(l);});
+    this._mline=this._mglow=this._mwp=null;
   },
   _drawCamsNav(){
     // Значки камер на карте «В ПУТЬ» — в пределах 30 км от пользователя (остальные на карте).
