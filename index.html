@@ -1370,7 +1370,7 @@ function initMap(){
   // Стрелка пользователя масштабируется с зумом: на дальнем зуме мельче,
   // на ближнем крупнее, но в разумных пределах (не «огромная»).
   const scaleArrow=()=>{const z=map.getZoom();
-    const s=Math.max(0.5,Math.min(1.15,0.5+(z-10)*0.09));
+    const s=Math.max(0.42,Math.min(0.85,0.4+(z-10)*0.06));
     document.querySelectorAll('.user-arrow').forEach(el=>{
       const base=el.style.transform.replace(/\s*scale\([^)]*\)/,'');
       el.style.transform=base+' scale('+s.toFixed(2)+')';});};
@@ -1566,7 +1566,7 @@ window._userHdg=0;
 window.setUserHeading=function(h){
   if(h==null||isNaN(h))return;window._userHdg=h;
   let s=1;
-  if(window._map){const z=window._map.getZoom();s=Math.max(0.5,Math.min(1.15,0.5+(z-10)*0.09));}
+  if(window._map){const z=window._map.getZoom();s=Math.max(0.42,Math.min(0.85,0.4+(z-10)*0.06));}
   document.querySelectorAll('.user-arrow').forEach(el=>{el.style.transform='rotate('+h+'deg) scale('+s.toFixed(2)+')';});
 };
 
@@ -4036,16 +4036,21 @@ const NAV={
     if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);}
     cv.style.width=W+'px';cv.style.height=H+'px';
     const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
-    // Стрелка пользователя — В ЦЕНТРЕ окна, РУБИНОВО-КРАСНАЯ. Масштаб по зуму:
-    // на дальнем зуме мельче, на ближнем крупнее (иначе «огромная» при отдалении).
+    // Стрелка пользователя — В ЦЕНТРЕ окна, ЯРКИЙ РУБИН + свечение (как на карте). МЕНЬШЕ.
     const cx=W/2,cy=H/2,me=PM.last;
     const zNow=this._rmap.getZoom();
-    const aS=Math.max(0.5,Math.min(1.2,0.5+(zNow-9)*0.07));
+    const aS=Math.max(0.42,Math.min(0.95,0.42+(zNow-9)*0.055)); // мельче, чем было
     c.save();c.translate(cx,cy);c.scale(aS,aS);
-    c.fillStyle='#e0115f';c.strokeStyle='#1a0008';c.lineWidth=2.6;
-    c.beginPath();c.moveTo(0,-18);c.lineTo(13,16);c.quadraticCurveTo(0,9,0,9);c.quadraticCurveTo(0,9,-13,16);c.closePath();c.fill();c.stroke();
-    c.beginPath();c.arc(0,7,5,0,Math.PI*2);c.fillStyle='#1a0008';c.fill();
-    c.beginPath();c.arc(0,7,2.7,0,Math.PI*2);c.fillStyle='#ff3b7a';c.fill();
+    // ореол-свечение
+    c.beginPath();c.arc(0,2,20,0,Math.PI*2);
+    const g=c.createRadialGradient(0,2,2,0,2,20);
+    g.addColorStop(0,'rgba(255,0,51,.55)');g.addColorStop(1,'rgba(255,0,51,0)');
+    c.fillStyle=g;c.fill();
+    // остроносая стрелка (рубин #ff0033)
+    c.fillStyle='#ff0033';c.strokeStyle='#1a0008';c.lineWidth=2.4;
+    c.beginPath();c.moveTo(0,-16);c.lineTo(11,14);c.quadraticCurveTo(0,8,0,8);c.quadraticCurveTo(0,8,-11,14);c.closePath();c.fill();c.stroke();
+    c.beginPath();c.arc(0,6,4.4,0,Math.PI*2);c.fillStyle='#1a0008';c.fill();
+    c.beginPath();c.arc(0,6,2.4,0,Math.PI*2);c.fillStyle='#ff3355';c.fill();
     c.restore();
     // Указатель на ЦЕЛЬ по краю круга (золотой) — направление на цель по прямой.
     if(me&&this.dest){
@@ -4068,36 +4073,40 @@ const NAV={
       c.beginPath();c.moveTo(0,-12);c.lineTo(8,8);c.lineTo(-8,8);c.closePath();c.fill();c.stroke();
       c.restore();
     }
-    // ── ЗНАЧКИ КАМЕР ЗА КРАЕМ ОКНА (вариант В: в 30 км И на маршруте) ──
-    // Если камера не помещается в видимую область — показываем её на краю круга:
-    // мини-камера + дорожный знак лимита + расстояние. 2 ближайших по маршруту — ярче.
-    if(me){
-      const onR=this._camsOnRoute(me);
+    // ── ЗНАЧКИ КАМЕР ЗА КРАЕМ ОКНА ──
+    // ВСЕ камеры в 30 км, что не помещаются в кадр → значок на краю (особенно на дальних зумах,
+    // где слой камер уже за пределами видимой области). 2 ближайших ПО МАРШРУТУ — ярче/крупнее.
+    if(me&&typeof PO!=='undefined'&&PO.cams&&PO.cams.length){
       const bounds=this._rmap.getBounds();
-      onR.forEach((item,idx)=>{
-        const cam=item.cam;
-        const visible=bounds.contains([cam.lat,cam.lng]); // в кадре уже нарисована слоем
-        if(visible)return;                                 // рисуем за краем только невидимые
+      const onR=this._camsOnRoute(me);
+      // множество "маршрутных" камер и их дистанция вдоль маршрута (для подписи)
+      const routeMap=new Map();
+      onR.forEach((item,idx)=>routeMap.set(item.cam,{idx,along:item.along,lim:item.lim}));
+      // кандидаты: все камеры в 30 км, вне кадра
+      const cand=PO.cams.filter(c=>TP._dist(me.lat,me.lng,c.lat,c.lng)<=30000 && !bounds.contains([c.lat,c.lng]));
+      cand.forEach(cam=>{
+        const r=routeMap.get(cam);
+        const top2=r&&r.idx<2;                             // 2 ближайших по маршруту
+        const dM=r?r.along:TP._dist(me.lat,me.lng,cam.lat,cam.lng); // по маршруту или по прямой
+        const lim=cam.tags&&cam.tags.maxspeed?String(cam.tags.maxspeed).replace(/[^0-9]/g,'')||'?':'?';
         const brg=AR._brg(me.lat,me.lng,cam.lat,cam.lng);
         const rel=((brg-hd+540)%360-180)*Math.PI/180;
-        const rr=Math.min(W,H)*0.46;                       // у самого края
+        const rr=Math.min(W,H)*0.46;
         let ex=cx+Math.sin(rel)*rr, ey=cy-Math.cos(rel)*rr;
         ex=Math.max(30,Math.min(W-30,ex)); ey=Math.max(40,Math.min(H-30,ey));
-        const top2=idx<2;                                  // 2 ближайших по маршруту — ярче/крупнее
-        const dm=item.along<1000?Math.round(item.along)+'м':(item.along/1000).toFixed(1)+'км';
+        const dm=dM<1000?Math.round(dM)+'м':(dM/1000).toFixed(1)+'км';
         c.save();c.translate(ex,ey);
-        // дорожный знак лимита (белый круг, красный ободок)
-        const R=top2?15:12;
+        c.globalAlpha=top2?1:0.7;                          // не-маршрутные тусклее
+        const R=top2?15:11;
         c.beginPath();c.arc(0,0,R+2,0,Math.PI*2);c.fillStyle='#d11';c.fill();
         c.beginPath();c.arc(0,0,R,0,Math.PI*2);c.fillStyle='#fff';c.fill();
-        c.fillStyle='#111';c.font='700 '+(top2?14:11)+'px Arial';c.textAlign='center';c.textBaseline='middle';
-        c.fillText(item.lim,0,0);
-        // мини-камера сверху-слева от знака
-        c.font=(top2?14:11)+'px sans-serif';c.fillText('📸',-(R+6),-(R-2));
-        // расстояние под знаком
-        c.fillStyle=top2?'#FFD60A':'rgba(255,235,170,.8)';
+        c.fillStyle='#111';c.font='700 '+(top2?14:10)+'px Arial';c.textAlign='center';c.textBaseline='middle';
+        c.fillText(lim,0,0);
+        c.font=(top2?14:10)+'px sans-serif';c.fillText('📸',-(R+6),-(R-2));
+        c.fillStyle=top2?'#FFD60A':'rgba(255,235,170,.85)';
         c.font='700 '+(top2?11:9)+'px Orbitron,monospace';c.textBaseline='top';
         c.fillText(dm,0,R+4);
+        c.globalAlpha=1;
         c.restore();
       });
     }
