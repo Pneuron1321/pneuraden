@@ -613,6 +613,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
   <div id="srch-res" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 60px);left:12px;right:12px;z-index:1200;background:rgba(8,11,24,.98);backdrop-filter:blur(16px);border:1px solid var(--border2);border-radius:14px;overflow:hidden;max-height:60vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.6)"></div>
   <div id="cam-near" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 64px);left:50%;transform:translateX(-50%);z-index:25;background:var(--glass);border:1px solid var(--border2);border-radius:9999px;padding:5px 14px;font-family:'Orbitron',monospace;font-size:.72rem;letter-spacing:.06em;color:var(--txt)"></div>
   <div id="map-container"></div>
+  <button id="back-to-nav" onclick="NAV._resume()" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:600;background:linear-gradient(135deg,#fbbf24,#f59e0b);border:0;color:#1a1205;border-radius:9999px;padding:10px 20px;font-family:Rajdhani,sans-serif;font-weight:700;letter-spacing:.05em;font-size:.84rem;box-shadow:0 3px 14px rgba(251,191,36,.5);cursor:pointer">🧭 ВЕРНУТЬСЯ В ПУТЬ</button>
   <div class="map-focus" onclick="focusUser()" title="Показать меня">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.2"><circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="2.5" fill="#22d3ee" stroke="none"/></svg>
   </div>
@@ -1379,6 +1380,14 @@ function initMap(){
   // Тап по ней — «В ПУТЬ» к ней. Решает: поставить цель где угодно без поиска.
   window._pinMode=false;
   window._followUser=false;window._followSub=null;
+  // Шторка «Легенда» закрывается тапом вне её области
+  document.addEventListener('pointerdown',(e)=>{
+    const leg=document.getElementById('mleg');
+    if(!leg||!leg.classList.contains('open'))return;
+    if(leg.contains(e.target))return;            // клик внутри шторки — не трогаем
+    if(e.target.closest('.leg-tog'))return;      // клик по язычку — его обработчик сам
+    leg.classList.remove('open');
+  },true);
   window.focusUser=()=>{
     const m=window._map;if(!m)return;
     const btn=document.querySelector('.map-focus');
@@ -3836,7 +3845,9 @@ const NAV={
     if(this._winBound)return;this._winBound=true;
     const wrap=document.getElementById('vnav-radar-wrap');if(!wrap)return;
     let held=false,moved=false,sx=0,sy=0,timer=null;
-    const openMap=()=>{go('map');setTimeout(()=>{if(window._map)window._map.invalidateSize();},120);};
+    const openMap=()=>{go('map');
+      const b=document.getElementById('back-to-nav');if(b&&this.on)b.style.display='';
+      setTimeout(()=>{if(window._map)window._map.invalidateSize();},120);};
     wrap.addEventListener('touchstart',e=>{
       held=false;moved=false;sx=e.touches[0].clientX;sy=e.touches[0].clientY;
       timer=setTimeout(()=>{held=true;openMap();},380); // зажатие → карта пока держишь
@@ -3864,6 +3875,7 @@ const NAV={
     this._rline=this._rglow=this._rwp=this._camLayer=null;this.pts=null;
     const vmap=document.getElementById('vnav-map');if(vmap)vmap.style.transform='';
     if(this._sub&&typeof PM!=='undefined'&&PM.unsub)PM.unsub(this._sub);
+    const b=document.getElementById('back-to-nav');if(b)b.style.display='none';
     go('map');
   },
   _kick(){
@@ -3875,6 +3887,17 @@ const NAV={
     if(!this._rmap)return;
     const z=Math.max(9,Math.min(19,this._rmap.getZoom()+d)); // ниже 11→9: отдаляет дальше
     this._rmap.setZoom(z);
+  },
+  _driveZoom(){ // комфортный масштаб для вождения — видно ближайшие повороты
+    if(!this._rmap)return;
+    this._rmap.setZoom(16);
+    toast('Зум для вождения');
+  },
+  _resume(){ // вернуться в «В ПУТЬ» с карты (без перезапуска маршрута)
+    if(!this.on)return;
+    go('nav');
+    const b=document.getElementById('back-to-nav');if(b)b.style.display='none';
+    setTimeout(()=>{if(this._rmap){this._rmap.invalidateSize();}this._kick();},120);
   },
   _cal(delta){
     if(typeof OM==='undefined')return;
@@ -4461,8 +4484,9 @@ SL.init();
     <button onclick="NAV._cal(2)" title="Курс правее" style="width:34px;height:34px;border-radius:50%;background:none;border:0;color:#22d3ee;font-size:20px;font-weight:700;cursor:pointer">▶</button>
   </div>
   <button onclick="NAV._theme()" title="Светлая / тёмная" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 66px);right:12px;z-index:660;width:44px;height:44px;border-radius:50%;background:rgba(10,14,30,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,214,10,.4);color:#FFD60A;font-size:20px;cursor:pointer">🌓</button>
+  <button onclick="NAV._driveZoom()" title="Удобный зум для вождения" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 116px);right:12px;z-index:660;width:44px;height:44px;border-radius:50%;background:rgba(10,14,30,.85);backdrop-filter:blur(8px);border:1px solid rgba(34,211,238,.4);color:#22d3ee;font-size:19px;cursor:pointer">🚗</button>
   <!-- плашка цели/ETA сверху -->
-  <div id="vnav-hud" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:50%;transform:translateX(-50%);z-index:25;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(20,16,4,.94),rgba(10,8,2,.94));border:1px solid rgba(255,214,10,.45);border-radius:14px;padding:8px 14px;max-width:74vw">
+  <div id="vnav-hud" style="position:absolute;top:calc(env(safe-area-inset-top,0px) + 60px);left:50%;transform:translateX(-50%);z-index:25;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(20,16,4,.94),rgba(10,8,2,.94));border:1px solid rgba(255,214,10,.45);border-radius:14px;padding:8px 14px;max-width:70vw">
     <div id="vnav-arrow" style="font-size:24px;font-weight:800;color:#FFD60A;width:22px;text-align:center">↑</div>
     <div style="min-width:0">
       <div id="vnav-name" style="font-family:Rajdhani,sans-serif;font-weight:700;font-size:.84rem;color:#FFD60A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Маршрут</div>
@@ -4470,16 +4494,16 @@ SL.init();
     </div>
   </div>
   <!-- знак ФАКТИЧЕСКОГО лимита на текущем участке (над окном) -->
-  <div id="vnav-roadlimit" style="position:absolute;top:calc(10% - 4px);left:50%;transform:translate(-50%,-50%);z-index:670;width:58px;height:58px;border-radius:50%;background:#fff;border:6px solid #d11;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.6)">
+  <div id="vnav-roadlimit" style="position:absolute;top:calc(20% - 2px);left:50%;transform:translate(-50%,-50%);z-index:670;width:58px;height:58px;border-radius:50%;background:#fff;border:6px solid #d11;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.6)">
     <span id="vnav-roadlimit-n" style="font-family:Arial,sans-serif;font-weight:800;font-size:1.3rem;color:#111;line-height:1">?</span>
   </div>
   <!-- ОКНО-РАДАР: 70% высоты, отступ сверху 10%, снизу 20% -->
-  <div id="vnav-radar-wrap" style="position:absolute;left:50%;top:10%;transform:translateX(-50%);width:92vw;height:70%;border-radius:24px;overflow:hidden;border:1px solid rgba(255,214,10,.35);box-shadow:0 0 40px rgba(255,214,10,.12)">
+  <div id="vnav-radar-wrap" style="position:absolute;left:50%;top:20%;transform:translateX(-50%);width:92vw;height:68%;border-radius:24px;overflow:hidden;border:1px solid rgba(255,214,10,.35);box-shadow:0 0 40px rgba(255,214,10,.12)">
     <div id="vnav-map" style="position:absolute;top:-55%;left:-55%;width:210%;height:210%;transform-origin:center"></div>
     <canvas id="vnav-cv" style="position:absolute;inset:0;pointer-events:none;z-index:650"></canvas>
   </div>
   <!-- кнопки зума радара -->
-  <div style="position:absolute;right:calc(4vw + 8px);top:calc(10% + 12px);z-index:660;display:flex;flex-direction:column;gap:8px">
+  <div style="position:absolute;right:calc(4vw + 8px);top:calc(20% + 12px);z-index:660;display:flex;flex-direction:column;gap:8px">
     <button onclick="NAV._zoom(1)" style="width:44px;height:44px;border-radius:12px;background:rgba(10,14,30,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,214,10,.4);color:#FFD60A;font-size:24px;font-weight:700;line-height:1;cursor:pointer">+</button>
     <button onclick="NAV._zoom(-1)" style="width:44px;height:44px;border-radius:12px;background:rgba(10,14,30,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,214,10,.4);color:#FFD60A;font-size:24px;font-weight:700;line-height:1;cursor:pointer">−</button>
   </div>
