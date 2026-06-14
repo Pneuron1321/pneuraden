@@ -3787,6 +3787,11 @@ const NAV={
     const loop=()=>{if(!this.on){this._raf=null;return;}this._draw3();this._raf=requestAnimationFrame(loop);};
     loop();
   },
+  _zoom(d){
+    if(!this._rmap)return;
+    const z=Math.max(11,Math.min(19,this._rmap.getZoom()+d));
+    this._rmap.setZoom(z);
+  },
   _initRadar(){
     if(this._rmap){this._rmap.invalidateSize();return;}
     const me=(PM.last)||{lat:CLUB.lat,lng:CLUB.lng};
@@ -3886,15 +3891,15 @@ const NAV={
     if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);}
     cv.style.width=W+'px';cv.style.height=H+'px';
     const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);
-    // Стрелка пользователя — В ЦЕНТРЕ окна (там же, где центр карты = ось вращения).
+    // Стрелка пользователя — В ЦЕНТРЕ окна, РУБИНОВО-КРАСНАЯ.
     const cx=W/2,cy=H/2,me=PM.last;
     c.save();c.translate(cx,cy);
-    c.fillStyle='#22d3ee';c.strokeStyle='#0a0e1a';c.lineWidth=2.6;
+    c.fillStyle='#e0115f';c.strokeStyle='#1a0008';c.lineWidth=2.6;
     c.beginPath();c.moveTo(0,-18);c.lineTo(13,16);c.quadraticCurveTo(0,9,0,9);c.quadraticCurveTo(0,9,-13,16);c.closePath();c.fill();c.stroke();
-    c.beginPath();c.arc(0,7,5,0,Math.PI*2);c.fillStyle='#0a0e1a';c.fill();
-    c.beginPath();c.arc(0,7,2.7,0,Math.PI*2);c.fillStyle='#22d3ee';c.fill();
+    c.beginPath();c.arc(0,7,5,0,Math.PI*2);c.fillStyle='#1a0008';c.fill();
+    c.beginPath();c.arc(0,7,2.7,0,Math.PI*2);c.fillStyle='#ff3b7a';c.fill();
     c.restore();
-    // Указатель на цель по краю круга — куда поворачивать (относительно курса)
+    // Указатель на ЦЕЛЬ по краю круга (золотой) — направление на цель по прямой.
     if(me&&this.dest){
       const brg=AR._brg(me.lat,me.lng,this.dest.lat,this.dest.lng);
       const rel=((brg-hd+540)%360-180)*Math.PI/180;
@@ -3904,6 +3909,60 @@ const NAV={
       c.beginPath();c.moveTo(0,-14);c.lineTo(10,9);c.lineTo(-10,9);c.closePath();c.fill();c.stroke();
       c.restore();
     }
+    // ВТОРАЯ стрелка — направление ПО ДОРОГЕ (по линии маршрута впереди), ПЕСОЧНАЯ.
+    const roadBrg=this._roadBearing(me);
+    if(roadBrg!=null){
+      const rel=((roadBrg-hd+540)%360-180)*Math.PI/180;
+      const rr=Math.min(W,H)*0.30; // ближе к центру, чем цель — это "куда ехать сейчас"
+      const ex=cx+Math.sin(rel)*rr,ey=cy-Math.cos(rel)*rr;
+      c.save();c.translate(ex,ey);c.rotate(rel);
+      c.fillStyle='#d9c189';c.strokeStyle='#1a1205';c.lineWidth=1.4;
+      c.beginPath();c.moveTo(0,-12);c.lineTo(8,8);c.lineTo(-8,8);c.closePath();c.fill();c.stroke();
+      c.restore();
+    }
+    // обновляем нижнюю панель (скорость/компас/ближайший радар)
+    this._panel(me);
+  },
+  // Направление по линии маршрута: берём точку чуть впереди ближайшей и считаем пеленг
+  _roadBearing(me){
+    if(!me||!this.pts||this.pts.length<2)return null;
+    // ближайший индекс на маршруте
+    let bi=0,bd=1e18;
+    for(let i=0;i<this.pts.length;i++){const d=TP._dist(me.lat,me.lng,this.pts[i][0],this.pts[i][1]);if(d<bd){bd=d;bi=i;}}
+    // точка впереди (на 1-2 шага дальше по маршруту)
+    const j=Math.min(this.pts.length-1,bi+2);
+    if(j<=bi)return null;
+    return AR._brg(me.lat,me.lng,this.pts[j][0],this.pts[j][1]);
+  },
+  // Ближайшая камера: сторона относительно курса, расстояние, лимит
+  _nearestCam(me){
+    if(!me||typeof PO==='undefined'||!PO.cams||!PO.cams.length)return null;
+    let best=null,bd=1e18;
+    for(const cam of PO.cams){const d=TP._dist(me.lat,me.lng,cam.lat,cam.lng);if(d<bd){bd=d;best=cam;}}
+    if(!best||bd>5000)return null; // только в пределах 5 км
+    const brg=AR._brg(me.lat,me.lng,best.lat,best.lng);
+    const rel=((brg-(this._hd||0)+540)%360)-180;
+    const arrow=['↑','↗','→','↘','↓','↙','←','↖'][Math.round(((rel+360)%360)/45)%8];
+    const lim=best.tags&&best.tags.maxspeed?String(best.tags.maxspeed).replace(/[^0-9]/g,'')||'?':'?';
+    return {dist:bd,arrow,lim};
+  },
+  _panel(me){
+    const spdEl=document.getElementById('vnav-spd');
+    const compEl=document.getElementById('vnav-comp');
+    const compdEl=document.getElementById('vnav-compd');
+    const camEl=document.getElementById('vnav-cam');
+    // скорость (м/с → км/ч)
+    if(spdEl){const s=(me&&me.spd!=null&&me.spd>=0)?Math.round(me.spd*3.6):0;spdEl.textContent=s;}
+    // компас: сторона света + градусы (курс носа = OM.head)
+    if(compEl){const h=this._hd||0;
+      const dirs=['С','СВ','В','ЮВ','Ю','ЮЗ','З','СЗ'];
+      compEl.textContent=dirs[Math.round(h/45)%8];
+      if(compdEl)compdEl.textContent=Math.round(h)+'°';}
+    // ближайший радар
+    if(camEl){const nc=this._nearestCam(me);
+      if(nc){const dm=nc.dist<1000?Math.round(nc.dist)+' м':(nc.dist/1000).toFixed(1)+' км';
+        camEl.innerHTML='📸 '+nc.arrow+' '+dm+' · <b style="color:#fff">'+nc.lim+'</b>';}
+      else camEl.textContent='📸 нет рядом';}
   }
 };
 
@@ -4257,8 +4316,25 @@ SL.init();
     <div id="vnav-map" style="position:absolute;top:-22%;left:-22%;width:144%;height:144%;transform-origin:center"></div>
     <canvas id="vnav-cv" style="position:absolute;inset:0;pointer-events:none;z-index:650"></canvas>
   </div>
-  <div style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 6%);left:0;width:100%;text-align:center;z-index:5;pointer-events:none">
-    <span style="background:rgba(10,14,30,.6);border:1px solid var(--border);border-radius:9999px;padding:5px 14px;font-size:.58rem;letter-spacing:.1em;color:rgba(255,255,255,.7)">МИНИ-РАДАР · НОС = 70% ЦЕЛЬ + 30% КУРС ТЕЛЕФОНА</span>
+  <!-- кнопки зума радара -->
+  <div style="position:absolute;right:calc(4vw + 8px);top:calc(10% + 12px);z-index:660;display:flex;flex-direction:column;gap:8px">
+    <button onclick="NAV._zoom(1)" style="width:44px;height:44px;border-radius:12px;background:rgba(10,14,30,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,214,10,.4);color:#FFD60A;font-size:24px;font-weight:700;line-height:1;cursor:pointer">+</button>
+    <button onclick="NAV._zoom(-1)" style="width:44px;height:44px;border-radius:12px;background:rgba(10,14,30,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,214,10,.4);color:#FFD60A;font-size:24px;font-weight:700;line-height:1;cursor:pointer">−</button>
+  </div>
+  <!-- нижняя панель: скорость · компас · ближайший радар (сторона/расст/лимит) -->
+  <div style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 5%);left:50%;transform:translateX(-50%);z-index:660;display:flex;gap:8px;align-items:stretch">
+    <div style="background:rgba(10,14,30,.88);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:13px;padding:7px 12px;text-align:center;min-width:62px">
+      <div id="vnav-spd" style="font-family:Orbitron,monospace;font-weight:700;font-size:1rem;color:#22d3ee;line-height:1">0</div>
+      <div style="font-size:.5rem;letter-spacing:.12em;color:var(--td);margin-top:2px">КМ/Ч</div>
+    </div>
+    <div style="background:rgba(10,14,30,.88);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:13px;padding:7px 12px;text-align:center;min-width:62px">
+      <div id="vnav-comp" style="font-family:Orbitron,monospace;font-weight:700;font-size:1rem;color:#fff;line-height:1">—</div>
+      <div id="vnav-compd" style="font-size:.5rem;letter-spacing:.12em;color:var(--td);margin-top:2px">КОМПАС</div>
+    </div>
+    <div style="background:rgba(10,14,30,.88);backdrop-filter:blur(10px);border:1px solid rgba(255,214,10,.4);border-radius:13px;padding:7px 12px;text-align:center;min-width:88px">
+      <div id="vnav-cam" style="font-weight:700;font-size:.82rem;color:#FFD60A;line-height:1.15">📸 нет рядом</div>
+      <div style="font-size:.5rem;letter-spacing:.12em;color:var(--td);margin-top:2px">РАДАР · ЛИМИТ</div>
+    </div>
   </div>
 </div>
 
