@@ -338,7 +338,7 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   gap:6px;cursor:pointer;font-size:.72rem;font-weight:700;letter-spacing:.1em;
   color:var(--np);text-transform:uppercase;transition:all var(--t-f)}
 .map-addbtn:hover{background:rgba(168,85,247,.15);box-shadow:0 0 16px rgba(168,85,247,.3)}
-.map-legend{position:absolute;bottom:80px;right:0;z-index:500;width:190px;
+.map-legend{position:absolute;bottom:80px;right:0;z-index:500;width:230px;
   transform:translateX(100%);transition:transform var(--t-m)}
 .map-legend.open{transform:translateX(0)}
 .leg-tog{position:absolute;left:-38px;top:0;width:38px;height:38px;
@@ -349,6 +349,13 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 .leg-body{background:var(--glass);backdrop-filter:blur(20px);
   border:1px solid var(--border2);border-radius:var(--r-m) 0 0 var(--r-m);padding:14px}
 .leg-item{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:.7rem;color:var(--td)}
+.leg-layers{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.leg-layers .lbtn{width:100%;aspect-ratio:1;height:auto}
+.map-focus{position:absolute;top:70px;right:12px;z-index:500;width:46px;height:46px;
+  border-radius:50%;border:1px solid var(--border2);background:var(--glass);
+  backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+.map-focus:active{transform:scale(.92)}
 .ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 /* Leaflet */
 .leaflet-container{font-family:'Rajdhani',sans-serif;background:#0a0a14}
@@ -601,24 +608,28 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
   <div id="srch-res" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 60px);left:12px;right:12px;z-index:1200;background:rgba(8,11,24,.98);backdrop-filter:blur(16px);border:1px solid var(--border2);border-radius:14px;overflow:hidden;max-height:60vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.6)"></div>
   <div id="cam-near" style="display:none;position:absolute;top:calc(env(safe-area-inset-top,0px) + 64px);left:50%;transform:translateX(-50%);z-index:25;background:var(--glass);border:1px solid var(--border2);border-radius:9999px;padding:5px 14px;font-family:'Orbitron',monospace;font-size:.72rem;letter-spacing:.06em;color:var(--txt)"></div>
   <div id="map-container"></div>
-  <div class="map-layers">
-    <div class="lbtn active" id="lv" onclick="toggleL('v')" title="Верифицированные">🟢</div>
-    <div class="lbtn active" id="lp" onclick="toggleL('p')" title="На проверке">🟡</div>
-    <div class="lbtn active" id="lc" onclick="toggleL('c')" title="Клуб">⭕</div>
-    <div class="lbtn active" id="lq" onclick="toggleL('q')" title="Землетрясения · USGS live">🌋</div>
-    <div class="lbtn active" id="lo" onclick="toggleL('o')" title="Места · OSM">📍</div>
-    <div class="lbtn active" id="lcam" onclick="toggleL('cam')" title="Камеры скорости · OSM">📸</div>
-    <div class="lbtn active" id="lair" onclick="toggleL('air')" title="Самолёты · ADS-B live">✈️</div>
-    <div class="lbtn" id="llt" onclick="LT.toggle()" title="Молнии · Blitzortung (эксперимент)">⚡</div>
-    <div class="lbtn" onclick="openTraffic()" title="Пробки · Waze Live (Google)">🚦</div>
-    <div class="lbtn" id="pin-btn" onclick="togglePinMode()" title="Поставить метку цели на карте">🎯</div>
-    <div class="lbtn" onclick="openAR()" title="Навести · дополненная реальность">🔭</div>
-    <div class="lbtn active" id="lsnd" onclick="CA.toggle()" title="Звук радаров">🔔</div>
+  <div class="map-focus" onclick="focusUser()" title="Показать меня">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.2"><circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="2.5" fill="#22d3ee" stroke="none"/></svg>
   </div>
   <div class="map-legend" id="mleg">
     <div class="leg-tog" onclick="document.getElementById('mleg').classList.toggle('open')">☰</div>
     <div class="leg-body">
-      <div class="label" style="margin-bottom:10px">Легенда</div>
+      <div class="label" style="margin-bottom:8px">Слои</div>
+      <div class="leg-layers">
+        <div class="lbtn active" id="lv" onclick="toggleL('v')" title="Верифицированные">🟢</div>
+        <div class="lbtn active" id="lp" onclick="toggleL('p')" title="На проверке">🟡</div>
+        <div class="lbtn active" id="lc" onclick="toggleL('c')" title="Клуб">⭕</div>
+        <div class="lbtn active" id="lq" onclick="toggleL('q')" title="Землетрясения · USGS">🌋</div>
+        <div class="lbtn active" id="lo" onclick="toggleL('o')" title="Места · OSM">📍</div>
+        <div class="lbtn active" id="lcam" onclick="toggleL('cam')" title="Камеры · OSM">📸</div>
+        <div class="lbtn active" id="lair" onclick="toggleL('air')" title="Самолёты · ADS-B">✈️</div>
+        <div class="lbtn" id="llt" onclick="LT.toggle()" title="Молнии">⚡</div>
+        <div class="lbtn" onclick="openTraffic()" title="Пробки · Waze">🚦</div>
+        <div class="lbtn" id="pin-btn" onclick="togglePinMode()" title="Метка цели">🎯</div>
+        <div class="lbtn" onclick="openAR()" title="Навести · AR">🔭</div>
+        <div class="lbtn active" id="lsnd" onclick="CA.toggle()" title="Звук радаров">🔔</div>
+      </div>
+      <div class="label" style="margin:12px 0 10px">Легенда</div>
       <div class="leg-item"><div class="ldot" style="background:#4ade80;box-shadow:0 0 6px #4ade80"></div>Верифицировано</div>
       <div class="leg-item"><div class="ldot" style="background:#fbbf24;box-shadow:0 0 6px #fbbf24"></div>На проверке</div>
       <div class="leg-item"><div class="ldot" style="background:#a855f7;box-shadow:0 0 6px #a855f7"></div>Борцовский клуб</div>
@@ -1354,6 +1365,13 @@ function initMap(){
   // Ручная метка цели — кнопкой 🎯 (см. ниже), перетаскиваемая.
   // Тап по ней — «В ПУТЬ» к ней. Решает: поставить цель где угодно без поиска.
   window._pinMode=false;
+  window.focusUser=()=>{
+    const m=window._map;if(!m)return;
+    const p=(typeof PM!=='undefined'&&PM.last);
+    if(p){m.flyTo([p.lat,p.lng],Math.max(m.getZoom(),16),{duration:.8});}
+    else if(typeof PM!=='undefined'&&PM.refresh){PM.refresh(pos=>{if(pos)m.flyTo([pos.lat,pos.lng],16,{duration:.8});});}
+    else toast('Геолокация недоступна');
+  };
   const dropTarget=(latlng)=>{
     if(typeof NAV==='undefined')return;
     if(NAV._manual){map.removeLayer(NAV._manual);NAV._manual=null;}
@@ -3770,11 +3788,41 @@ const NAV={
     setTimeout(()=>{if(this._rmap)this._rmap.invalidateSize();},450);
     this._route();
     this._sub=p=>this._tick(p);PM.sub(this._sub);
+    // опрос фактического лимита дороги под пользователем — раз в 2 секунды
+    if(this._limT)clearInterval(this._limT);
+    this._limT=setInterval(()=>this._roadLimit(),2000);
+    setTimeout(()=>this._roadLimit(),800);
+    // тап по окну → карта; зажим → карта, пока держишь
+    this._bindWindow();
     toast('Маршрут построен');
+  },
+  _bindWindow(){
+    if(this._winBound)return;this._winBound=true;
+    const wrap=document.getElementById('vnav-radar-wrap');if(!wrap)return;
+    let held=false,moved=false,sx=0,sy=0,timer=null;
+    const openMap=()=>{go('map');setTimeout(()=>{if(window._map)window._map.invalidateSize();},120);};
+    wrap.addEventListener('touchstart',e=>{
+      held=false;moved=false;sx=e.touches[0].clientX;sy=e.touches[0].clientY;
+      timer=setTimeout(()=>{held=true;openMap();},380); // зажатие → карта пока держишь
+    },{passive:true});
+    wrap.addEventListener('touchmove',e=>{
+      if(Math.abs(e.touches[0].clientX-sx)>10||Math.abs(e.touches[0].clientY-sy)>10)moved=true;
+    },{passive:true});
+    wrap.addEventListener('touchend',e=>{
+      if(timer){clearTimeout(timer);timer=null;}
+      if(held){ // держали → вернуться в радар при отпускании
+        if(this.on)go('nav');
+        held=false;return;
+      }
+      if(!moved)openMap(); // короткий тап → открыть карту насовсем
+    },{passive:true});
+    // десктоп: клик открывает карту
+    wrap.addEventListener('click',e=>{if(!('ontouchstart'in window))openMap();});
   },
   stop(){
     this.on=false;this._hd=null;
     if(this._raf){cancelAnimationFrame(this._raf);this._raf=null;}
+    if(this._limT){clearInterval(this._limT);this._limT=null;}
     const m=this._rmap;
     [this._rline,this._rglow,this._rwp].forEach(l=>{if(l&&m&&m.hasLayer(l))m.removeLayer(l);});
     this._rline=this._rglow=this._rwp=null;this.pts=null;
@@ -3937,14 +3985,42 @@ const NAV={
   // Ближайшая камера: сторона относительно курса, расстояние, лимит
   _nearestCam(me){
     if(!me||typeof PO==='undefined'||!PO.cams||!PO.cams.length)return null;
+    // ТЗ: в режиме В ПУТЬ учитываем радары только в пределах 30 км (остальные — на карте).
     let best=null,bd=1e18;
-    for(const cam of PO.cams){const d=TP._dist(me.lat,me.lng,cam.lat,cam.lng);if(d<bd){bd=d;best=cam;}}
-    if(!best||bd>5000)return null; // только в пределах 5 км
+    for(const cam of PO.cams){const d=TP._dist(me.lat,me.lng,cam.lat,cam.lng);
+      if(d>30000)continue; // дальше 30 км — игнор в режиме В ПУТЬ
+      if(d<bd){bd=d;best=cam;}}
+    if(!best||bd>5000)return null; // показываем как "ближайший" только в пределах 5 км
     const brg=AR._brg(me.lat,me.lng,best.lat,best.lng);
     const rel=((brg-(this._hd||0)+540)%360)-180;
     const arrow=['↑','↗','→','↘','↓','↙','←','↖'][Math.round(((rel+360)%360)/45)%8];
     const lim=best.tags&&best.tags.maxspeed?String(best.tags.maxspeed).replace(/[^0-9]/g,'')||'?':'?';
     return {dist:bd,arrow,lim};
+  },
+  _roadLimit(){
+    const me=PM.last;if(!me)return;
+    // ближайшая дорога с тегом maxspeed в радиусе 40 м от пользователя
+    const q='[out:json][timeout:8];way(around:40,'+me.lat.toFixed(5)+','+me.lng.toFixed(5)
+      +')["highway"]["maxspeed"];out tags 3;';
+    const EPS=['https://overpass-api.de/api/interpreter',
+               'https://overpass.kumi.systems/api/interpreter',
+               'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+    const tryEp=(k)=>{
+      if(k>=EPS.length){this._setRoadLimit('?');return;}
+      fetch(EPS[k],{method:'POST',body:'data='+encodeURIComponent(q)})
+        .then(r=>{if(!r.ok)throw 0;return r.json();}).then(d=>{
+          const w=(d.elements||[]).find(e=>e.tags&&e.tags.maxspeed);
+          if(w){const v=String(w.tags.maxspeed).replace(/[^0-9]/g,'');this._setRoadLimit(v||'?');}
+          else this._setRoadLimit('?');
+        }).catch(()=>tryEp(k+1));
+    };
+    tryEp(0);
+  },
+  _setRoadLimit(v){
+    const n=document.getElementById('vnav-roadlimit-n');
+    const box=document.getElementById('vnav-roadlimit');
+    if(n)n.textContent=v;
+    if(box)box.style.opacity=(v==='?')?'.5':'1';
   },
   _panel(me){
     const spdEl=document.getElementById('vnav-spd');
@@ -3961,8 +4037,11 @@ const NAV={
     // ближайший радар
     if(camEl){const nc=this._nearestCam(me);
       if(nc){const dm=nc.dist<1000?Math.round(nc.dist)+' м':(nc.dist/1000).toFixed(1)+' км';
-        camEl.innerHTML='📸 '+nc.arrow+' '+dm+' · <b style="color:#fff">'+nc.lim+'</b>';}
-      else camEl.textContent='📸 нет рядом';}
+        camEl.innerHTML='📸 '+nc.arrow+' '+dm;
+        const signN=document.getElementById('vnav-camsign-n'),sign=document.getElementById('vnav-camsign');
+        if(signN)signN.textContent=nc.lim;if(sign)sign.style.opacity='1';}
+      else{camEl.textContent='нет рядом';
+        const sign=document.getElementById('vnav-camsign');if(sign)sign.style.opacity='.35';}}
   }
 };
 
@@ -4311,6 +4390,10 @@ SL.init();
       <div style="display:flex;gap:9px;font-size:.7rem;color:rgba(255,235,170,.92)"><span id="vnav-dist" style="font-family:Orbitron,monospace;font-weight:700">—</span><span id="vnav-eta">—</span></div>
     </div>
   </div>
+  <!-- знак ФАКТИЧЕСКОГО лимита на текущем участке (над окном) -->
+  <div id="vnav-roadlimit" style="position:absolute;top:calc(10% - 4px);left:50%;transform:translate(-50%,-50%);z-index:670;width:58px;height:58px;border-radius:50%;background:#fff;border:6px solid #d11;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.6)">
+    <span id="vnav-roadlimit-n" style="font-family:Arial,sans-serif;font-weight:800;font-size:1.3rem;color:#111;line-height:1">?</span>
+  </div>
   <!-- ОКНО-РАДАР: 70% высоты, отступ сверху 10%, снизу 20% -->
   <div id="vnav-radar-wrap" style="position:absolute;left:50%;top:10%;transform:translateX(-50%);width:92vw;height:70%;border-radius:24px;overflow:hidden;border:1px solid rgba(255,214,10,.35);box-shadow:0 0 40px rgba(255,214,10,.12)">
     <div id="vnav-map" style="position:absolute;top:-22%;left:-22%;width:144%;height:144%;transform-origin:center"></div>
@@ -4321,19 +4404,22 @@ SL.init();
     <button onclick="NAV._zoom(1)" style="width:44px;height:44px;border-radius:12px;background:rgba(10,14,30,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,214,10,.4);color:#FFD60A;font-size:24px;font-weight:700;line-height:1;cursor:pointer">+</button>
     <button onclick="NAV._zoom(-1)" style="width:44px;height:44px;border-radius:12px;background:rgba(10,14,30,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,214,10,.4);color:#FFD60A;font-size:24px;font-weight:700;line-height:1;cursor:pointer">−</button>
   </div>
-  <!-- нижняя панель: скорость · компас · ближайший радар (сторона/расст/лимит) -->
-  <div style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 5%);left:50%;transform:translateX(-50%);z-index:660;display:flex;gap:8px;align-items:stretch">
-    <div style="background:rgba(10,14,30,.88);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:13px;padding:7px 12px;text-align:center;min-width:62px">
+  <!-- нижняя панель: [знак радара] · скорость · компас · радар(сторона/расст) -->
+  <div style="position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 5%);left:50%;transform:translateX(-50%);z-index:660;display:flex;gap:8px;align-items:center">
+    <div id="vnav-camsign" style="width:52px;height:52px;border-radius:50%;background:#fff;border:5px solid #d11;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.5);flex:none;opacity:.35">
+      <span id="vnav-camsign-n" style="font-family:Arial,sans-serif;font-weight:800;font-size:1.15rem;color:#111;line-height:1">?</span>
+    </div>
+    <div style="background:rgba(10,14,30,.88);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:13px;padding:7px 12px;text-align:center;min-width:58px">
       <div id="vnav-spd" style="font-family:Orbitron,monospace;font-weight:700;font-size:1rem;color:#22d3ee;line-height:1">0</div>
       <div style="font-size:.5rem;letter-spacing:.12em;color:var(--td);margin-top:2px">КМ/Ч</div>
     </div>
-    <div style="background:rgba(10,14,30,.88);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:13px;padding:7px 12px;text-align:center;min-width:62px">
+    <div style="background:rgba(10,14,30,.88);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:13px;padding:7px 12px;text-align:center;min-width:58px">
       <div id="vnav-comp" style="font-family:Orbitron,monospace;font-weight:700;font-size:1rem;color:#fff;line-height:1">—</div>
       <div id="vnav-compd" style="font-size:.5rem;letter-spacing:.12em;color:var(--td);margin-top:2px">КОМПАС</div>
     </div>
-    <div style="background:rgba(10,14,30,.88);backdrop-filter:blur(10px);border:1px solid rgba(255,214,10,.4);border-radius:13px;padding:7px 12px;text-align:center;min-width:88px">
-      <div id="vnav-cam" style="font-weight:700;font-size:.82rem;color:#FFD60A;line-height:1.15">📸 нет рядом</div>
-      <div style="font-size:.5rem;letter-spacing:.12em;color:var(--td);margin-top:2px">РАДАР · ЛИМИТ</div>
+    <div style="background:rgba(10,14,30,.88);backdrop-filter:blur(10px);border:1px solid rgba(255,214,10,.4);border-radius:13px;padding:7px 12px;text-align:center;min-width:74px">
+      <div id="vnav-cam" style="font-weight:700;font-size:.8rem;color:#FFD60A;line-height:1.15">нет рядом</div>
+      <div style="font-size:.5rem;letter-spacing:.12em;color:var(--td);margin-top:2px">РАДАР</div>
     </div>
   </div>
 </div>
