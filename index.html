@@ -336,7 +336,8 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
   padding:0 16px;border-radius:var(--r-p);border:1px solid var(--np);
   background:var(--glass);backdrop-filter:blur(10px);display:flex;align-items:center;
   gap:6px;cursor:pointer;font-size:.72rem;font-weight:700;letter-spacing:.1em;
-  color:var(--np);text-transform:uppercase;transition:all var(--t-f)}
+  color:var(--np);text-transform:uppercase;transition:all var(--t-f);opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .25s,transform .25s}
+.map-addbtn.show{opacity:1;transform:translateY(0);pointer-events:auto}
 .map-addbtn:hover{background:rgba(168,85,247,.15);box-shadow:0 0 16px rgba(168,85,247,.3)}
 .map-legend{position:absolute;bottom:80px;right:0;z-index:500;width:230px;
   transform:translateX(100%);transition:transform var(--t-m)}
@@ -624,7 +625,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
     <button onclick="OM.setOff(OM.off+2);toast('Курс '+(OM.off>=0?'+':'')+OM.off.toFixed(0)+'°')" title="Курс правее">▶</button>
   </div>
   <div class="map-legend" id="mleg">
-    <div class="leg-tog" onclick="document.getElementById('mleg').classList.toggle('open')">☰</div>
+    <div class="leg-tog" onclick="toggleLegend()">☰</div>
     <div class="leg-body">
       <div class="label" style="margin-bottom:8px">Слои</div>
       <div class="leg-layers">
@@ -632,9 +633,9 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
         <div class="lbtn active" id="lp" onclick="toggleL('p')" title="На проверке">🟡</div>
         <div class="lbtn active" id="lc" onclick="toggleL('c')" title="Клуб">⭕</div>
         <div class="lbtn active" id="lq" onclick="toggleL('q')" title="Землетрясения · USGS">🌋</div>
-        <div class="lbtn active" id="lo" onclick="toggleL('o')" title="Места · OSM">📍</div>
-        <div class="lbtn active" id="lcam" onclick="toggleL('cam')" title="Камеры · OSM">📸</div>
-        <div class="lbtn active" id="lair" onclick="toggleL('air')" title="Самолёты · ADS-B">✈️</div>
+        <div class="lbtn" id="lo" onclick="toggleL('o')" title="Места · OSM">📍</div>
+        <div class="lbtn" id="lcam" onclick="toggleL('cam')" title="Камеры · OSM">📸</div>
+        <div class="lbtn" id="lair" onclick="toggleL('air')" title="Самолёты · ADS-B">✈️</div>
         <div class="lbtn" id="llt" onclick="LT.toggle()" title="Молнии">⚡</div>
         <div class="lbtn" onclick="openTraffic()" title="Пробки · Waze">🚦</div>
         <div class="lbtn" id="pin-btn" onclick="togglePinMode()" title="Метка цели">🎯</div>
@@ -681,7 +682,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
       <circle cx="20" cy="20" r="2.5" fill="#fff" opacity=".9"/>
     </svg>
   </button>
-  <button class="map-addbtn" onclick="openSheet()">+ добавить ивент</button>
+  <button class="map-addbtn" id="map-addbtn" onclick="openSheet()">+ добавить ивент</button>
 </div>
 
 <!-- ═══ EVENTS ═══ -->
@@ -1357,7 +1358,7 @@ function submitEv(){
 }
 
 /* ── Map ────────────────────────────────────────────────── */
-const LV={v:true,p:true,c:true,q:true,o:true,cam:true,air:true};
+const LV={v:true,p:true,c:true,q:false,o:false,cam:false,air:false};
 let _mapAngle=0;
 
 function initMap(){
@@ -1380,13 +1381,20 @@ function initMap(){
   // Тап по ней — «В ПУТЬ» к ней. Решает: поставить цель где угодно без поиска.
   window._pinMode=false;
   window._followUser=false;window._followSub=null;
-  // Шторка «Легенда» закрывается тапом вне её области
+  // Шторка «Легенда»: открытие/закрытие + синхронизация кнопки «добавить ивент»
+  window.toggleLegend=()=>{
+    const leg=document.getElementById('mleg');if(!leg)return;
+    const open=leg.classList.toggle('open');
+    const add=document.getElementById('map-addbtn');if(add)add.classList.toggle('show',open);
+  };
+  // закрытие тапом вне её области
   document.addEventListener('pointerdown',(e)=>{
     const leg=document.getElementById('mleg');
     if(!leg||!leg.classList.contains('open'))return;
-    if(leg.contains(e.target))return;            // клик внутри шторки — не трогаем
-    if(e.target.closest('.leg-tog'))return;      // клик по язычку — его обработчик сам
+    if(leg.contains(e.target))return;
+    if(e.target.closest('.leg-tog'))return;
     leg.classList.remove('open');
+    const add=document.getElementById('map-addbtn');if(add)add.classList.remove('show');
   },true);
   window.focusUser=()=>{
     const m=window._map;if(!m)return;
@@ -2335,26 +2343,11 @@ let _minimap=null;
   });
 })();
 
-/* ── Migration v3: seed demo events if map is empty ─────── */
-if(!localStorage.getItem('pnd-v3')){
-  localStorage.setItem('pnd-v3','1');
-  if(S.events.length===0){
-    const n=Date.now();
-    const h=t=>new Date(n+t*3600000).toISOString().slice(0,16);
-    S.events=[
-      {id:'demo1',title:'Тренировка по борьбе',type:'training',
-       date:h(1.5),lat:CLUB.lat+.0002,lng:CLUB.lng+.0001,
-       loc:'HK Rovinj Rovigno',desc:'Открытая тренировка · все уровни',
-       verified:true,addedBy:'demo'},
-      {id:'demo2',title:'Концерт на набережной',type:'concert',
-       date:h(4),lat:CLUB.lat+.0031,lng:CLUB.lng-.0048,
-       loc:'Набережная Ровиня',desc:'Живая музыка у моря',
-       verified:true,addedBy:'demo'},
-      {id:'demo3',title:'Воскресный маркет',type:'market',
-       date:h(7),lat:CLUB.lat-.0038,lng:CLUB.lng+.0029,
-       loc:'Центр города',desc:'Местные производители',
-       verified:false,addedBy:'demo'},
-    ];
+/* ── Демо-ивенты убраны. Чистим ранее засеянные демки (addedBy:'demo'). ─── */
+if(!localStorage.getItem('pnd-v4')){
+  localStorage.setItem('pnd-v4','1');
+  if(S.events&&S.events.length){
+    S.events=S.events.filter(e=>e.addedBy!=='demo');
     localStorage.setItem('pnd-ev',JSON.stringify(S.events));
   }
 }
@@ -4061,6 +4054,39 @@ const NAV={
       c.beginPath();c.moveTo(0,-12);c.lineTo(8,8);c.lineTo(-8,8);c.closePath();c.fill();c.stroke();
       c.restore();
     }
+    // ── ЗНАЧКИ КАМЕР ЗА КРАЕМ ОКНА (вариант В: в 30 км И на маршруте) ──
+    // Если камера не помещается в видимую область — показываем её на краю круга:
+    // мини-камера + дорожный знак лимита + расстояние. 2 ближайших по маршруту — ярче.
+    if(me){
+      const onR=this._camsOnRoute(me);
+      const bounds=this._rmap.getBounds();
+      onR.forEach((item,idx)=>{
+        const cam=item.cam;
+        const visible=bounds.contains([cam.lat,cam.lng]); // в кадре уже нарисована слоем
+        if(visible)return;                                 // рисуем за краем только невидимые
+        const brg=AR._brg(me.lat,me.lng,cam.lat,cam.lng);
+        const rel=((brg-hd+540)%360-180)*Math.PI/180;
+        const rr=Math.min(W,H)*0.46;                       // у самого края
+        let ex=cx+Math.sin(rel)*rr, ey=cy-Math.cos(rel)*rr;
+        ex=Math.max(30,Math.min(W-30,ex)); ey=Math.max(40,Math.min(H-30,ey));
+        const top2=idx<2;                                  // 2 ближайших по маршруту — ярче/крупнее
+        const dm=item.along<1000?Math.round(item.along)+'м':(item.along/1000).toFixed(1)+'км';
+        c.save();c.translate(ex,ey);
+        // дорожный знак лимита (белый круг, красный ободок)
+        const R=top2?15:12;
+        c.beginPath();c.arc(0,0,R+2,0,Math.PI*2);c.fillStyle='#d11';c.fill();
+        c.beginPath();c.arc(0,0,R,0,Math.PI*2);c.fillStyle='#fff';c.fill();
+        c.fillStyle='#111';c.font='700 '+(top2?14:11)+'px Arial';c.textAlign='center';c.textBaseline='middle';
+        c.fillText(item.lim,0,0);
+        // мини-камера сверху-слева от знака
+        c.font=(top2?14:11)+'px sans-serif';c.fillText('📸',-(R+6),-(R-2));
+        // расстояние под знаком
+        c.fillStyle=top2?'#FFD60A':'rgba(255,235,170,.8)';
+        c.font='700 '+(top2?11:9)+'px Orbitron,monospace';c.textBaseline='top';
+        c.fillText(dm,0,R+4);
+        c.restore();
+      });
+    }
     // обновляем нижнюю панель (скорость/компас/ближайший радар)
     this._panel(me);
   },
@@ -4074,6 +4100,30 @@ const NAV={
     const j=Math.min(this.pts.length-1,bi+2);
     if(j<=bi)return null;
     return AR._brg(me.lat,me.lng,this.pts[j][0],this.pts[j][1]);
+  },
+  // Камеры по варианту В: в пределах 30 км ОТ пользователя И близко к маршруту (≤300 м).
+  // distRoute — дистанция по маршруту от пользователя до камеры (для "ближайших по маршруту").
+  _camsOnRoute(me){
+    if(!me||typeof PO==='undefined'||!PO.cams||!PO.cams.length||!this.pts||this.pts.length<2)return [];
+    // индекс пользователя на маршруте
+    let ui=0,ud=1e18;
+    for(let i=0;i<this.pts.length;i++){const d=TP._dist(me.lat,me.lng,this.pts[i][0],this.pts[i][1]);if(d<ud){ud=d;ui=i;}}
+    const out=[];
+    for(const cam of PO.cams){
+      const dUser=TP._dist(me.lat,me.lng,cam.lat,cam.lng);
+      if(dUser>30000)continue;                 // условие 30 км
+      // ближайшая точка маршрута к камере + её индекс
+      let ci=0,cd=1e18;
+      for(let i=0;i<this.pts.length;i++){const d=TP._dist(cam.lat,cam.lng,this.pts[i][0],this.pts[i][1]);if(d<cd){cd=d;ci=i;}}
+      if(cd>300)continue;                       // камера должна лежать на маршруте (≤300 м от линии)
+      if(ci<ui-2)continue;                      // позади пользователя — пропускаем
+      // дистанция по маршруту от пользователя до камеры
+      let along=0;for(let i=ui;i<ci;i++)along+=TP._dist(this.pts[i][0],this.pts[i][1],this.pts[i+1][0],this.pts[i+1][1]);
+      const lim=cam.tags&&cam.tags.maxspeed?String(cam.tags.maxspeed).replace(/[^0-9]/g,'')||'?':'?';
+      out.push({cam,dUser,along,lim});
+    }
+    out.sort((a,b)=>a.along-b.along);
+    return out;
   },
   // Ближайшая камера: сторона относительно курса, расстояние, лимит
   _nearestCams(me,n){
@@ -4126,13 +4176,15 @@ const NAV={
       const dirs=['С','СВ','В','ЮВ','Ю','ЮЗ','З','СЗ'];
       compEl.textContent=dirs[Math.round(h/45)%8];
       if(compdEl)compdEl.textContent=Math.round(h)+'°';}
-    // ДВА ближайших радара: первый → знак-лимит слева; оба → строки в блоке
-    if(camEl){const cams=this._nearestCams(me,2);
+    // 2 ближайших радара ПО МАРШРУТУ (если маршрут есть), иначе по прямой в 30 км
+    if(camEl){
+      let cams=this._camsOnRoute(me).slice(0,2).map(x=>({dist:x.along,lim:x.lim}));
+      if(!cams.length)cams=this._nearestCams(me,2);
       const sign=document.getElementById('vnav-camsign'),signN=document.getElementById('vnav-camsign-n');
       if(cams.length){
         camEl.innerHTML=cams.map(nc=>{
           const dm=nc.dist<1000?Math.round(nc.dist)+' м':(nc.dist/1000).toFixed(1)+' км';
-          return '📸 '+nc.arrow+' '+dm+' · '+nc.lim;
+          return '📸 '+(nc.arrow||'→')+' '+dm+' · '+nc.lim;
         }).join('<br>');
         if(signN)signN.textContent=cams[0].lim;
         if(sign)sign.style.opacity='1';}
