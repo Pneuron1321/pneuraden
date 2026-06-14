@@ -1416,14 +1416,13 @@ function initMap(){
     const cx=W/2, cy=H*0.42;
     const RINGS=14, CELLS=24;
     const Rmax=Math.max(W,H)*0.95, Rmin=18;
-    const bg=c.createRadialGradient(cx,cy,Rmin,cx,cy,Rmax);
-    bg.addColorStop(0,'#05060c');bg.addColorStop(1,'rgba(8,10,20,0)');
-    c.fillStyle=bg;c.fillRect(0,0,W,H);
+    // без заливки-диска (она давала светлое пятно под радаром) — глубину дают сами плитки
     const ringR=(i)=>{const t=i/RINGS;return Rmin+(Rmax-Rmin)*Math.pow(t,1.7);};
     for(let i=0;i<RINGS;i++){
       const r0=ringR(i), r1=ringR(i+1);
       const depth=i/RINGS;
-      const lum=0.06+depth*0.16, stroke=0.10+depth*0.22;
+      // ярче и контрастнее, чтобы воронку было ВИДНО (глубина — через рост яркости к краю)
+      const lum=0.10+depth*0.32, stroke=0.18+depth*0.42;
       for(let j=0;j<CELLS;j++){
         const a0=(j/CELLS)*Math.PI*2, a1=((j+1)/CELLS)*Math.PI*2;
         const x0=cx+Math.cos(a0)*r0, y0=cy+Math.sin(a0)*r0;
@@ -1431,10 +1430,10 @@ function initMap(){
         const x2=cx+Math.cos(a1)*r1, y2=cy+Math.sin(a1)*r1;
         const x3=cx+Math.cos(a0)*r1, y3=cy+Math.sin(a0)*r1;
         c.beginPath();c.moveTo(x0,y0);c.lineTo(x1,y1);c.lineTo(x2,y2);c.lineTo(x3,y3);c.closePath();
-        c.fillStyle='rgba('+Math.round(20+depth*30)+','+Math.round(24+depth*40)+','+Math.round(40+depth*70)+','+lum+')';
+        c.fillStyle='rgba('+Math.round(30+depth*50)+','+Math.round(38+depth*70)+','+Math.round(70+depth*130)+','+lum+')';
         c.fill();
-        c.strokeStyle='rgba(120,140,200,'+(stroke*0.5)+')';
-        c.lineWidth=1;c.stroke();
+        c.strokeStyle='rgba(140,170,240,'+stroke+')';
+        c.lineWidth=1.2;c.stroke();
       }
     }
   };
