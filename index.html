@@ -208,8 +208,7 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 /* ── HOME / RADAR ── */
 #vh{align-items:center;justify-content:flex-start;gap:4px;padding-top:calc(env(safe-area-inset-top,0px) + 6px)}
 #vh::before{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
-  background:radial-gradient(ellipse 52% 48% at 50% 46%,
-    transparent 18%, rgba(0,0,0,.52) 65%, rgba(0,0,0,.80) 100%)}
+  background:none}
 [data-theme="light"] #vh::before{
   background:radial-gradient(ellipse 70% 45% at 50% 0%,
     rgba(99,102,241,.10) 0%,rgba(168,85,247,.06) 60%,transparent 100%)}
@@ -1277,36 +1276,57 @@ window._initTunnelGL = function(){
     '    mengerDist(p+e.yyx) - mengerDist(p-e.yyx)));',
     '}',
     'mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }',
+    // ── процедурный РЕЗНОЙ УЗОР на гранях (имитация орнамента изображения 2) ──
+    'float engrave(vec3 p){',
+    '  vec3 q = p * 26.0;',
+    '  float a = sin(q.x)*sin(q.y) + sin(q.y)*sin(q.z) + sin(q.z)*sin(q.x);',
+    '  float b = abs(sin(q.x*2.3 + q.z*1.1)) * abs(cos(q.y*1.7 - q.x*0.9));',
+    '  float c = abs(sin((q.x+q.y+q.z)*0.7));',
+    '  return abs(a)*0.5 + b*0.35 + c*0.25;',
+    '}',
     'void main(){',
     '  vec2 uv = (gl_FragCoord.xy - 0.5*iResolution.xy) / iResolution.y;',
-    // камера смотрит в центральный тоннель губки (вдоль -z), лёгкое дыхание+поворот
     '  float tt = iTime*0.08;',
-    '  vec3 ro = vec3(0.0, 0.0, 2.3 + 0.25*sin(iTime*0.2));',
+    '  vec3 ro = vec3(0.0, 0.0, 2.3 + 0.22*sin(iTime*0.18));',
     '  vec3 rd = normalize(vec3(uv, -1.3));',
-    '  rd.xy = rot(tt*0.5) * rd.xy;',
+    '  rd.xy = rot(tt*0.5) * rd.xy;',          // всё вращается
     '  ro.xy = rot(tt*0.5) * ro.xy;',
     '  float dist = 0.0; float steps = 0.0; bool hit = false; vec3 p = ro;',
-    '  for(int i=0; i<80; i++){',
+    '  for(int i=0; i<82; i++){',
     '    p = ro + rd*dist;',
     '    float d = mengerDist(p);',
     '    if(d < 0.001*dist + 0.0006){ hit = true; break; }',
     '    dist += d; steps += 1.0;',
     '    if(dist > 7.0) break;',
     '  }',
-    '  vec3 col = vec3(0.015, 0.02, 0.04);',
+    '  vec3 col = vec3(0.012, 0.016, 0.03);',  // фон-горло (тёмный сине-чёрный)
     '  if(hit){',
     '    vec3 n = calcNormal(p);',
-    '    vec3 lig = normalize(vec3(0.4, 0.7, 0.45));',
-    '    float diff = clamp(dot(n, lig), 0.0, 1.0);',
-    '    float ao = clamp(1.0 - steps/80.0, 0.0, 1.0);',
-    '    vec3 base = vec3(0.10, 0.145, 0.27);',           // холодный синий камень
-    '    col = base * (0.18 + 0.95*diff) * (0.35 + 0.65*ao);',
-    '    float rim = pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 2.0);',
-    '    col += rim * vec3(0.05, 0.08, 0.16);',           // подсветка граней к зрителю
-    '    col *= exp(-dist*0.28);',                         // туман глубины → тёмный центр
+    // резной узор: модулируем альбедо + лёгкий бамп для рельефа граней
+    '    float eng = engrave(p);',
+    '    float e2 = 0.012;',
+    '    vec3 g = vec3(engrave(p+vec3(e2,0.0,0.0))-eng, engrave(p+vec3(0.0,e2,0.0))-eng, engrave(p+vec3(0.0,0.0,e2))-eng);',
+    '    n = normalize(n - 0.22*g);',          // бамп от узора (рельеф ловит свет)
+    // ДВА источника: тёплый золотой ключевой + холодный синий заполняющий (как на изображении 2)
+    '    vec3 keyDir = normalize(vec3(0.45, 0.65, 0.42));',
+    '    float key = clamp(dot(n, keyDir), 0.0, 1.0);',
+    '    float sky = 0.5 + 0.5*n.y;',          // мягкий верхний свет
+    '    float ao = clamp(1.0 - steps/82.0, 0.0, 1.0); ao = ao*ao;',
+    // альбедо: тёмный сине-серый камень, узор слегка осветляет выступы
+    '    vec3 albedo = vec3(0.155, 0.175, 0.235) * (0.62 + 0.45*eng);',
+    '    vec3 keyCol = vec3(0.95, 0.70, 0.42);',  // тёплый золотой свет
+    '    vec3 fillCol = vec3(0.10, 0.15, 0.26);', // холодный синий заполняющий
+    '    col = albedo * (keyCol*key*1.25 + fillCol*sky*0.9) * (0.30 + 0.70*ao);',
+    // тёплый rim по кромкам к свету — золотая окантовка резьбы
+    '    float rim = pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 2.5);',
+    '    col += rim * vec3(0.55, 0.40, 0.20) * (0.4 + 0.6*key);',
+    // глубина тонет в сине-чёрном
+    '    col *= exp(-dist*0.30);',
+    '    col += vec3(0.015, 0.022, 0.04) * (1.0-ao) * 0.5;',  // лёгкий холодный подвал в тенях
     '  }',
-    '  float vig = 1.0 - 0.25*dot(uv,uv);',
+    '  float vig = 1.0 - 0.18*dot(uv,uv);',
     '  col *= vig;',
+    '  col = pow(col, vec3(0.92));',           // лёгкая гамма для глубины тонов
     '  gl_FragColor = vec4(col, 1.0);',
     '}'
   ].join('\n');
