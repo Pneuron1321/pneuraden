@@ -1250,23 +1250,23 @@ window._initTunnelGL = function(){
     'precision highp float;',
     'uniform vec2 iResolution;',
     'uniform float iTime;',
-    'mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }',
-    'float sdBox(vec3 p, vec3 b){ vec3 di = abs(p) - b; return min(max(di.x,max(di.y,di.z)), length(max(di, 0.0))); }',
-    // ── ОРНАМЕНТАЛЬНАЯ губка Менгера: KIFS с поворотом складок (даёт завитки/террасы как на референсе) ──
-    'float mengerDist(vec3 z){',
-    '  float scale = 3.0;',
-    '  vec3 offset = vec3(1.0);',
-    '  for(int i=0; i<5; i++){',
-    '    z = abs(z);',
-    '    if(z.x<z.y) z.xy=z.yx;',
-    '    if(z.x<z.z) z.xz=z.zx;',
-    '    if(z.y<z.z) z.yz=z.zy;',
-    '    z = scale*z - offset*(scale-1.0);',
-    '    if(z.z < -0.5*offset.z*(scale-1.0)) z.z += offset.z*(scale-1.0);',
-    '    z.xy = rot(0.10) * z.xy;',          // поворот складок → орнамент
-    '    z.yz = rot(0.06) * z.yz;',
+    'float maxcomp(vec3 p){ return max(p.x, max(p.y, p.z)); }',
+    'float sdBox(vec3 p, vec3 b){ vec3 di = abs(p) - b; return min(maxcomp(di), length(max(di, 0.0))); }',
+    // губка Менгера — 5 уровней рекурсии (самоподобный резной узор)
+    'float mengerDist(vec3 p){',
+    '  float d = sdBox(p, vec3(1.0));',
+    '  float s = 1.0;',
+    '  for(int m=0; m<5; m++){',
+    '    vec3 a = mod(p*s, 2.0) - 1.0;',
+    '    s *= 3.0;',
+    '    vec3 r = abs(1.0 - 3.0*abs(a));',
+    '    float da = max(r.x, r.y);',
+    '    float db = max(r.y, r.z);',
+    '    float dc = max(r.z, r.x);',
+    '    float c = (min(da, min(db, dc)) - 1.0) / s;',
+    '    d = max(d, c);',
     '  }',
-    '  return (length(z) - 2.0) * pow(scale, -5.0);',
+    '  return d;',
     '}',
     'vec3 calcNormal(vec3 p){',
     '  vec2 e = vec2(0.0015, 0.0);',
@@ -1275,52 +1275,58 @@ window._initTunnelGL = function(){
     '    mengerDist(p+e.yxy) - mengerDist(p-e.yxy),',
     '    mengerDist(p+e.yyx) - mengerDist(p-e.yyx)));',
     '}',
-    // ── каменная фактура (шум) ──
-    'float hash(vec3 p){ return fract(sin(dot(p, vec3(27.1,57.7,113.3)))*43758.5453); }',
-    'float noise3(vec3 p){',
-    '  vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);',
-    '  return mix(mix(mix(hash(i+vec3(0.0,0.0,0.0)),hash(i+vec3(1.0,0.0,0.0)),f.x),',
-    '                 mix(hash(i+vec3(0.0,1.0,0.0)),hash(i+vec3(1.0,1.0,0.0)),f.x),f.y),',
-    '             mix(mix(hash(i+vec3(0.0,0.0,1.0)),hash(i+vec3(1.0,0.0,1.0)),f.x),',
-    '                 mix(hash(i+vec3(0.0,1.0,1.0)),hash(i+vec3(1.0,1.0,1.0)),f.x),f.y),f.z);',
+    'mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }',
+    // ── процедурный РЕЗНОЙ УЗОР на гранях (имитация орнамента изображения 2) ──
+    'float engrave(vec3 p){',
+    '  vec3 q = p * 26.0;',
+    '  float a = sin(q.x)*sin(q.y) + sin(q.y)*sin(q.z) + sin(q.z)*sin(q.x);',
+    '  float b = abs(sin(q.x*2.3 + q.z*1.1)) * abs(cos(q.y*1.7 - q.x*0.9));',
+    '  float c = abs(sin((q.x+q.y+q.z)*0.7));',
+    '  return abs(a)*0.5 + b*0.35 + c*0.25;',
     '}',
     'void main(){',
     '  vec2 uv = (gl_FragCoord.xy - 0.5*iResolution.xy) / iResolution.y;',
     '  float tt = iTime*0.08;',
-    '  vec3 ro = vec3(0.0, 0.0, 2.4 + 0.22*sin(iTime*0.18));',
+    '  vec3 ro = vec3(0.0, 0.0, 2.3 + 0.22*sin(iTime*0.18));',
     '  vec3 rd = normalize(vec3(uv, -1.3));',
-    '  rd.xy = rot(tt*0.5) * rd.xy;',           // всё вращается
+    '  rd.xy = rot(tt*0.5) * rd.xy;',          // всё вращается
     '  ro.xy = rot(tt*0.5) * ro.xy;',
     '  float dist = 0.0; float steps = 0.0; bool hit = false; vec3 p = ro;',
-    '  for(int i=0; i<88; i++){',
+    '  for(int i=0; i<82; i++){',
     '    p = ro + rd*dist;',
     '    float d = mengerDist(p);',
-    '    if(d < 0.0009*dist + 0.0005){ hit = true; break; }',
-    '    dist += d * 0.85;',                     // safety-factor (DE не идеален из-за поворотов)
-    '    steps += 1.0;',
+    '    if(d < 0.001*dist + 0.0006){ hit = true; break; }',
+    '    dist += d; steps += 1.0;',
     '    if(dist > 7.0) break;',
     '  }',
-    '  vec3 col = vec3(0.010, 0.013, 0.026);',  // тёмное сине-чёрное горло
+    '  vec3 col = vec3(0.012, 0.016, 0.03);',  // фон-горло (тёмный сине-чёрный)
     '  if(hit){',
     '    vec3 n = calcNormal(p);',
-    '    float stone = noise3(p*28.0)*0.55 + noise3(p*80.0)*0.30;',  // фактура камня
-    '    vec3 keyDir = normalize(vec3(0.5, 0.7, 0.35));',
+    // резной узор: модулируем альбедо + лёгкий бамп для рельефа граней
+    '    float eng = engrave(p);',
+    '    float e2 = 0.012;',
+    '    vec3 g = vec3(engrave(p+vec3(e2,0.0,0.0))-eng, engrave(p+vec3(0.0,e2,0.0))-eng, engrave(p+vec3(0.0,0.0,e2))-eng);',
+    '    n = normalize(n - 0.22*g);',          // бамп от узора (рельеф ловит свет)
+    // ДВА источника: тёплый золотой ключевой + холодный синий заполняющий (как на изображении 2)
+    '    vec3 keyDir = normalize(vec3(0.45, 0.65, 0.42));',
     '    float key = clamp(dot(n, keyDir), 0.0, 1.0);',
-    '    float sky = 0.5 + 0.5*n.y;',
-    '    float ao = clamp(1.0 - steps/88.0, 0.0, 1.0); ao = ao*ao;',
-    // тёмный сине-серый камень с вариацией от шума (выступы светлее)
-    '    vec3 albedo = mix(vec3(0.115, 0.135, 0.195), vec3(0.225, 0.215, 0.235), stone);',
-    '    vec3 keyCol = vec3(0.96, 0.72, 0.42);',  // тёплый золотой ключевой
-    '    vec3 fillCol = vec3(0.10, 0.15, 0.27);', // холодный синий заполняющий
-    '    col = albedo * (keyCol*key*1.30 + fillCol*sky*0.95) * (0.25 + 0.75*ao);',
-    '    float rim = pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 3.0);',
-    '    col += rim * vec3(0.52, 0.38, 0.18) * (0.35 + 0.65*key);',  // золотая окантовка резьбы
-    '    col *= exp(-dist*0.32);',                 // глубина тонет в темноте
-    '    col += vec3(0.012, 0.018, 0.034) * (1.0-ao) * 0.45;',  // холодный подвал теней
+    '    float sky = 0.5 + 0.5*n.y;',          // мягкий верхний свет
+    '    float ao = clamp(1.0 - steps/82.0, 0.0, 1.0); ao = ao*ao;',
+    // альбедо: тёмный сине-серый камень, узор слегка осветляет выступы
+    '    vec3 albedo = vec3(0.155, 0.175, 0.235) * (0.62 + 0.45*eng);',
+    '    vec3 keyCol = vec3(0.95, 0.70, 0.42);',  // тёплый золотой свет
+    '    vec3 fillCol = vec3(0.10, 0.15, 0.26);', // холодный синий заполняющий
+    '    col = albedo * (keyCol*key*1.25 + fillCol*sky*0.9) * (0.30 + 0.70*ao);',
+    // тёплый rim по кромкам к свету — золотая окантовка резьбы
+    '    float rim = pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 2.5);',
+    '    col += rim * vec3(0.55, 0.40, 0.20) * (0.4 + 0.6*key);',
+    // глубина тонет в сине-чёрном
+    '    col *= exp(-dist*0.30);',
+    '    col += vec3(0.015, 0.022, 0.04) * (1.0-ao) * 0.5;',  // лёгкий холодный подвал в тенях
     '  }',
-    '  float vig = 1.0 - 0.16*dot(uv,uv);',
+    '  float vig = 1.0 - 0.18*dot(uv,uv);',
     '  col *= vig;',
-    '  col = pow(col, vec3(0.90));',               // гамма для богатства тонов
+    '  col = pow(col, vec3(0.92));',           // лёгкая гамма для глубины тонов
     '  gl_FragColor = vec4(col, 1.0);',
     '}'
   ].join('\n');
