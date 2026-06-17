@@ -1305,17 +1305,18 @@ window._initTunnelGL = function(){
     '  }',
     '  vec3 col = vec3(0.012, 0.016, 0.03);',
     '  if(!hit && iTexOn > 0.5){',
-    '    vec2 tuv = rd.xy * 0.9 + 0.5;',
+    '    vec2 tuv = rd.xy * 2.3 + 0.5;',
     '    tuv = clamp(tuv, 0.0, 1.0);',
     '    vec3 img = texture2D(iTex, tuv).rgb;',
     // цветокоррекция: привести картинку к палитре сцены (тёплый камень + холодные тени)
     '    float lum = dot(img, vec3(0.299, 0.587, 0.114));',
-    '    vec3 warm = vec3(0.95, 0.72, 0.42);',   // тёплый (как блики камня)
-    '    vec3 cool = vec3(0.12, 0.16, 0.28);',   // холодный (как тени сцены)
-    '    vec3 graded = mix(cool, warm, smoothstep(0.10, 0.6, lum));',  // тон по яркости
-    '    img = mix(img, graded * (0.5 + lum), 0.55);',  // 55% к палитре сцены, детали сохранены
-    '    float cen = 1.0 - smoothstep(0.0, 0.55, length(uv));',
-    '    col = img * (0.42 + 0.62*cen);',         // чуть ярче, чем было
+    '    vec3 darkW = vec3(0.05, 0.040, 0.030);',
+    '    vec3 midW  = vec3(0.22, 0.160, 0.095);',
+    '    vec3 hiW   = vec3(0.98, 0.74, 0.44);',
+    '    vec3 graded = (lum < 0.5) ? mix(darkW, midW, lum*2.0) : mix(midW, hiW, (lum-0.5)*2.0);',
+    '    img = mix(img, graded, 0.88);',
+    '    float cen = 1.0 - smoothstep(0.0, 0.6, length(uv));',
+    '    col = img * (0.5 + 0.6*cen);',         // чуть ярче, чем было
     '    col = pow(col, vec3(0.9));',
     '  }',
     '  if(hit){',
