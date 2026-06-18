@@ -1370,22 +1370,14 @@ window._initTunnelGL = function(){
     '    col *= exp(-dist*0.30);',
     '    col += vec3(0.015, 0.022, 0.04) * (1.0-ao) * 0.5;',
     // ── ТЕКУЩИЕ ЛИНИИ света по швам/углублениям: внутрь у центра, наружу по фракталу ──
-    // СВЕТЯЩИЕСЯ ЛИНИИ по швам/канавкам фрактала, цвет течёт НАРУЖУ (как полоски на HOME)
-    '    float radial = length(uv);',
-    '    float seam = (1.0 - ao) * (1.0 - smoothstep(0.25, 0.80, eng));', // швы/канавки построенного
-    '    float glowLine = pow(clamp(seam, 0.0, 1.0), 1.3);',              // светящиеся жилы по структуре
-    '    float flowPhase = -radial*4.5 + iTime*1.3;',                     // перелив течёт наружу
-    '    vec3 prism = 0.5 + 0.5*cos(flowPhase + vec3(0.0, 2.094, 4.188));',
-    '    float flowFall = exp(-radial*0.8);',
-    '    vec3 flowCol = mix(prism, vec3(1.0, 0.06, 0.22), iRuby);',       // радуга → рубин (двойной тап)
-    '    col += flowCol * glowLine * flowFall * 1.0;',
+    // (свечение линий убрано — пока чистый резной камень)
     '  }',
     '  float vig = 1.0 - 0.18*dot(uv,uv);',
     '  col *= vig;',
     '  col = pow(col, vec3(0.92));',
     '  float aSize = 0.013;',
     '  vec2 q = uv / aSize;',
-    '  q = rot(-iNorth) * q;',
+    '  q = rot(iNorth) * q;',
     '  float inner = arrowMask(q);',
     '  float outer = arrowMask(q / 1.36);',
     '  float aglow = exp(-length(uv) / 0.04);',
@@ -1437,12 +1429,15 @@ window.drawDepthTunnel = function(time){
   const gl = window._initTunnelGL();
   if(!gl) return;
   gl.material.uniforms.iTime.value = time || 0;
-  try{ if(window.OM && typeof OM.head==='number'){ gl.material.uniforms.iNorth.value = OM.head * Math.PI/180; } }catch(e){}
+  gl.material.uniforms.iNorth.value = (window._coreNorth||0);
   try{ gl.renderer.render(gl.scene, gl.camera); }catch(e){}
 };
 
 // ── переключатель статика / анимация (кнопка ❄/✦) ──
 window._bgAnim=true; window._bgRaf=null; window._bgT=0; window._tunnelRuby=false;
+// курс для стрелки-ядра: подписка на компас (обновляется на каждом событии), знак как минимап (−head)
+window._coreNorth = 0;
+try{ if(window.OM && OM.sub){ OM.sub(function(h){ window._coreNorth = -h * Math.PI/180; if(!window._bgAnim){ window.drawDepthTunnel(window._bgT||0); } }); } }catch(e){}
 window._startBgLoop=function(){
   if(!window._bgAnim||window._bgRaf) return;
   if(typeof S!=='undefined'&&S.view!=='home') return;
