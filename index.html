@@ -250,6 +250,14 @@ textarea.input{resize:vertical;min-height:72px;line-height:1.5}
 #top-prism{position:fixed;top:0;left:0;right:0;height:3px;z-index:9999;pointer-events:none;
   box-shadow:0 0 10px rgba(255,255,255,.35),0 1px 6px rgba(139,92,246,.5)}
 /* 3. Свечение-обводка вокруг радара HOME — переливается по кругу */
+@keyframes uaRainbow{
+  0%{filter:drop-shadow(0 0 5px #ff0080) drop-shadow(0 0 9px #00b3ff)}
+  25%{filter:drop-shadow(0 0 5px #ff8c00) drop-shadow(0 0 9px #8b5cf6)}
+  50%{filter:drop-shadow(0 0 5px #ffed00) drop-shadow(0 0 9px #ff0080)}
+  75%{filter:drop-shadow(0 0 5px #00ff88) drop-shadow(0 0 9px #00b3ff)}
+  100%{filter:drop-shadow(0 0 5px #ff0080) drop-shadow(0 0 9px #00b3ff)}
+}
+body.rainbow-arrows .user-arrow{ animation:uaRainbow 3s linear infinite !important }
 @keyframes prismSpin{to{transform:rotate(360deg)}}
 .radar-prism{position:absolute;inset:-6px;border-radius:50%;z-index:-1;
   background:conic-gradient(from 0deg,#ff0080,#ff8c00,#ffed00,#00ff88,#00b3ff,#8b5cf6,#ff0080);
@@ -1255,6 +1263,7 @@ window._initTunnelGL = function(){
     'uniform sampler2D iTex;',
     'uniform float iTexOn;',
     'uniform float iRuby;',
+    'uniform float iNorth;',
     'float maxcomp(vec3 p){ return max(p.x, max(p.y, p.z)); }',
     'float sdBox(vec3 p, vec3 b){ vec3 di = abs(p) - b; return min(maxcomp(di), length(max(di, 0.0))); }',
     // губка Менгера — 5 уровней рекурсии (самоподобный резной узор)
@@ -1300,10 +1309,10 @@ window._initTunnelGL = function(){
     '  return (mn >= 0.0 || mx <= 0.0) ? 1.0 : 0.0;',
     '}',
     'float arrowMask(vec2 q){',
-    '  vec2 ap = vec2(0.0, 1.0);',
-    '  vec2 br = vec2(0.60, -0.80);',
-    '  vec2 nt = vec2(0.0, -0.40);',
-    '  vec2 bl = vec2(-0.60, -0.80);',
+    '  vec2 ap = vec2(0.0, 0.92);',
+    '  vec2 br = vec2(0.80, -0.60);',
+    '  vec2 nt = vec2(0.0, -0.26);',
+    '  vec2 bl = vec2(-0.80, -0.60);',
     '  return max(inTri(q, ap, br, nt), inTri(q, ap, nt, bl));',
     '}',
     'void main(){',
@@ -1361,28 +1370,26 @@ window._initTunnelGL = function(){
     '    col *= exp(-dist*0.30);',
     '    col += vec3(0.015, 0.022, 0.04) * (1.0-ao) * 0.5;',
     // ── ТЕКУЩИЕ ЛИНИИ света по швам/углублениям: внутрь у центра, наружу по фракталу ──
+    // СВЕТЯЩИЕСЯ ЛИНИИ по швам/канавкам фрактала, цвет течёт НАРУЖУ (как полоски на HOME)
     '    float radial = length(uv);',
-    '    float throatR = 0.13;',
-    '    float flowDir = (radial < throatR) ? 1.0 : -1.0;',         // +внутрь у стрелки, -наружу по камню
-    '    float rings = radial * 26.0;',
-    '    float ph = fract(rings + iTime * 1.5 * flowDir);',         // бегущие кольца
-    '    float lw = 0.13;',
-    '    float stripe = smoothstep(0.0, lw, ph) * (1.0 - smoothstep(lw, lw*2.2, ph));', // узкая линия
-    '    float seam = (1.0 - ao) * (1.0 - smoothstep(0.30, 0.85, eng));', // только в углублениях/швах
-    '    float flowFall = exp(-radial*0.9);',
-    '    vec3 prism = 0.5 + 0.5*cos(rings*0.45 - iTime + vec3(0.0, 2.094, 4.188));',
-    '    vec3 flowCol = mix(prism, vec3(1.0, 0.06, 0.22), iRuby);',  // радуга → рубин по двойному тапу
-    '    col += flowCol * stripe * seam * flowFall * 1.1;',
+    '    float seam = (1.0 - ao) * (1.0 - smoothstep(0.25, 0.80, eng));', // швы/канавки построенного
+    '    float glowLine = pow(clamp(seam, 0.0, 1.0), 1.3);',              // светящиеся жилы по структуре
+    '    float flowPhase = -radial*4.5 + iTime*1.3;',                     // перелив течёт наружу
+    '    vec3 prism = 0.5 + 0.5*cos(flowPhase + vec3(0.0, 2.094, 4.188));',
+    '    float flowFall = exp(-radial*0.8);',
+    '    vec3 flowCol = mix(prism, vec3(1.0, 0.06, 0.22), iRuby);',       // радуга → рубин (двойной тап)
+    '    col += flowCol * glowLine * flowFall * 1.0;',
     '  }',
     '  float vig = 1.0 - 0.18*dot(uv,uv);',
     '  col *= vig;',
     '  col = pow(col, vec3(0.92));',
-    '  float aSize = 0.020;',
+    '  float aSize = 0.013;',
     '  vec2 q = uv / aSize;',
+    '  q = rot(-iNorth) * q;',
     '  float inner = arrowMask(q);',
-    '  float outer = arrowMask(q / 1.32);',
-    '  float aglow = exp(-length(uv) / 0.05);',
-    '  col += vec3(0.85, 0.0, 0.18) * aglow * 0.22;',
+    '  float outer = arrowMask(q / 1.36);',
+    '  float aglow = exp(-length(uv) / 0.04);',
+    '  col += vec3(0.85, 0.0, 0.18) * aglow * 0.20;',
     '  float ang = atan(q.y, q.x);',
     '  vec3 cPrism = 0.5 + 0.5*cos(iTime*1.5 + ang*3.0 + vec3(0.0, 2.094, 4.188));',
     '  vec3 contourCol = mix(cPrism, vec3(1.0, 0.06, 0.22), iRuby);',
@@ -1393,7 +1400,7 @@ window._initTunnelGL = function(){
   ].join('\n');
 
   const material = new THREE.ShaderMaterial({
-    uniforms: { iResolution:{value:new THREE.Vector2(1,1)}, iTime:{value:0}, iTex:{value:null}, iTexOn:{value:0.0}, iRuby:{value:0.0} },
+    uniforms: { iResolution:{value:new THREE.Vector2(1,1)}, iTime:{value:0}, iTex:{value:null}, iTexOn:{value:0.0}, iRuby:{value:0.0}, iNorth:{value:0.0} },
     vertexShader: vert, fragmentShader: frag, depthTest:false, depthWrite:false
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2,2), material);
@@ -1430,6 +1437,7 @@ window.drawDepthTunnel = function(time){
   const gl = window._initTunnelGL();
   if(!gl) return;
   gl.material.uniforms.iTime.value = time || 0;
+  try{ if(window.OM && typeof OM.head==='number'){ gl.material.uniforms.iNorth.value = OM.head * Math.PI/180; } }catch(e){}
   try{ gl.renderer.render(gl.scene, gl.camera); }catch(e){}
 };
 
@@ -1442,6 +1450,15 @@ window._startBgLoop=function(){
     window._bgT+=0.016; window.drawDepthTunnel(window._bgT);
     window._bgRaf=requestAnimationFrame(loop); };
   loop();
+};
+// единый режим: рубин ↔ радуга для ядра-туннеля И стрелок пользователя во всех режимах
+window.setCoreMode=function(ruby){
+  window._tunnelRuby=ruby;
+  const gl=window._tunnelGL;
+  if(gl){ gl.material.uniforms.iRuby.value=ruby?1.0:0.0; if(!window._bgAnim)window.drawDepthTunnel(window._bgT||0); }
+  // стрелки пользователя: радужный ободок когда НЕ рубин
+  document.body.classList.toggle('rainbow-arrows', !ruby);
+  if(typeof toast==='function')toast(ruby?'Режим · рубин':'Режим · радуга');
 };
 // двойной тап по центру (стрелка-ядро) → линии радуга ↔ рубин
 window._initCoreTap=function(){
@@ -1456,15 +1473,12 @@ window._initCoreTap=function(){
     if(Math.sqrt(dx*dx+dy*dy) > 0.22) { lastTap=0; return; }  // далеко от ядра — не тут
     const now=Date.now();
     if(now-lastTap < 350){
-      window._tunnelRuby=!window._tunnelRuby;
-      const gl=window._tunnelGL;
-      if(gl){ gl.material.uniforms.iRuby.value=window._tunnelRuby?1.0:0.0; if(!window._bgAnim)window.drawDepthTunnel(window._bgT||0); }
-      if(typeof toast==='function')toast(window._tunnelRuby?'Ядро · рубин':'Ядро · радуга');
+      window.setCoreMode(!window._tunnelRuby);   // переключить рубин/радуга (ядро + стрелки во всех режимах)
       lastTap=0;
     } else { lastTap=now; }
   });
 };
-window.addEventListener('load', function(){ setTimeout(window._initCoreTap, 600); });
+window.addEventListener('load', function(){ setTimeout(window._initCoreTap, 600); document.body.classList.add('rainbow-arrows'); });
 window.toggleBgAnim=function(){
   window._bgAnim=!window._bgAnim;
   const b=document.getElementById('bg-anim-btn');
