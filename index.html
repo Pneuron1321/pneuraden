@@ -545,7 +545,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
       <span id="uid" style="font-size:.6rem;letter-spacing:.15em;color:var(--tm);text-transform:uppercase"></span>
       <span id="eq-chip" style="font-size:.6rem;letter-spacing:.08em;color:var(--dng);opacity:.9"></span>
       <span id="kp-chip" style="font-size:.6rem;letter-spacing:.08em;color:var(--nc);opacity:.9"></span>
-      <button id="bg-anim-btn" class="theme-btn" onclick="toggleBgAnim()" title="Фон: статика / анимация" style="opacity:0.5">❄</button>
+      <button id="bg-anim-btn" class="theme-btn" onclick="toggleBgAnim()" title="Фон: анимация / статика" style="opacity:1">✦</button>
       <button id="schumann-btn" class="theme-btn" onclick="toggleSchumann()" title="Schumann 7.83Hz" style="opacity:0.28"><svg viewBox="0 0 26 14" width="20" height="11" style="display:block"><path d="M0,7 L3,7 L5.5,1 L8,13 L10.5,7 L13,7 L15.5,1 L18,13 L20.5,7 L23,7 L26,7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <button class="theme-btn" onclick="toggleTheme()">🌓</button>
     </div>
@@ -1254,6 +1254,7 @@ window._initTunnelGL = function(){
     'uniform float iTime;',
     'uniform sampler2D iTex;',
     'uniform float iTexOn;',
+    'uniform float iRuby;',
     'float maxcomp(vec3 p){ return max(p.x, max(p.y, p.z)); }',
     'float sdBox(vec3 p, vec3 b){ vec3 di = abs(p) - b; return min(maxcomp(di), length(max(di, 0.0))); }',
     // губка Менгера — 5 уровней рекурсии (самоподобный резной узор)
@@ -1288,18 +1289,22 @@ window._initTunnelGL = function(){
     '  float c = abs(sin((q.x+q.y+q.z)*0.7));',
     '  return abs(a)*0.5 + b*0.35 + c*0.25;',
     '}',
-    // ── стрелка: точка-в-треугольнике (робастно к winding) ──
+    // ── стрелка как на карте: остроносая с вогнутым низом (точка-в-2-треугольниках) ──
     'float cross2(vec2 a, vec2 b){ return a.x*b.y - a.y*b.x; }',
-    'float triMask(vec2 q){',
-    '  vec2 A = vec2(0.0, 1.0);',
-    '  vec2 B = vec2(0.62, -0.78);',
-    '  vec2 C = vec2(-0.62, -0.78);',
-    '  float a = cross2(B-A, q-A);',
-    '  float b = cross2(C-B, q-B);',
-    '  float c = cross2(A-C, q-C);',
-    '  float mn = min(min(a,b),c);',
-    '  float mx = max(max(a,b),c);',
+    'float inTri(vec2 p, vec2 a, vec2 b, vec2 c){',
+    '  float d1 = cross2(b-a, p-a);',
+    '  float d2 = cross2(c-b, p-b);',
+    '  float d3 = cross2(a-c, p-c);',
+    '  float mn = min(min(d1,d2),d3);',
+    '  float mx = max(max(d1,d2),d3);',
     '  return (mn >= 0.0 || mx <= 0.0) ? 1.0 : 0.0;',
+    '}',
+    'float arrowMask(vec2 q){',
+    '  vec2 ap = vec2(0.0, 1.0);',
+    '  vec2 br = vec2(0.60, -0.80);',
+    '  vec2 nt = vec2(0.0, -0.40);',
+    '  vec2 bl = vec2(-0.60, -0.80);',
+    '  return max(inTri(q, ap, br, nt), inTri(q, ap, nt, bl));',
     '}',
     'void main(){',
     '  vec2 uv = (gl_FragCoord.xy - 0.5*iResolution.xy) / iResolution.y;',
@@ -1355,32 +1360,40 @@ window._initTunnelGL = function(){
     // глубина тонет в сине-чёрном
     '    col *= exp(-dist*0.30);',
     '    col += vec3(0.015, 0.022, 0.04) * (1.0-ao) * 0.5;',
+    // ── ТЕКУЩИЕ ЛИНИИ света по швам/углублениям: внутрь у центра, наружу по фракталу ──
     '    float radial = length(uv);',
-    '    float phase = radial*5.5 - iTime*1.1;',
-    '    vec3 prism = 0.5 + 0.5*cos(phase + vec3(0.0, 2.094, 4.188));',
-    '    float flowFall = exp(-radial*1.15);',
-    '    col += prism * rim * flowFall * 0.55;',
-    '    col += prism * (1.0-ao) * flowFall * 0.12;',
+    '    float throatR = 0.13;',
+    '    float flowDir = (radial < throatR) ? 1.0 : -1.0;',         // +внутрь у стрелки, -наружу по камню
+    '    float rings = radial * 26.0;',
+    '    float ph = fract(rings + iTime * 1.5 * flowDir);',         // бегущие кольца
+    '    float lw = 0.13;',
+    '    float stripe = smoothstep(0.0, lw, ph) * (1.0 - smoothstep(lw, lw*2.2, ph));', // узкая линия
+    '    float seam = (1.0 - ao) * (1.0 - smoothstep(0.30, 0.85, eng));', // только в углублениях/швах
+    '    float flowFall = exp(-radial*0.9);',
+    '    vec3 prism = 0.5 + 0.5*cos(rings*0.45 - iTime + vec3(0.0, 2.094, 4.188));',
+    '    vec3 flowCol = mix(prism, vec3(1.0, 0.06, 0.22), iRuby);',  // радуга → рубин по двойному тапу
+    '    col += flowCol * stripe * seam * flowFall * 1.1;',
     '  }',
     '  float vig = 1.0 - 0.18*dot(uv,uv);',
     '  col *= vig;',
     '  col = pow(col, vec3(0.92));',
-    '  float aSize = 0.052;',
+    '  float aSize = 0.020;',
     '  vec2 q = uv / aSize;',
-    '  float inner = triMask(q);',
-    '  float outer = triMask(q / 1.34);',
-    '  float aglow = exp(-length(uv) / 0.10);',
-    '  col += vec3(0.85, 0.0, 0.18) * aglow * 0.28;',
-    '  float ang = atan(uv.y, uv.x);',
-    '  vec3 edgePrism = 0.5 + 0.5*cos(iTime*1.5 + ang*3.0 + vec3(0.0, 2.094, 4.188));',
-    '  if(outer > 0.5 && inner < 0.5){ col = mix(col, edgePrism, 0.92); }',
-    '  if(inner > 0.5){ col = mix(col, vec3(1.0, 0.05, 0.22), 0.94); }',
+    '  float inner = arrowMask(q);',
+    '  float outer = arrowMask(q / 1.32);',
+    '  float aglow = exp(-length(uv) / 0.05);',
+    '  col += vec3(0.85, 0.0, 0.18) * aglow * 0.22;',
+    '  float ang = atan(q.y, q.x);',
+    '  vec3 cPrism = 0.5 + 0.5*cos(iTime*1.5 + ang*3.0 + vec3(0.0, 2.094, 4.188));',
+    '  vec3 contourCol = mix(cPrism, vec3(1.0, 0.06, 0.22), iRuby);',
+    '  if(outer > 0.5 && inner < 0.5){ col = mix(col, contourCol, 0.92); }',
+    '  if(inner > 0.5){ col = mix(col, vec3(1.0, 0.05, 0.22), 0.95); }',
     '  gl_FragColor = vec4(col, 1.0);',
     '}'
   ].join('\n');
 
   const material = new THREE.ShaderMaterial({
-    uniforms: { iResolution:{value:new THREE.Vector2(1,1)}, iTime:{value:0}, iTex:{value:null}, iTexOn:{value:0.0} },
+    uniforms: { iResolution:{value:new THREE.Vector2(1,1)}, iTime:{value:0}, iTex:{value:null}, iTexOn:{value:0.0}, iRuby:{value:0.0} },
     vertexShader: vert, fragmentShader: frag, depthTest:false, depthWrite:false
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2,2), material);
@@ -1421,7 +1434,37 @@ window.drawDepthTunnel = function(time){
 };
 
 // ── переключатель статика / анимация (кнопка ❄/✦) ──
-window._bgAnim=false; window._bgRaf=null; window._bgT=0;
+window._bgAnim=true; window._bgRaf=null; window._bgT=0; window._tunnelRuby=false;
+window._startBgLoop=function(){
+  if(!window._bgAnim||window._bgRaf) return;
+  if(typeof S!=='undefined'&&S.view!=='home') return;
+  const loop=()=>{ if(!window._bgAnim||(typeof S!=='undefined'&&S.view!=='home')){window._bgRaf=null;return;}
+    window._bgT+=0.016; window.drawDepthTunnel(window._bgT);
+    window._bgRaf=requestAnimationFrame(loop); };
+  loop();
+};
+// двойной тап по центру (стрелка-ядро) → линии радуга ↔ рубин
+window._initCoreTap=function(){
+  const vh=document.getElementById('vh'); if(!vh||vh._coreTapBound) return; vh._coreTapBound=true;
+  let lastTap=0;
+  vh.addEventListener('click', function(e){
+    // игнорируем интерактивные элементы (кнопки/карточки/радар)
+    if(e.target.closest && e.target.closest('button, input, a, #rwrap, .card, .seg, .legend, .pill, .dot')) return;
+    // тап должен быть около центра экрана (там стрелка-ядро)
+    const cx=window.innerWidth/2, cy=window.innerHeight*0.42;
+    const dx=(e.clientX-cx)/window.innerWidth, dy=(e.clientY-cy)/window.innerHeight;
+    if(Math.sqrt(dx*dx+dy*dy) > 0.22) { lastTap=0; return; }  // далеко от ядра — не тут
+    const now=Date.now();
+    if(now-lastTap < 350){
+      window._tunnelRuby=!window._tunnelRuby;
+      const gl=window._tunnelGL;
+      if(gl){ gl.material.uniforms.iRuby.value=window._tunnelRuby?1.0:0.0; if(!window._bgAnim)window.drawDepthTunnel(window._bgT||0); }
+      if(typeof toast==='function')toast(window._tunnelRuby?'Ядро · рубин':'Ядро · радуга');
+      lastTap=0;
+    } else { lastTap=now; }
+  });
+};
+window.addEventListener('load', function(){ setTimeout(window._initCoreTap, 600); });
 window.toggleBgAnim=function(){
   window._bgAnim=!window._bgAnim;
   const b=document.getElementById('bg-anim-btn');
@@ -1442,7 +1485,7 @@ window.addEventListener('resize', function(){
   clearTimeout(window._dtT);
   window._dtT=setTimeout(function(){ const gl=window._tunnelGL; if(gl){gl.resize();window.drawDepthTunnel(window._bgT||0);} }, 200);
 });
-window.addEventListener('load', function(){ setTimeout(function(){ window.drawDepthTunnel(0); }, 400); });
+window.addEventListener('load', function(){ setTimeout(function(){ window.drawDepthTunnel(window._bgT||0); window._startBgLoop&&window._startBgLoop(); }, 400); });
 document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ window.drawDepthTunnel(0); }, 250); });
 setTimeout(function(){ if(window.drawDepthTunnel)window.drawDepthTunnel(0); }, 800);
 
