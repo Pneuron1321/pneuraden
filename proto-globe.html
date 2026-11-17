@@ -137,10 +137,7 @@ const W={
     });
     map.on('style.load',()=>{
       try{map.setProjection({type:'globe'});}catch(e){}
-      // атмосфера: неоновый горизонт, к улице растворяется
-      try{map.setSky({'sky-color':'#05070f','horizon-color':'#3b1d6e','fog-color':'#0a0f1e',
-        'sky-horizon-blend':.6,'horizon-fog-blend':.5,'fog-ground-blend':.4,
-        'atmosphere-blend':['interpolate',['linear'],['zoom'],0,1,6,.8,10,0]});}catch(e){}
+      this._sky();
       this._buildings();
     });
     map.on('error',e=>{ // необязательные слои (дома OpenFreeMap) не должны ронять карту
@@ -148,6 +145,8 @@ const W={
     });
     this._markers();this._lift();this._fps();
     map.on('move',()=>this._hud());
+    map.on('moveend',()=>{clearTimeout(this._skyT);this._skyT=setTimeout(()=>this._sky(),400);});
+    setInterval(()=>this._sky(),300000);
     this._hud();
     this._gps();
     this._fetchISS();setInterval(()=>this._fetchISS(),5000);
@@ -261,14 +260,29 @@ const W={
     return{type:'FeatureCollection',features:ev.filter(e=>e.lat!=null&&e.lng!=null).map(e=>({type:'Feature',
       geometry:{type:'Point',coordinates:[+e.lng,+e.lat]},properties:{t:e.title||'',c:e.verified?(C[e.type]||'#818cf8'):'#fbbf24'}}))};
   },
-  // ── линия ночи: та же астрономия, что в приложении (склонение + уравнение времени) ──
-  _night(){
+  // ── Солнце: склонение и подсолнечная долгота (та же астрономия, что в приложении) ──
+  _sun(){
     const d=new Date(),days=(d.getTime()-946728000000)/864e5,g=(357.529+.98560028*days)*Math.PI/180;
     const L=(280.459+.98564736*days+1.915*Math.sin(g)+.02*Math.sin(2*g))*Math.PI/180;
     const dec=Math.asin(Math.sin(.40928)*Math.sin(L));
     const st=Date.UTC(d.getUTCFullYear(),0,1),B=2*Math.PI*((d.getTime()-st)/864e5)/365.2422;
     const eot=229.18*(.000075+.001868*Math.cos(B)-.032077*Math.sin(B)-.014615*Math.cos(2*B)-.040849*Math.sin(2*B));
-    const h=d.getUTCHours()+d.getUTCMinutes()/60+eot/60,sub=((12-h)*15+540)%360-180;
+    const h=d.getUTCHours()+d.getUTCMinutes()/60+eot/60;return{dec,sub:((12-h)*15+540)%360-180};
+  },
+  _alt(lat,lng){const {dec,sub}=this._sun(),r=Math.PI/180;
+    return Math.asin(Math.sin(lat*r)*Math.sin(dec)+Math.cos(lat*r)*Math.cos(dec)*Math.cos((lng-sub)*r))/r;},
+  // ── небо по Солнцу над центром карты: день — фирменный неон, закат — оранжевый горизонт, ночь — глубокий синий ──
+  _sky(){
+    const c=this.map.getCenter(),a=this._alt(c.lat,c.lng);
+    const P=a>10?{sky:'#0b1430',hor:'#3b1d6e',fog:'#0a0f1e'}:a>-4?{sky:'#1e1033',hor:'#f97316',fog:'#2a1408'}
+      :a>-9?{sky:'#0b1030',hor:'#4338ca',fog:'#0a0f24'}:{sky:'#03040c',hor:'#1e1b4b',fog:'#05070f'};
+    try{this.map.setSky({'sky-color':P.sky,'horizon-color':P.hor,'fog-color':P.fog,
+      'sky-horizon-blend':.6,'horizon-fog-blend':.5,'fog-ground-blend':.4,
+      'atmosphere-blend':['interpolate',['linear'],['zoom'],0,1,6,.8,10,0]});}catch(e){}
+  },
+  // ── линия ночи ──
+  _night(){
+    const {dec,sub}=this._sun();
     const pts=[];for(let lng=-180;lng<=180;lng+=2){const ha=(lng-sub)*Math.PI/180;
       pts.push([lng,Math.atan(-Math.cos(ha)/Math.tan(dec))*180/Math.PI]);}
     const pole=dec>=0?-89.9:89.9;

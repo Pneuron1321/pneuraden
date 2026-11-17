@@ -611,7 +611,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
       </div>
       <!-- РЕЖИССЁР: один кадр — самое интересное в реальности вокруг тебя прямо сейчас -->
       <div id="dir-card" onclick="DIR.act()">
-        <div class="dir-top"><span id="dir-kick">Вокруг</span><button class="dir-q" onclick="event.stopPropagation();DIR.toggleWhy()" aria-label="Почему этот кадр">?</button></div>
+        <div class="dir-top"><span id="dir-kick">Вокруг</span><span style="display:flex;gap:6px"><button class="dir-q" id="dir-feel" onclick="event.stopPropagation();FEEL.toggle()" aria-label="Звук и вибрация кадров">🔇</button><button class="dir-q" onclick="event.stopPropagation();DIR.toggleWhy()" aria-label="Почему этот кадр">?</button></span></div>
         <div id="dir-main" class="dir-main">
           <div id="dir-ico" class="dir-ico">✦</div>
           <div class="dir-txt"><div id="dir-title" class="dir-title">Смотрю вокруг…</div><div id="dir-sub" class="dir-sub"></div></div>
@@ -1303,8 +1303,7 @@ window._initTunnelGL = function(){
     'uniform float iTime;',
     'uniform sampler2D iTex;',
     'uniform float iTexOn;',
-    'uniform float iRuby;',
-    'uniform float iNorth;',
+    'uniform vec3 iKey;',   // цвет ключевого света = небо над тобой (SUN)
     'float maxcomp(vec3 p){ return max(p.x, max(p.y, p.z)); }',
     'float sdBox(vec3 p, vec3 b){ vec3 di = abs(p) - b; return min(maxcomp(di), length(max(di, 0.0))); }',
     // губка Менгера — 5 уровней рекурсии (самоподобный резной узор)
@@ -1401,12 +1400,12 @@ window._initTunnelGL = function(){
     '    float ao = clamp(1.0 - steps/82.0, 0.0, 1.0); ao = ao*ao;',
     // альбедо: тёмный сине-серый камень, узор слегка осветляет выступы
     '    vec3 albedo = vec3(0.155, 0.175, 0.235) * (0.62 + 0.45*eng);',
-    '    vec3 keyCol = vec3(0.95, 0.70, 0.42);',  // тёплый золотой свет
+    '    vec3 keyCol = iKey;',  // днём — золото, в золотой час — густой оранжевый, ночью — лунный синий
     '    vec3 fillCol = vec3(0.10, 0.15, 0.26);', // холодный синий заполняющий
     '    col = albedo * (keyCol*key*1.25 + fillCol*sky*0.9) * (0.30 + 0.70*ao);',
     // тёплый rim по кромкам к свету — золотая окантовка резьбы
     '    float rim = pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 2.5);',
-    '    col += rim * vec3(0.55, 0.40, 0.20) * (0.4 + 0.6*key);',
+    '    col += rim * iKey * 0.58 * (0.4 + 0.6*key);',
     // глубина тонет в сине-чёрном
     '    col *= exp(-dist*0.30);',
     '    col += vec3(0.015, 0.022, 0.04) * (1.0-ao) * 0.5;',
@@ -1421,7 +1420,8 @@ window._initTunnelGL = function(){
   ].join('\n');
 
   const material = new THREE.ShaderMaterial({
-    uniforms: { iResolution:{value:new THREE.Vector2(1,1)}, iTime:{value:0}, iTex:{value:null}, iTexOn:{value:0.0} },
+    uniforms: { iResolution:{value:new THREE.Vector2(1,1)}, iTime:{value:0}, iTex:{value:null}, iTexOn:{value:0.0},
+                iKey:{value:(()=>{try{const k=SUN.key;return new THREE.Vector3(k[0],k[1],k[2]);}catch(e){return new THREE.Vector3(0.95,0.70,0.42);}})()} },
     vertexShader: vert, fragmentShader: frag, depthTest:false, depthWrite:false
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2,2), material);
@@ -5051,6 +5051,86 @@ function closeTraffic(){
   go('map');
 }
 
+/* ═══ СВЕТ ПО СОЛНЦУ — неон, который задаёт небо над тобой ═══
+   Раз в минуту: высота Солнца у тебя → цвет ключевого света туннеля.
+   День (>10°) — фирменное золото; золотой час (≈ −4…8°) — густой оранжевый;
+   синий час и ночь (< −6°) — лунный синий, тусклее. Переходы плавные. ═══ */
+const SUN={alt:null,key:[0.95,0.70,0.42],
+  DAY:[0.95,0.70,0.42],GOLD:[1.0,0.46,0.16],NIGHT:[0.30,0.40,0.80],
+  start(){this.update();setInterval(()=>this.update(),60000);},
+  _mix(a,b,t){return a.map((v,i)=>v+(b[i]-v)*t);},
+  _sm(e0,e1,x){const t=Math.max(0,Math.min(1,(x-e0)/(e1-e0)));return t*t*(3-2*t);},
+  update(){
+    const p=(typeof PM!=='undefined'&&PM.last)||{lat:CLUB.lat,lng:CLUB.lng};
+    const a=solarElevation(new Date(),p.lat,p.lng);this.alt=a;
+    // день ← золотой час ← ночь
+    let k=this._mix(this.GOLD,this.DAY,this._sm(4,12,a));
+    k=this._mix(this.NIGHT,k,this._sm(-9,-2,a));
+    this.key=k;
+    const gl=window._tunnelGL;
+    if(gl){gl.material.uniforms.iKey.value.set(k[0],k[1],k[2]);gl._lastT=null;window.drawDepthTunnel(window._bgT||0);}
+    const ph=a>10?'day':a>-4?'gold':a>-9?'blue':'night';
+    if(document.body&&document.body.dataset.sun!==ph)document.body.dataset.sun=ph; // для CSS, раз в минуту
+  }
+};
+
+/* ═══ ЧУВСТВА — звук и вибрация кадра (по умолчанию выключены) ═══
+   Каждый тип события звучит по-своему; звук синтезируется на лету (WebAudio),
+   без файлов. Вибрация — где браузер умеет (Android; iOS Safari — нет).
+   iOS отдаёт звук только после касания — включение кнопкой это и есть. ═══ */
+const FEEL={on:false,ctx:null,
+  init(){try{this.on=localStorage.getItem('pnd-feel')==='1';}catch(e){}
+    document.addEventListener('pointerdown',()=>{if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();},{passive:true});
+    this._btn();},
+  toggle(){this.on=!this.on;try{localStorage.setItem('pnd-feel',this.on?'1':'0');}catch(e){}
+    this._btn();if(this.on){this._ac();this.cue('on');}toast(this.on?'🔊 Чувства: звук и вибрация кадров':'🔇 Чувства выключены');},
+  _btn(){const b=document.getElementById('dir-feel');if(b){b.textContent=this.on?'🔊':'🔇';b.title=this.on?'Звук кадров: вкл':'Звук кадров: выкл';}},
+  _ac(){if(!this.ctx){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;try{this.ctx=new A();}catch(e){return null;}}
+    if(this.ctx.state==='suspended')this.ctx.resume();return this.ctx;},
+  // тон: osc type, частота from→to, длительность, громкость, задержка
+  _tone(ac,o){const t0=ac.currentTime+(o.at||0),osc=ac.createOscillator(),g=ac.createGain();
+    osc.type=o.type||'sine';osc.frequency.setValueAtTime(o.f,t0);
+    if(o.to)osc.frequency.exponentialRampToValueAtTime(o.to,t0+o.d);
+    g.gain.setValueAtTime(0.0001,t0);g.gain.exponentialRampToValueAtTime(o.v||.08,t0+(o.a||.02));
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+o.d);
+    osc.connect(g).connect(this._out(ac));osc.start(t0);osc.stop(t0+o.d+.05);},
+  _noise(ac,o){const t0=ac.currentTime+(o.at||0),n=ac.sampleRate*o.d|0,buf=ac.createBuffer(1,n,ac.sampleRate),d=buf.getChannelData(0);
+    for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+    const src=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();src.buffer=buf;
+    f.type=o.ft||'lowpass';f.frequency.setValueAtTime(o.f,t0);if(o.to)f.frequency.exponentialRampToValueAtTime(o.to,t0+o.d);f.Q.value=o.q||1;
+    g.gain.setValueAtTime(0.0001,t0);g.gain.exponentialRampToValueAtTime(o.v||.06,t0+(o.a||.05));g.gain.exponentialRampToValueAtTime(0.0001,t0+o.d);
+    src.connect(f).connect(g).connect(this._out(ac));src.start(t0);},
+  _out(ac){if(!this._bus){this._bus=ac.createDynamicsCompressor();this._bus.connect(ac.destination);}return this._bus;},
+  KIND:{pass:'pass',eq:'eq',kp:'kp',sunset:'sun',sunrise:'sun',golden:'sun',fullmoon:'moon',dark:'moon',
+    ev:'event',club:'event',move:'move',alt:'move',air:'pass',trails:'trails'},
+  cue(kind,power){
+    if(!this.on)return;power=power==null?.5:Math.max(0,Math.min(1,power));
+    const VIB={pass:[18,40,18],eq:[60,40,40+120*power],kp:[40,60,40],sun:[30],moon:[20],event:[14,30,14],move:[10],trails:[8,60,8],on:[12]};
+    try{if(navigator.vibrate&&VIB[kind])navigator.vibrate(VIB[kind]);}catch(e){}
+    const ac=this._ac();if(!ac)return;
+    try{switch(kind){
+      case 'pass': // станция: два восходящих блика с эхом
+        this._tone(ac,{f:660,to:990,d:.45,v:.06});this._tone(ac,{f:880,to:1320,d:.5,v:.05,at:.18});this._tone(ac,{f:990,to:1480,d:.6,v:.025,at:.42});break;
+      case 'eq': // землетрясение: низкий удар и гул, сила — от магнитуды
+        this._tone(ac,{type:'sine',f:70,to:38,d:.5+power*.8,v:.12+.1*power,a:.01});this._noise(ac,{f:240,to:60,d:.6+power*.6,v:.05+.05*power});break;
+      case 'kp': // буря: дрожащие пилы под фильтром — «сияние»
+        [0,7,-6].forEach((dt,i)=>this._tone(ac,{type:'sawtooth',f:110*Math.pow(2,dt/1200)*(i?1.5:1),d:1.4,v:.018,a:.4}));
+        this._noise(ac,{ft:'bandpass',f:400,to:2400,d:1.4,v:.03,q:6});break;
+      case 'sun': // закат/восход: тёплый мажорный аккорд
+        [392,494,587].forEach((f,i)=>this._tone(ac,{type:'triangle',f,d:1.3,v:.04,a:.25,at:i*.06}));break;
+      case 'moon': // луна/тёмное небо: высокий тихий колокольчик
+        this._tone(ac,{f:1568,d:1.1,v:.035,a:.01});this._tone(ac,{f:2349,d:.9,v:.015,a:.01,at:.05});break;
+      case 'event': // ивент/клуб: щипок + квинта
+        this._tone(ac,{type:'triangle',f:523,d:.35,v:.07,a:.005});this._tone(ac,{type:'triangle',f:784,d:.4,v:.05,a:.005,at:.09});break;
+      case 'move': // движение: короткий вихрь
+        this._noise(ac,{ft:'bandpass',f:300,to:2600,d:.45,v:.05,q:2});break;
+      case 'trails': // следы: два мягких шага
+        this._noise(ac,{f:900,d:.08,v:.05,a:.005});this._noise(ac,{f:800,d:.08,v:.04,a:.005,at:.28});break;
+      default: this._tone(ac,{f:880,d:.12,v:.04,a:.005});
+    }}catch(e){}
+  }
+};
+
 /* ═══ РЕЖИССЁР — один кадр вместо десяти экранов ═══
    Каждые 5 с собирает кандидатов из уже живых потоков: пролёты станций (SAT),
    землетрясения и геомагнитная буря (ED), закат/восход и Луна, ивенты и клуб,
@@ -5215,6 +5295,9 @@ const DIR={
       this.log.unshift({t:Date.now(),title:f.title.replace('{t}',this._in((f.at||0)-Date.now())),s:Math.round(f.score)});
       if(this.log.length>12)this.log.length=12;this._save();
       card.style.setProperty('--dir-tint',f.tint);
+      if(this._shown&&!f.calm&&typeof FEEL!=='undefined'){const k=f.id.split(':')[0];
+        FEEL.cue(FEEL.KIND[k]||k,k==='eq'?f.R:f.score/100);}
+      this._shown=true;
       const m=document.getElementById('dir-main');
       if(m){m.classList.remove('dir-in');void m.offsetWidth;m.classList.add('dir-in');}
     }
@@ -5256,6 +5339,8 @@ LT.init();
 TT.start();
 SL.init();
 TR.init();
+SUN.start();
+FEEL.init();
 DIR.start();
 </script>
 
