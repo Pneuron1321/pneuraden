@@ -1,0 +1,2372 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PNEURADEN</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   PNEURADEN — Design System v1.1
+   Deep Bright Tech Cozyful
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  --bg:        #030508;
+  --surface:   #0a0f1e;
+  --surface2:  #0f1628;
+  --surface3:  #151d35;
+  --glass:     rgba(10,15,30,0.88);
+  --border:    rgba(168,85,247,0.15);
+  --border2:   rgba(168,85,247,0.32);
+  --np:  #a855f7;
+  --npi: #ec4899;
+  --nc:  #22d3ee;
+  --nm:  #34d399;
+  --ns:  #38bdf8;
+  --nl:  #818cf8;
+  --ng:  #fbbf24;
+  --vf:  #34d399;
+  --pnd: #fbbf24;
+  --ag:  #4ade80;
+  --cl:  #475569;
+  --dng: #f43f5e;
+  --txt: #e2e8f0;
+  --td:  rgba(226,232,240,0.55);
+  --tm:  rgba(226,232,240,0.28);
+  --r-s: 8px; --r-m: 16px; --r-l: 24px; --r-xl: 32px; --r-p: 9999px;
+  --t-f: 0.15s ease;
+  --t-m: 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+[data-theme="light"] {
+  --bg:        #eef2ff;
+  --surface:   #ffffff;
+  --surface2:  #f0f4ff;
+  --surface3:  #e4ecff;
+  --glass:     rgba(255,255,255,0.92);
+  --border:    rgba(79,70,229,0.14);
+  --border2:   rgba(79,70,229,0.28);
+  --np: #7c3aed; --npi:#db2777; --nc:#0284c7;
+  --nm:#059669; --ns:#0369a1; --nl:#4f46e5; --ng:#d97706;
+  --vf:#059669; --pnd:#d97706; --ag:#16a34a; --cl:#64748b;
+  --dng:#dc2626;
+  --txt:#0f172a; --td:rgba(15,23,42,0.6); --tm:rgba(15,23,42,0.32);
+}
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
+  font-family:'Rajdhani',sans-serif;-webkit-font-smoothing:antialiased;
+  overscroll-behavior:none}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit}
+
+#app{width:100vw;height:100vh;height:100dvh;position:relative;overflow:hidden}
+
+.vbg{position:fixed;inset:0;pointer-events:none;z-index:0}
+[data-theme="dark"] .vbg{
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 85%,rgba(168,85,247,0.07) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 35% at 85% 15%,rgba(34,211,238,0.05) 0%,transparent 70%),
+    linear-gradient(rgba(168,85,247,0.10) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(168,85,247,0.10) 1px,transparent 1px);
+  background-size:auto,auto,48px 48px,48px 48px}
+[data-theme="light"] .vbg{
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 85%,rgba(79,70,229,0.06) 0%,transparent 70%),
+    radial-gradient(ellipse 50% 35% at 85% 15%,rgba(14,165,233,0.04) 0%,transparent 70%),
+    linear-gradient(rgba(79,70,229,0.05) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(79,70,229,0.05) 1px,transparent 1px);
+  background-size:auto,auto,48px 48px,48px 48px}
+
+.view{position:absolute;inset:0;display:none;flex-direction:column}
+.view.active{display:flex}
+
+/* ── Island ── */
+.island{
+  background:var(--glass);border:1px solid var(--border2);
+  border-radius:var(--r-l);backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);padding:20px;position:relative;overflow:hidden}
+[data-theme="dark"] .island{
+  box-shadow:0 0 0 1px rgba(168,85,247,0.05),0 4px 24px rgba(0,0,0,0.45),
+    0 12px 40px rgba(0,0,0,0.5),0 0 60px rgba(168,85,247,0.04),inset 0 1px 0 rgba(255,255,255,0.04)}
+[data-theme="light"] .island{
+  background:rgba(255,255,255,.52);
+  backdrop-filter:blur(18px) saturate(180%);-webkit-backdrop-filter:blur(18px) saturate(180%);
+  border:1px solid rgba(255,255,255,.72);
+  box-shadow:0 8px 32px rgba(99,102,241,.18),0 2px 8px rgba(0,0,0,.07),
+    inset 0 1px 0 rgba(255,255,255,.85)}
+.island::before{content:'';position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(135deg,rgba(255,255,255,0.07) 0%,transparent 50%,rgba(0,0,0,0.02) 100%);
+  pointer-events:none}
+.island-s{padding:12px 16px;border-radius:var(--r-m)}
+.island-l{padding:28px;border-radius:var(--r-xl)}
+
+/* ── Components ── */
+.label{font-size:.6rem;letter-spacing:.3em;text-transform:uppercase;color:var(--tm);font-weight:700}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:10px 20px;border-radius:var(--r-s);border:1px solid var(--border2);
+  background:var(--surface2);color:var(--txt);font-size:.8rem;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;transition:all var(--t-f);user-select:none}
+.btn:hover{border-color:var(--np);box-shadow:0 0 12px rgba(168,85,247,0.22)}
+.btn:active{transform:scale(0.97)}
+.btn-p{background:var(--np);border-color:var(--np);color:#fff}
+.btn-p:hover{background:var(--npi);border-color:var(--npi);box-shadow:0 0 20px rgba(236,72,153,0.4)}
+.btn-g{background:transparent;border-color:transparent}
+.btn-g:hover{background:var(--surface2);border-color:var(--border)}
+.input{width:100%;padding:10px 14px;border-radius:var(--r-s);border:1px solid var(--border);
+  background:var(--surface2);color:var(--txt);font-size:.9rem;outline:none;
+  transition:border-color var(--t-f),box-shadow var(--t-f)}
+.input:focus{border-color:var(--np);box-shadow:0 0 0 3px rgba(168,85,247,0.1)}
+.input::placeholder{color:var(--tm)}
+select.input{-webkit-appearance:none;cursor:pointer}
+textarea.input{resize:vertical;min-height:72px;line-height:1.5}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;
+  border-radius:var(--r-p);font-size:.58rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.bv{background:rgba(52,211,153,.12);color:var(--vf);border:1px solid rgba(52,211,153,.25)}
+.bp{background:rgba(251,191,36,.12);color:var(--pnd);border:1px solid rgba(251,191,36,.25)}
+.ba{background:rgba(74,222,128,.12);color:var(--ag);border:1px solid rgba(74,222,128,.25)}
+.pdot{width:6px;height:6px;border-radius:50%;background:currentColor;
+  animation:pdotA 1.5s ease-in-out infinite}
+@keyframes pdotA{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+
+/* ── Orientation permission overlay ── */
+#gyro-overlay{position:fixed;inset:0;z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;
+  background:rgba(3,5,8,.92);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  cursor:pointer;transition:opacity .4s ease}
+#gyro-overlay.hidden{opacity:0;pointer-events:none}
+.gyro-ring{width:110px;height:110px;border-radius:50%;position:relative;
+  border:1.5px solid rgba(168,85,247,.3);
+  display:flex;align-items:center;justify-content:center;
+  animation:gyroRot 3s linear infinite}
+@keyframes gyroRot{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.gyro-ring::before{content:'N';position:absolute;top:8px;left:50%;transform:translateX(-50%);
+  font-family:'Orbitron',monospace;font-size:.65rem;font-weight:900;color:#ef4444}
+.gyro-ring::after{content:'';width:12px;height:12px;border-radius:50%;
+  background:radial-gradient(circle,#a855f7,#ec4899);
+  box-shadow:0 0 16px rgba(168,85,247,.8)}
+.gyro-title{font-family:'Orbitron',monospace;font-size:1rem;font-weight:700;
+  letter-spacing:.2em;text-align:center;
+  background:linear-gradient(135deg,#a855f7,#ec4899,#38bdf8);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.gyro-sub{font-size:.72rem;letter-spacing:.15em;color:rgba(226,232,240,.5);
+  text-transform:uppercase;text-align:center}
+.gyro-tap{padding:12px 32px;border-radius:9999px;
+  background:linear-gradient(135deg,rgba(168,85,247,.2),rgba(236,72,153,.15));
+  border:1px solid rgba(168,85,247,.5);
+  font-family:'Orbitron',monospace;font-size:.75rem;font-weight:700;
+  letter-spacing:.2em;color:#a855f7;text-transform:uppercase;
+  animation:tapPulse 2s ease-in-out infinite}
+@keyframes tapPulse{0%,100%{box-shadow:0 0 0 0 rgba(168,85,247,.4)}
+  50%{box-shadow:0 0 0 12px rgba(168,85,247,0)}}
+
+/* ── Pull-to-refresh ── */
+#ptr{position:absolute;top:0;left:0;right:0;z-index:200;display:flex;
+  align-items:center;justify-content:center;height:0;overflow:hidden;
+  transition:height .2s ease}
+#ptr.visible{height:64px}
+.ptr-arc{width:36px;height:36px;border-radius:50%;
+  border:2.5px solid transparent;
+  border-top-color:var(--np);border-right-color:var(--nc);
+  opacity:0;transition:opacity .15s,transform .15s}
+#ptr.visible .ptr-arc{opacity:1}
+#ptr.ready .ptr-arc{border-color:var(--nm);animation:ptrSpin .6s linear infinite}
+@keyframes ptrSpin{to{transform:rotate(360deg)}}
+
+/* ── Nav Bar ── */
+.nav{position:fixed;bottom:0;left:0;right:0;z-index:100;display:flex;
+  align-items:center;justify-content:space-around;
+  padding:8px 16px max(16px,env(safe-area-inset-bottom));
+  background:var(--glass);border-top:1px solid rgba(255,255,255,.10);
+  backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);
+  box-shadow:0 -1px 0 rgba(255,255,255,.04),0 -28px 52px rgba(0,0,0,.28)}
+.ni{display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:6px 16px;border-radius:var(--r-m);cursor:pointer;
+  transition:all var(--t-f);border:1px solid transparent;
+  background:none;color:var(--tm);min-width:54px}
+.ni.active{
+  border-color:var(--ni-border,rgba(168,85,247,.30));
+  background:var(--ni-bg,rgba(168,85,247,.08));
+  box-shadow:0 -6px 18px var(--ni-glow,rgba(168,85,247,.40)),inset 0 1px 0 rgba(255,255,255,.06)}
+.ni.active .ni-icon{transform:scale(1.18) translateY(-2px)}
+.ni[data-v="home"].active  {color:rgba(52,211,153,1); --ni-border:rgba(52,211,153,.28); --ni-bg:rgba(52,211,153,.08); --ni-glow:rgba(52,211,153,.38)}
+.ni[data-v="map"].active   {color:rgba(34,211,238,1); --ni-border:rgba(34,211,238,.28); --ni-bg:rgba(34,211,238,.08); --ni-glow:rgba(34,211,238,.38)}
+.ni[data-v="events"].active{color:rgba(168,85,247,1); --ni-border:rgba(168,85,247,.28); --ni-bg:rgba(168,85,247,.08); --ni-glow:rgba(168,85,247,.38)}
+.ni[data-v="profile"].active{color:rgba(251,191,36,1); --ni-border:rgba(251,191,36,.28); --ni-bg:rgba(251,191,36,.08); --ni-glow:rgba(251,191,36,.38)}
+.ni:hover:not(.active){color:var(--td)}
+.ni-icon{font-size:1.2rem;line-height:1}
+.ni-lbl{font-size:.5rem;letter-spacing:.15em;text-transform:uppercase;font-weight:700}
+
+/* ── Top Bar ── */
+.topbar{position:relative;z-index:10;display:flex;align-items:center;
+  justify-content:space-between;padding:16px 20px 12px;
+  padding-top:max(16px,env(safe-area-inset-top))}
+.logo{font-family:'Orbitron',monospace;font-size:1rem;font-weight:900;
+  letter-spacing:.2em;background:linear-gradient(135deg,var(--np),var(--npi));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.theme-btn{width:36px;height:36px;border-radius:50%;border:1px solid var(--border2);
+  background:var(--surface2);display:flex;align-items:center;justify-content:center;
+  font-size:1rem;transition:all var(--t-f)}
+.theme-btn:hover{border-color:var(--np);box-shadow:0 0 12px rgba(168,85,247,0.3)}
+
+/* ── HOME / RADAR ── */
+#vh{align-items:center;justify-content:space-between}
+#vh::before{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:radial-gradient(ellipse 52% 48% at 50% 46%,
+    transparent 18%, rgba(0,0,0,.52) 65%, rgba(0,0,0,.80) 100%)}
+[data-theme="light"] #vh::before{
+  background:radial-gradient(ellipse 70% 45% at 50% 0%,
+    rgba(99,102,241,.10) 0%,rgba(168,85,247,.06) 60%,transparent 100%)}
+[data-theme="light"] .radar-wrap{
+  box-shadow:
+    0 0 0 2px rgba(99,102,241,.50),
+    0 0 60px 20px rgba(99,102,241,.25),
+    0 0 130px 60px rgba(99,102,241,.11)}
+[data-theme="light"] .radar-wrap::after{
+  background:conic-gradient(
+    rgba(99,102,241,0) 0deg,
+    rgba(99,102,241,.65) 4deg,
+    rgba(14,165,233,.50) 18deg,
+    rgba(14,165,233,0) 32deg)}
+.home-main{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;position:relative;z-index:5;gap:20px;padding:0 20px;
+  perspective:700px;perspective-origin:50% 38%}
+.radar-wrap{position:relative;width:280px;height:280px;cursor:pointer;
+  user-select:none;-webkit-user-select:none;border-radius:50%;
+  box-shadow:
+    0 0 0 2px rgba(52,211,153,.55),
+    0 0 60px 20px rgba(52,211,153,.38),
+    0 0 140px 70px rgba(52,211,153,.16)}
+.radar-wrap:hover #radar{filter:brightness(1.15) drop-shadow(0 0 22px rgba(0,200,80,.55))}
+.radar-wrap::after{content:'';position:absolute;inset:-4px;border-radius:50%;z-index:2;
+  pointer-events:none;
+  background:conic-gradient(
+    rgba(168,85,247,0) 0deg,
+    rgba(168,85,247,.70) 4deg,
+    rgba(34,211,238,.55) 18deg,
+    rgba(34,211,238,0) 32deg);
+  -webkit-mask:radial-gradient(circle at 50% 50%,transparent 91%,black 92%);
+  mask:radial-gradient(circle at 50% 50%,transparent 91%,black 92%);
+  animation:sweepRing 3.5s linear infinite}
+@keyframes sweepRing{to{transform:rotate(360deg)}}
+#radar-minimap{position:absolute;top:0;left:0;width:280px;height:280px;
+  border-radius:50%;overflow:hidden;z-index:0}
+#radar{position:absolute;top:0;left:0;width:280px;height:280px;border-radius:50%;
+  display:block;z-index:1;pointer-events:none;
+  transition:filter var(--t-f);
+  filter:drop-shadow(0 0 14px rgba(0,180,70,.35))}
+.radar-hint{position:absolute;bottom:-30px;left:50%;transform:translateX(-50%);
+  font-size:.58rem;letter-spacing:.25em;color:var(--tm);text-transform:uppercase;
+  white-space:nowrap;animation:hintA 2.5s ease-in-out infinite;
+  text-shadow:0 -2px 10px rgba(52,211,153,.28)}
+@keyframes hintA{0%,100%{opacity:.3}50%{opacity:.9}}
+.zpills{display:flex;gap:6px;margin-top:8px;transform:translateZ(10px)}
+.zpill{width:7px;height:7px;border-radius:50%;border:1px solid var(--border2);
+  background:transparent;cursor:pointer;transition:all var(--t-f)}
+.zpill.active{background:var(--nm);border-color:var(--nm);box-shadow:0 0 6px rgba(52,211,153,.6);width:14px;border-radius:3px}
+.home-main::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 62% 52% at 50% 38%,
+    rgba(136 238 255/var(--aura-a1,.20)) 0%,
+    rgba(168 85 247/var(--aura-a2,.17)) 48%,
+    transparent 72%);
+}
+.home-title{font-family:'Orbitron',monospace;font-size:clamp(1.8rem,7vw,2.6rem);
+  font-weight:900;letter-spacing:.2em;text-align:center;transform:translateZ(22px)}
+[data-theme="dark"] .home-title{
+  background:linear-gradient(135deg,#a855f7,#ec4899,#38bdf8);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+[data-theme="light"] .home-title{color:var(--nl)}
+.home-coords{font-family:'Orbitron',monospace;font-size:.67rem;letter-spacing:.12em;
+  color:rgba(251,191,36,0.52);text-align:center;margin-top:4px;
+  text-shadow:0 -3px 18px rgba(52,211,153,.55);transform:translateZ(14px)}
+.stats{display:flex;gap:10px;width:100%;max-width:340px;transform:translateZ(-18px)}
+.stats .stat:nth-child(1){border-left:2px solid rgba(34,211,238,.55)}
+.stats .stat:nth-child(2){border-left:2px solid rgba(251,191,36,.55)}
+.stats .stat:nth-child(3){border-left:2px solid rgba(52,211,153,.55)}
+.stat{flex:1;padding:10px 12px;border-radius:var(--r-m);background:var(--surface);
+  border:1px solid var(--border);text-align:center;
+  animation:cardBreathe 6s ease-in-out infinite;transition:transform var(--t-f)}
+.stat:nth-child(2){animation-delay:2s}
+.stat:nth-child(3){animation-delay:4s}
+.stat:hover{transform:translateY(-2px);box-shadow:0 0 0 1px rgba(168,85,247,0.35),0 6px 20px rgba(168,85,247,0.12)}
+.stat-n{font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;color:var(--nc)}
+.stat-l{font-size:.5rem;letter-spacing:.18em;text-transform:uppercase;color:var(--tm);margin-top:2px}
+@keyframes cardBreathe{
+  0%,100%{box-shadow:0 0 0 1px var(--border),0 2px 8px rgba(0,0,0,.18)}
+  50%{box-shadow:0 0 0 1px rgba(168,85,247,0.22),0 2px 16px rgba(168,85,247,0.08)}}
+
+/* ── MAP ── */
+#vm{background:#0a0a10;overflow:hidden}
+#map-container{
+  position:absolute;
+  /* Must cover screen diagonal at any angle. Proof: diagonal=√(vw²+vh²) ≤ √2·vmax
+     So 142vmax×142vmax guaranteed to cover any screen shape at any rotation */
+  width:142vmax;height:142vmax;
+  top:50%;left:50%;
+  margin-top:-71vmax;margin-left:-71vmax;
+  z-index:1;
+  transform-origin:center center}
+.map-top{position:absolute;top:0;left:0;right:0;z-index:500;display:flex;
+  align-items:center;padding:12px 16px;gap:10px;
+  padding-top:max(12px,env(safe-area-inset-top));
+  background:linear-gradient(to bottom,rgba(3,5,8,.95) 0%,transparent 100%)}
+.map-back{width:36px;height:36px;border-radius:50%;border:1px solid var(--border2);
+  background:var(--glass);backdrop-filter:blur(10px);display:flex;
+  align-items:center;justify-content:center;color:var(--txt);font-size:.9rem;
+  flex-shrink:0;transition:all var(--t-f)}
+.map-back:hover{border-color:var(--np)}
+.map-search{flex:1;height:36px;border-radius:var(--r-p);border:1px solid var(--border);
+  background:var(--glass);backdrop-filter:blur(10px);padding:0 14px;
+  color:var(--txt);font-size:.85rem;outline:none}
+.map-layers{position:absolute;top:70px;right:12px;z-index:500;display:flex;flex-direction:column;gap:6px}
+.lbtn{width:36px;height:36px;border-radius:var(--r-s);border:1px solid var(--border2);
+  background:var(--glass);backdrop-filter:blur(10px);display:flex;align-items:center;
+  justify-content:center;cursor:pointer;font-size:.85rem;transition:all var(--t-f);
+  color:var(--td)}
+.lbtn.active{border-color:var(--nm);color:var(--nm)}
+.lbtn:hover:not(.active){color:var(--txt)}
+.map-locate{position:absolute;bottom:80px;left:12px;z-index:500;width:40px;height:40px;
+  border-radius:50%;border:1px solid var(--border2);background:var(--glass);
+  backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:1rem;color:var(--nc);transition:all var(--t-f)}
+.map-locate:hover{border-color:var(--nc);box-shadow:0 0 12px rgba(34,211,238,.3)}
+.map-addbtn{position:absolute;bottom:80px;left:62px;z-index:500;height:40px;
+  padding:0 16px;border-radius:var(--r-p);border:1px solid var(--np);
+  background:var(--glass);backdrop-filter:blur(10px);display:flex;align-items:center;
+  gap:6px;cursor:pointer;font-size:.72rem;font-weight:700;letter-spacing:.1em;
+  color:var(--np);text-transform:uppercase;transition:all var(--t-f)}
+.map-addbtn:hover{background:rgba(168,85,247,.15);box-shadow:0 0 16px rgba(168,85,247,.3)}
+.map-legend{position:absolute;bottom:80px;right:0;z-index:500;width:190px;
+  transform:translateX(100%);transition:transform var(--t-m)}
+.map-legend.open{transform:translateX(0)}
+.leg-tog{position:absolute;left:-38px;top:0;width:38px;height:38px;
+  border-radius:var(--r-s) 0 0 var(--r-s);background:var(--glass);
+  backdrop-filter:blur(10px);border:1px solid var(--border2);border-right:none;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  font-size:.8rem;color:var(--td)}
+.leg-body{background:var(--glass);backdrop-filter:blur(20px);
+  border:1px solid var(--border2);border-radius:var(--r-m) 0 0 var(--r-m);padding:14px}
+.leg-item{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:.7rem;color:var(--td)}
+.ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+/* Leaflet */
+.leaflet-container{font-family:'Rajdhani',sans-serif;background:#0a0a14}
+/* Radar minimap: always dark_all tiles — theme-independent filter */
+#radar-minimap .leaflet-tile-pane{filter:brightness(4.5) contrast(1.15)}
+/* Full map — dark theme */
+[data-theme="dark"] #map-container .leaflet-tile-pane{filter:brightness(3.8) contrast(1.1)}
+/* Full map — light theme: CSS-only (no SVG ref), expressive details */
+[data-theme="light"] #map-container .leaflet-tile-pane{filter:brightness(0.82) contrast(1.85) saturate(2.6)}
+.leaflet-popup-content-wrapper{background:transparent;border:none;box-shadow:none;padding:0}
+.leaflet-popup-content{margin:0}
+.leaflet-popup-tip{display:none}
+/* Club popup */
+.club-pop{width:280px;background:var(--glass);border:1px solid var(--border2);
+  border-radius:var(--r-l);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5),0 0 0 1px rgba(168,85,247,.1)}
+.club-hd{padding:16px 18px;background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(236,72,153,.1));
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.club-logo{width:48px;height:48px;border-radius:50%;
+  background:linear-gradient(135deg,rgba(168,85,247,.2),rgba(236,72,153,.15));
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  border:1px solid rgba(168,85,247,.4)}
+.club-nm{font-family:'Orbitron',monospace;font-size:.72rem;font-weight:700;letter-spacing:.08em}
+.club-sub{font-size:.62rem;color:var(--tm);margin-top:2px}
+.club-bd{padding:14px 18px}
+.srow{display:flex;justify-content:space-between;align-items:center;
+  padding:6px 0;border-bottom:1px solid var(--border);font-size:.75rem}
+.srow:last-child{border-bottom:none}
+.sday{color:var(--td);letter-spacing:.04em}
+.stime{color:var(--txt);font-weight:700;font-family:'Orbitron',monospace;font-size:.62rem}
+/* Event popup */
+.ev-pop{width:250px;background:var(--glass);border:1px solid var(--border2);
+  border-radius:var(--r-l);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  padding:16px;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.ev-pop-t{font-family:'Orbitron',monospace;font-size:.72rem;font-weight:700;
+  letter-spacing:.06em;margin-bottom:8px}
+.ev-pop-m{font-size:.7rem;color:var(--td);line-height:1.55}
+/* User popup */
+.user-pop{width:220px;background:var(--glass);border:1px solid var(--border2);
+  border-radius:var(--r-l);backdrop-filter:blur(24px);
+  padding:14px;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+
+/* ── EVENTS ── */
+#ve{overflow:hidden}
+.ev-scroll{flex:1;overflow-y:auto;padding:0 16px 80px;display:flex;flex-direction:column;gap:8px}
+.ev-scroll::-webkit-scrollbar{width:3px}
+.ev-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.sec-lbl{display:flex;align-items:center;gap:10px;padding:8px 0 4px}
+.sec-lbl-t{font-size:.6rem;letter-spacing:.28em;text-transform:uppercase;
+  color:var(--nc);font-weight:700;white-space:nowrap}
+.sec-lbl-t::before{content:'▸';margin-right:6px;display:inline-block;animation:pdotA 1.5s ease-in-out infinite}
+.sec-line{flex:1;height:1px;background:var(--border)}
+.ev-card{padding:14px 16px;border-radius:var(--r-m);background:var(--surface);
+  border:1px solid var(--border);border-left:3px solid var(--ev-accent,var(--border2));
+  transition:all var(--t-f);cursor:pointer}
+.ev-card:hover{border-color:var(--border2);transform:translateY(-1px);
+  box-shadow:0 4px 16px rgba(0,0,0,.2),0 0 14px var(--ev-accent,rgba(168,85,247,0.2))}
+.ev-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.ev-card-t{font-weight:700;font-size:.88rem;flex:1;margin-right:8px}
+.ev-card-m{display:flex;flex-direction:column;gap:3px;font-size:.68rem;color:var(--td)}
+.ev-card-d{font-size:.76rem;color:var(--td);line-height:1.5;margin-top:5px}
+
+/* ── ADD EVENT SHEET ── */
+.sheet{position:fixed;inset:0;z-index:1000;display:none;align-items:flex-end}
+.sheet.open{display:flex}
+.sheet-bg{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+.sheet-box{position:relative;z-index:1;width:100%;background:var(--surface);
+  border-radius:var(--r-xl) var(--r-xl) 0 0;border:1px solid var(--border2);border-bottom:none;
+  padding:20px 20px max(24px,env(safe-area-inset-bottom));max-height:85vh;overflow-y:auto;
+  animation:sheetUp var(--t-m) forwards}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-handle{width:40px;height:4px;border-radius:2px;background:var(--border2);
+  margin:0 auto 20px}
+.fg{margin-bottom:14px}
+.flbl{display:block;font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--tm);margin-bottom:6px;font-weight:700}
+
+/* ── PROFILE ── */
+#vp{overflow:hidden}
+.prof-scroll{flex:1;overflow-y:auto;padding:0 16px 80px;display:flex;flex-direction:column;gap:14px}
+.prof-scroll::-webkit-scrollbar{width:3px}
+.prof-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.avatar{width:72px;height:72px;border-radius:50%;
+  background:linear-gradient(135deg,var(--np),var(--npi));
+  display:flex;align-items:center;justify-content:center;font-size:2rem;
+  margin:0 auto;box-shadow:0 0 24px rgba(168,85,247,.4)}
+.auth-form{display:flex;flex-direction:column;gap:12px}
+/* Color swatches */
+.color-swatches{display:flex;gap:8px;flex-wrap:wrap;padding:6px 0}
+.cswatch{width:30px;height:30px;border-radius:50%;cursor:pointer;
+  transition:all .15s;border:2px solid transparent}
+.cswatch.selected{transform:scale(1.25);border-color:white}
+
+/* ── ADMIN ── */
+#vad{overflow:hidden}
+.adm-scroll{flex:1;overflow-y:auto;padding:0 16px 80px;display:flex;flex-direction:column;gap:10px}
+.adm-scroll::-webkit-scrollbar{width:3px}
+.adm-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.qcard{padding:14px 16px;border-radius:var(--r-m);background:var(--surface);
+  border:1px solid rgba(251,191,36,.4);display:flex;flex-direction:column;gap:8px}
+.adm-acts{display:flex;gap:8px}
+.btn-ok{flex:1;background:rgba(52,211,153,.1);border-color:var(--vf);color:var(--vf);font-size:.7rem}
+.btn-ok:hover{background:rgba(52,211,153,.2);box-shadow:0 0 10px rgba(52,211,153,.3)}
+.btn-no{flex:1;background:rgba(244,63,94,.1);border-color:var(--dng);color:var(--dng);font-size:.7rem}
+.btn-no:hover{background:rgba(244,63,94,.2);box-shadow:0 0 10px rgba(244,63,94,.3)}
+.status-tog{display:flex;gap:10px;align-items:center;padding:14px 16px;
+  border-radius:var(--r-m);background:var(--surface);border:1px solid var(--border)}
+.tog{position:relative;width:48px;height:26px;flex-shrink:0}
+.tog input{opacity:0;width:0;height:0}
+.tog-sl{position:absolute;inset:0;border-radius:13px;background:var(--surface3);
+  border:1px solid var(--border);cursor:pointer;transition:all var(--t-f)}
+.tog-sl::before{content:'';position:absolute;width:18px;height:18px;border-radius:50%;
+  background:var(--tm);top:3px;left:3px;transition:all var(--t-f)}
+input:checked+.tog-sl{background:rgba(74,222,128,.2);border-color:var(--ag)}
+input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
+  box-shadow:0 0 8px rgba(74,222,128,.5)}
+
+/* ── TOAST ── */
+#toasts{position:fixed;top:20px;left:50%;transform:translateX(-50%);
+  z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.toast{padding:10px 20px;border-radius:var(--r-p);background:var(--surface2);
+  border:1px solid var(--border2);font-size:.78rem;letter-spacing:.05em;
+  color:var(--txt);backdrop-filter:blur(10px);
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+  animation:tin .3s ease,tout .3s ease 2.7s forwards}
+@keyframes tin{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tout{from{opacity:1}to{opacity:0}}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── City Pulse — Event Energy Fields ── */
+@keyframes pulseExpand{
+  0%  {transform:scale(.25);opacity:.75}
+  100%{transform:scale(1);  opacity:0}}
+@keyframes pulseGlow{
+  0%,100%{opacity:.85}
+  50%    {opacity:1}}
+.pf-ring{position:absolute;border-radius:50%;border:1.5px solid;opacity:0;
+  animation:pulseExpand 2.6s ease-out infinite}
+.pf-ring:nth-child(2){animation-delay:.87s}
+.pf-ring:nth-child(3){animation-delay:1.74s}
+.pf-core{position:absolute;inset:0;border-radius:50%;animation:pulseGlow 2s ease-in-out infinite}
+/* ── Physics Whisper ─────────────────────────────── */
+#physics-whisper{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;pointer-events:none;padding:40px;text-align:center;opacity:0;}
+#physics-whisper span{font-family:'Rajdhani',sans-serif;font-size:clamp(1rem,4vw,1.45rem);font-weight:500;color:rgba(255,218,130,0.95);line-height:1.65;text-shadow:0 0 40px rgba(251,191,36,0.65),0 0 80px rgba(255,140,40,0.3);letter-spacing:0.03em;max-width:420px;display:block;}
+/* ── Earth Glow — planetary ambient light in Space View ── */
+#vspace::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:2;mix-blend-mode:screen;background:radial-gradient(ellipse 140% 45% at 50% 112%,rgba(251,191,36,0.11) 0%,transparent 60%),radial-gradient(ellipse 80% 28% at 50% 122%,rgba(255,80,20,0.06) 0%,transparent 50%);}
+</style>
+<script defer src="https://unpkg.com/three@0.148.0/build/three.min.js"></script>
+</head>
+<body>
+<!-- SVG filter: sharpening convolution matrix for crisp dark outlines on map tiles -->
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="tile-sharpen" color-interpolation-filters="sRGB" x="0%" y="0%" width="100%" height="100%">
+      <!-- Unsharp mask kernel: amplifies edges between light bg and dark features -->
+      <feConvolveMatrix order="3"
+        kernelMatrix="-1 -1 -1  -1 9 -1  -1 -1 -1"
+        preserveAlpha="true" edgeMode="duplicate"/>
+    </filter>
+  </defs>
+</svg>
+<div id="gyro-overlay" class="hidden">
+  <div class="gyro-ring"></div>
+  <div class="gyro-title">PNEURADEN</div>
+  <div class="gyro-sub">Компас · Навигация</div>
+  <div class="gyro-tap">Коснитесь для запуска</div>
+</div>
+<div id="app">
+<div class="vbg"></div>
+
+<!-- ═══ HOME ═══ -->
+<div id="vh" class="view active">
+  <div id="ptr"><div class="ptr-arc"></div></div>
+  <div class="topbar">
+    <span class="logo">PNEURADEN</span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span id="uid" style="font-size:.6rem;letter-spacing:.15em;color:var(--tm);text-transform:uppercase"></span>
+      <span id="eq-chip" style="font-size:.6rem;letter-spacing:.08em;color:var(--dng);opacity:.9"></span>
+      <span id="kp-chip" style="font-size:.6rem;letter-spacing:.08em;color:var(--nc);opacity:.9"></span>
+      <button id="schumann-btn" class="theme-btn" onclick="toggleSchumann()" title="Schumann 7.83Hz" style="opacity:0.28"><svg viewBox="0 0 26 14" width="20" height="11" style="display:block"><path d="M0,7 L3,7 L5.5,1 L8,13 L10.5,7 L13,7 L15.5,1 L18,13 L20.5,7 L23,7 L26,7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="theme-btn" onclick="toggleTheme()">🌓</button>
+    </div>
+  </div>
+  <div class="home-main">
+    <div class="radar-wrap" id="rwrap" onclick="goMap()">
+      <div id="radar-minimap"></div>
+      <canvas id="radar" width="560" height="560"></canvas>
+      <div class="radar-hint">нажми · открыть карту</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:36px">
+      <div class="home-title">PNEURADEN</div>
+      <div class="home-coords" id="hcoords">45.0811°N · 13.6387°E · ROVINJ</div>
+      <div class="zpills" id="zpills">
+        <div class="zpill" onclick="setZoom(0,event)"></div>
+        <div class="zpill active" onclick="setZoom(1,event)"></div>
+        <div class="zpill" onclick="setZoom(2,event)"></div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-n" id="sv">0</div>
+        <div class="stat-l">СОБЫТИЯ</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n" id="sp" style="color:var(--pnd)">0</div>
+        <div class="stat-l">ОЖИДАЮТ</div>
+      </div>
+      <div class="stat">
+        <div id="cs-dot" style="font-size:1.1rem;color:var(--ag)">●</div>
+        <div class="stat-l" id="cs-lbl">Открыт</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MAP ═══ -->
+<div id="vm" class="view">
+  <div class="map-top">
+    <button class="map-back" onclick="go('home')">←</button>
+    <input class="map-search" placeholder="Поиск..." type="text">
+    <button class="theme-btn" onclick="toggleTheme()" style="flex-shrink:0">🌓</button>
+  </div>
+  <div id="map-container"></div>
+  <div class="map-layers">
+    <div class="lbtn active" id="lv" onclick="toggleL('v')" title="Верифицированные">🟢</div>
+    <div class="lbtn active" id="lp" onclick="toggleL('p')" title="На проверке">🟡</div>
+    <div class="lbtn active" id="lc" onclick="toggleL('c')" title="Клуб">⭕</div>
+    <div class="lbtn active" id="lq" onclick="toggleL('q')" title="Землетрясения · USGS live">🌋</div>
+  </div>
+  <div class="map-legend" id="mleg">
+    <div class="leg-tog" onclick="document.getElementById('mleg').classList.toggle('open')">☰</div>
+    <div class="leg-body">
+      <div class="label" style="margin-bottom:10px">Легенда</div>
+      <div class="leg-item"><div class="ldot" style="background:#4ade80;box-shadow:0 0 6px #4ade80"></div>Верифицировано</div>
+      <div class="leg-item"><div class="ldot" style="background:#fbbf24;box-shadow:0 0 6px #fbbf24"></div>На проверке</div>
+      <div class="leg-item"><div class="ldot" style="background:#a855f7;box-shadow:0 0 6px #a855f7"></div>Борцовский клуб</div>
+      <div class="leg-item"><div class="ldot" style="background:#ef4444;box-shadow:0 0 6px #ef4444;animation:pdotA 1.5s ease-in-out infinite"></div>Пользователи</div>
+    </div>
+  </div>
+  <button class="map-locate" onclick="locate()" title="Моя позиция">📍</button>
+  <button class="map-locate" onclick="refreshGeo()" title="Обновить геолокацию" style="bottom:134px;width:48px;height:48px;left:10px;font-size:1.4rem;color:var(--np)">↻</button>
+  <button class="map-locate" onclick="if(window._map&&window._um)window._map.setView(window._um.getLatLng(),ZOOM_MAP[1]);else if(window._map)window._map.setZoom(ZOOM_MAP[1])" title="Моя позиция · зум как на радаре" style="bottom:194px;width:48px;height:48px;left:10px;padding:0;border-color:rgba(52,211,153,.45);color:var(--nm)">
+    <svg viewBox="0 0 40 40" width="26" height="26">
+      <!-- magnifying glass -->
+      <circle cx="17" cy="17" r="10" stroke="rgba(52,211,153,.85)" stroke-width="2.2" fill="none"/>
+      <line x1="24.5" y1="24.5" x2="34" y2="34" stroke="rgba(52,211,153,.85)" stroke-width="2.5" stroke-linecap="round"/>
+      <!-- location pin inside -->
+      <circle cx="17" cy="15.5" r="3" stroke="rgba(52,211,153,1)" stroke-width="1.8" fill="none"/>
+      <line x1="17" y1="18.5" x2="17" y2="23" stroke="rgba(52,211,153,1)" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+  </button>
+  <button class="map-locate" onclick="openSpaceView()" title="Space view · 3D глобус" style="bottom:314px;width:48px;height:48px;left:10px;padding:0;border-color:rgba(80,160,255,.4);background:rgba(4,7,16,.85)">
+    <svg viewBox="0 0 40 40" width="28" height="28">
+      <circle cx="20" cy="20" r="9.5" fill="none" stroke="rgba(100,180,255,0.85)" stroke-width="1.5"/>
+      <ellipse cx="20" cy="20" rx="18" ry="7" fill="none" stroke="rgba(100,180,255,0.40)" stroke-width="1.1" transform="rotate(-22 20 20)"/>
+      <circle cx="5" cy="7" r="0.9" fill="rgba(255,255,255,0.55)"/>
+      <circle cx="34" cy="11" r="0.9" fill="rgba(255,255,255,0.55)"/>
+      <circle cx="7" cy="31" r="0.9" fill="rgba(255,255,255,0.55)"/>
+      <circle cx="33" cy="33" r="0.9" fill="rgba(255,255,255,0.55)"/>
+    </svg>
+  </button>
+  <button class="map-locate" onclick="go('home')" title="Радар" style="bottom:254px;width:48px;height:48px;left:10px;padding:0;border-color:rgba(0,200,75,.4);background:rgba(4,7,16,.85)">
+    <svg viewBox="0 0 40 40" width="32" height="32">
+      <circle cx="20" cy="20" r="17" stroke="rgba(0,255,80,.65)" stroke-width="1.2" fill="none"/>
+      <circle cx="20" cy="20" r="11" stroke="rgba(0,255,80,.4)" stroke-width="1" fill="none"/>
+      <circle cx="20" cy="20" r="5.5" stroke="rgba(0,255,80,.25)" stroke-width="1" fill="none"/>
+      <line x1="20" y1="3" x2="20" y2="37" stroke="rgba(0,255,80,.18)" stroke-width="1"/>
+      <line x1="3" y1="20" x2="37" y2="20" stroke="rgba(0,255,80,.18)" stroke-width="1"/>
+      <text x="20" y="9.5" text-anchor="middle" font-size="5.5" fill="rgba(255,55,55,.95)" font-family="Orbitron,monospace" font-weight="900">N</text>
+      <circle cx="20" cy="20" r="2.5" fill="#fff" opacity=".9"/>
+    </svg>
+  </button>
+  <button class="map-addbtn" onclick="openSheet()">+ добавить ивент</button>
+</div>
+
+<!-- ═══ EVENTS ═══ -->
+<div id="ve" class="view">
+  <div class="topbar">
+    <span class="logo" style="font-size:.85rem">ИВЕНТЫ</span>
+    <button class="btn btn-p" style="font-size:.65rem;padding:6px 14px" onclick="openSheet()">+ Добавить</button>
+  </div>
+  <div class="ev-scroll" id="evlist"></div>
+</div>
+
+<!-- ═══ PROFILE ═══ -->
+<div id="vp" class="view">
+  <div class="topbar">
+    <span class="logo" style="font-size:.85rem">ПРОФИЛЬ</span>
+  </div>
+  <div class="prof-scroll" id="profcont"></div>
+</div>
+
+<!-- ═══ ADMIN ═══ -->
+<div id="vad" class="view">
+  <div class="topbar">
+    <span class="logo" style="font-size:.85rem">⚡ ADMIN</span>
+    <button class="btn btn-g" style="font-size:.65rem;padding:6px 12px" onclick="go('profile')">← Выйти</button>
+  </div>
+  <div class="adm-scroll" id="admcont"></div>
+</div>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+  <button class="ni active" data-v="home" onclick="go('home')">
+    <span class="ni-icon">◎</span><span class="ni-lbl">Радар</span>
+  </button>
+  <button class="ni" data-v="map" onclick="go('map')">
+    <span class="ni-icon">🗺</span><span class="ni-lbl">Карта</span>
+  </button>
+  <button class="ni" data-v="events" onclick="go('events')">
+    <span class="ni-icon">⚡</span><span class="ni-lbl">Ивенты</span>
+  </button>
+  <button class="ni" data-v="profile" onclick="go('profile')">
+    <span class="ni-icon">👤</span><span class="ni-lbl">Профиль</span>
+  </button>
+</nav>
+
+<!-- ADD EVENT SHEET -->
+<div class="sheet" id="sheet">
+  <div class="sheet-bg" onclick="closeSheet()"></div>
+  <div class="sheet-box">
+    <div class="sheet-handle"></div>
+    <div style="font-family:'Orbitron',monospace;font-size:.78rem;letter-spacing:.15em;margin-bottom:16px">НОВЫЙ ИВЕНТ</div>
+    <div class="fg"><label class="flbl">Название *</label>
+      <input class="input" id="et" placeholder="Название ивента" type="text"></div>
+    <div class="fg"><label class="flbl">Тип</label>
+      <select class="input" id="ety">
+        <option value="training">🥋 Тренировка</option>
+        <option value="concert">🎸 Концерт</option>
+        <option value="market">🛒 Маркет</option>
+        <option value="meetup">🤝 Встреча</option>
+        <option value="sport">⚽ Спорт</option>
+        <option value="other">⭐ Другое</option>
+      </select></div>
+    <div class="fg"><label class="flbl">Дата и время</label>
+      <input class="input" id="ed" type="datetime-local"></div>
+    <div class="fg"><label class="flbl">Место (адрес)</label>
+      <input class="input" id="eloc" placeholder="Адрес или описание места" type="text"></div>
+    <div class="fg"><label class="flbl">Описание</label>
+      <textarea class="input" id="edesc" placeholder="Описание ивента..."></textarea></div>
+    <div class="fg"><label class="flbl">Сообщение администратору</label>
+      <textarea class="input" id="emsg" placeholder="Дополнительная информация..." style="min-height:58px"></textarea></div>
+    <button class="btn btn-p" style="width:100%" onclick="submitEv()">Отправить на верификацию</button>
+  </div>
+</div>
+
+<div id="toasts"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════
+   PNEURADEN v1.1 — Core
+   ═══════════════════════════════════════════════════════════ */
+
+// One-time migration: clear fake default events from v1.0
+if(!localStorage.getItem('pnd-v2')){
+  localStorage.removeItem('pnd-ev');
+  localStorage.setItem('pnd-v2','1');
+}
+
+/* ── Constants ─────────────────────────────────────────── */
+const _sc = JSON.parse(localStorage.getItem('pnd-club')||'null');
+const CLUB = {
+  get lat(){ return JSON.parse(localStorage.getItem('pnd-club')||'null')?.lat ?? 45.0811; },
+  get lng(){ return JSON.parse(localStorage.getItem('pnd-club')||'null')?.lng ?? 13.6387; },
+  name:'HK Rovinj Rovigno', sub:'Борцовский клуб · Ровинь',
+  schedule:[
+    {d:'Пн',t:'18:30 — 20:30'},{d:'Ср',t:'18:30 — 20:30'},
+    {d:'Пт',t:'18:30 — 20:30'},{d:'Сб',t:'10:00 — 12:00'}
+  ],
+  contact:'+385 91 xxx xxxx'
+};
+
+const EV_ICONS = {training:'🥋',concert:'🎸',market:'🛒',meetup:'🤝',sport:'⚽',other:'⭐'};
+
+const USER_COLORS = [
+  {id:'cyan',   o:'#22d3ee', i:'#0891b2'},
+  {id:'mint',   o:'#34d399', i:'#059669'},
+  {id:'sky',    o:'#38bdf8', i:'#0369a1'},
+  {id:'amber',  o:'#fbbf24', i:'#b45309'},
+  {id:'rose',   o:'#fb7185', i:'#e11d48'},
+  {id:'violet', o:'#818cf8', i:'#4338ca'},
+  {id:'orange', o:'#fb923c', i:'#c2410c'},
+  {id:'lime',   o:'#a3e635', i:'#4d7c0f'},
+];
+
+function defaultEvents(){ return []; }
+
+/* ── City Pulse helpers ─────────────────────────────────── */
+const EV_COLS={training:'168,85,247',concert:'236,72,153',market:'251,191,36',
+  meetup:'34,211,238',sport:'52,211,153',other:'129,140,248'};
+const EV_HEX={training:'#a855f7',concert:'#ec4899',market:'#fbbf24',
+  meetup:'#22d3ee',sport:'#34d399',other:'#818cf8'};
+
+function eventIntensity(ev){
+  if(!ev.verified) return .32;
+  if(!ev.date) return .6;
+  const diff=(new Date(ev.date).getTime()-Date.now())/3600000;
+  if(diff>=-1&&diff<=0)  return 1.0;   // happening NOW
+  if(diff>0 &&diff<=2)   return .88;   // starting soon (≤2h)
+  if(diff>2 &&diff<=6)   return .68;   // upcoming today (≤6h)
+  if(diff<-1&&diff>=-3)  return .72;   // just finished (≤3h ago)
+  return .45;                           // future / distant past
+}
+
+function circadianFactor(){
+  const h=new Date().getHours()+new Date().getMinutes()/60;
+  const a=Math.sin((h-3)*Math.PI/12)*.38+.62;
+  return Math.max(.2,Math.min(1,a));
+}
+let _seismic=[];
+function triggerSeismicWave(lat,lng,type){
+  _seismic.push({lat,lng,rgb:EV_COLS[type]||'129,140,248',t:Date.now()});
+}
+let _gpsAccuracy=null;
+let _schumannBase=0.8;  // planetary storm activity 0.6..1.0 (updates 1/min)
+let _sPulse=0;          // current Schumann pulse value -1..1
+let _schumannOn=false;  // Schumann 7.83Hz display: off by default
+
+/* ── PositionManager: ОДНА GPS-подписка на всё приложение ──
+   Раньше карта и радар держали два параллельных watchPosition
+   с enableHighAccuracy — двойной расход батареи. Теперь один поток,
+   все потребители (карта, радар, Firebase) подписываются. ── */
+const PM={w:null,subs:[],last:null,
+  sub(fn){this.subs.push(fn);if(this.last)fn(this.last);this.start();},
+  start(){if(this.w!=null||!navigator.geolocation)return;
+    this.w=navigator.geolocation.watchPosition(
+      p=>{this.last={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
+          _gpsAccuracy=p.coords.accuracy;this.subs.forEach(f=>f(this.last));},
+      e=>{if(e.code===e.PERMISSION_DENIED)toast('Разрешите геолокацию для точного отображения');},
+      {enableHighAccuracy:true,timeout:15000,maximumAge:0});},
+  refresh(cb,err){if(!navigator.geolocation){err&&err();return;}
+    navigator.geolocation.getCurrentPosition(
+      p=>{this.last={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
+          _gpsAccuracy=p.coords.accuracy;this.subs.forEach(f=>f(this.last));cb&&cb(this.last);},
+      ()=>{err&&err();},{enableHighAccuracy:true,timeout:12000,maximumAge:0});}
+};
+
+/* ── OrientationManager: одно iOS-разрешение, общий компас ──
+   Раньше карта звала requestPermission() при инициализации БЕЗ жеста
+   пользователя — на iOS это всегда падало, и поворот не работал никогда.
+   Теперь единый шлюз: радарный оверлей = единственная точка запроса. ── */
+const OM={subs:[],on:false,head:null,
+  sub(fn){this.subs.push(fn);if(this.head!=null)fn(this.head);},
+  _h(e){const h=e.webkitCompassHeading!=null?e.webkitCompassHeading
+      :(e.alpha!=null?(360-e.alpha)%360:null);
+    if(h==null)return;OM.head=h;OM.subs.forEach(f=>f(h));},
+  attach(){if(this.on)return;this.on=true;
+    // Android Chrome: absolute-вариант привязан к сторонам света
+    if('ondeviceorientationabsolute' in window)
+      window.addEventListener('deviceorientationabsolute',this._h);
+    else window.addEventListener('deviceorientation',this._h);},
+  request(){ // iOS 13+: вызывать только из жеста пользователя
+    if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+      return DeviceOrientationEvent.requestPermission()
+        .then(p=>{if(p==='granted')this.attach();return p;});}
+    this.attach();return Promise.resolve('granted');}
+};
+
+/* ── Уравнение времени (Spencer 1971): подсолнечная точка и терминатор
+   раньше считались по среднему солнцу — ошибка до ~4° долготы (≈16 мин). ── */
+function _eotMin(d){
+  const start=Date.UTC(d.getUTCFullYear(),0,1);
+  const B=2*Math.PI*((d.getTime()-start)/864e5)/365.2422;
+  return 229.18*(0.000075+0.001868*Math.cos(B)-0.032077*Math.sin(B)
+    -0.014615*Math.cos(2*B)-0.040849*Math.sin(2*B));
+}
+function moonPhase(date){
+  const d=(date-new Date(2000,0,6))/(864e5);
+  return((d%29.53058867)+29.53058867)%29.53058867; // days since new moon
+}
+function solarElevation(date,lat,lng){
+  lat=lat||45.08; lng=lng||13.64;
+  const d=(date.getTime()-946728000000)/86400000;
+  const g=(357.529+0.98560028*d)*Math.PI/180;
+  const L=(280.459+0.98564736*d+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
+  const sD=Math.sin(0.40928)*Math.sin(L);
+  const ha=((date.getUTCHours()+date.getUTCMinutes()/60+_eotMin(date)/60+lng/15-12)*15)*Math.PI/180;
+  const lR=lat*Math.PI/180;
+  return Math.asin(Math.sin(lR)*sD+Math.cos(lR)*Math.sqrt(1-sD*sD)*Math.cos(ha))*180/Math.PI;
+}
+function solarPosition(date,lat,lng){
+  lat=lat||45.08;lng=lng||13.64;
+  const d=(date.getTime()-946728000000)/86400000;
+  const g=(357.529+0.98560028*d)*Math.PI/180;
+  const L=(280.459+0.98564736*d+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
+  const sD=Math.sin(0.40928)*Math.sin(L);const cD=Math.sqrt(1-sD*sD);
+  const ha=((date.getUTCHours()+date.getUTCMinutes()/60+_eotMin(date)/60+lng/15-12)*15)*Math.PI/180;
+  const lR=lat*Math.PI/180;
+  const sinAlt=Math.sin(lR)*sD+Math.cos(lR)*cD*Math.cos(ha);
+  const alt=Math.asin(Math.max(-1,Math.min(1,sinAlt)))*180/Math.PI;
+  const cA=Math.cos(lR)*Math.cos(alt*Math.PI/180);
+  let az=Math.acos(Math.max(-1,Math.min(1,cA<1e-4?0:(sD-Math.sin(lR)*sinAlt)/cA)))*180/Math.PI;
+  if(Math.sin(ha)>0)az=360-az;
+  return{alt,az};
+}
+function schumannFactor(d){
+  // Global lightning activity by UTC hour — three main centers
+  const h=d.getUTCHours()+d.getUTCMinutes()/60;
+  const af=Math.max(0,1-Math.abs(h-19)/2);   // Africa: peak 19 UTC
+  const as=Math.max(0,1-Math.abs(h-8)/2);    // Asia: peak 8 UTC
+  const amD=Math.min(Math.abs(h-23),Math.abs(h+1));
+  const am=Math.max(0,1-amD/2);              // Americas: peak 23 UTC
+  return 0.6+0.4*Math.max(af,as,am);         // 0.6..1.0
+}
+function nightPolygon(d){
+  // Solar declination from orbital mechanics (same math as solarPosition)
+  const days=(d.getTime()-946728000000)/86400000;
+  const g=(357.529+0.98560028*days)*Math.PI/180;
+  const Lsun=(280.459+0.98564736*days+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
+  const dec=Math.asin(Math.max(-1,Math.min(1,Math.sin(0.40928)*Math.sin(Lsun))));
+  // Subsolar longitude: where it's solar noon right now
+  const h=d.getUTCHours()+d.getUTCMinutes()/60+d.getUTCSeconds()/3600+_eotMin(d)/60;
+  const lngSub=((12-h)*15+540)%360-180;
+  // Terminator: latitude where solar elevation=0° for each longitude
+  // Must use atan (not atan2) — atan2 gives wrong quadrant when tan(dec)<0
+  const pts=[];
+  for(let lng=-180;lng<=180;lng+=2){
+    const ha=(lng-lngSub)*Math.PI/180;
+    const lat=Math.atan(-Math.cos(ha)/Math.tan(dec))*180/Math.PI;
+    pts.push([lat,lng]);
+  }
+  // Close polygon around the night-side pole
+  const pole=dec>=0?-90:90;
+  return[[pole,-180],...pts,[pole,180]];
+}
+// Real subsolar point — where the Sun is directly overhead right now
+function subsolarPoint(d){
+  const days=(d.getTime()-946728000000)/86400000;
+  const g=(357.529+0.98560028*days)*Math.PI/180;
+  const Lsun=(280.459+0.98564736*days+1.915*Math.sin(g)+0.02*Math.sin(2*g))*Math.PI/180;
+  const dec=Math.asin(Math.max(-1,Math.min(1,Math.sin(0.40928)*Math.sin(Lsun))));
+  const h=d.getUTCHours()+d.getUTCMinutes()/60+d.getUTCSeconds()/3600+_eotMin(d)/60;
+  return{lat:dec*180/Math.PI,lng:((12-h)*15+540)%360-180};
+}
+// Real sublunar point — where the Moon is directly overhead right now (simplified Meeus)
+function sublunarPoint(d){
+  const days=(d.getTime()-946728000000)/86400000;
+  const L=(218.316+13.176396*days)*Math.PI/180;
+  const M=(134.963+13.064993*days)*Math.PI/180;
+  const F=(93.272+13.229350*days)*Math.PI/180;
+  const lam=L+(6.289*Math.sin(M)+1.274*Math.sin(2*L-M)+0.658*Math.sin(2*L)-0.214*Math.sin(2*M))*Math.PI/180;
+  const beta=5.128*Math.sin(F)*Math.PI/180;
+  const eps=23.4397*Math.PI/180;
+  const dec=Math.asin(Math.max(-1,Math.min(1,Math.sin(beta)*Math.cos(eps)+Math.cos(beta)*Math.sin(eps)*Math.sin(lam))));
+  const ra=Math.atan2(Math.sin(lam)*Math.cos(eps)-Math.tan(beta)*Math.sin(eps),Math.cos(lam));
+  const GMST=((280.46061837+360.98564736629*days)%360)*Math.PI/180;
+  let lng=(ra-GMST)*180/Math.PI;while(lng>180)lng-=360;while(lng<-180)lng+=360;
+  return{lat:dec*180/Math.PI,lng};
+}
+function moonPos(date,lat,lng){
+  lat=lat||45.08;lng=lng||13.64;
+  const d=(date.getTime()-946728000000)/86400000;
+  const L0=((218.316+13.176396*d)%360+360)%360;
+  const M=((134.963+13.064993*d)%360+360)%360;
+  const lon=(L0+6.289*Math.sin(M*Math.PI/180))*Math.PI/180;
+  const sD=Math.sin(0.40928)*Math.sin(lon);const cD=Math.sqrt(1-sD*sD);
+  const ra=Math.atan2(Math.cos(0.40928)*Math.sin(lon),Math.cos(lon))*180/Math.PI;
+  const gmst=((280.46061837+360.98564736629*d)%360+360)%360;
+  const haDeg=((gmst+lng-ra)%360+360)%360;
+  const ha=(haDeg>180?haDeg-360:haDeg)*Math.PI/180;
+  const lR=lat*Math.PI/180;
+  const sinAlt=Math.sin(lR)*sD+Math.cos(lR)*cD*Math.cos(ha);
+  const alt=Math.asin(Math.max(-1,Math.min(1,sinAlt)))*180/Math.PI;
+  const cA=Math.cos(lR)*Math.cos(alt*Math.PI/180);
+  let az=Math.acos(Math.max(-1,Math.min(1,cA<1e-4?0:(sD-Math.sin(lR)*sinAlt)/cA)))*180/Math.PI;
+  if(Math.sin(ha)>0)az=360-az;
+  return{alt,az};
+}
+
+function pulseEventIcon(ev){
+  const inten=eventIntensity(ev);
+  const col=EV_HEX[ev.type]||'#818cf8';
+  const sz=Math.round(10+inten*8);          // core 10-18px
+  const fsz=Math.round(64+inten*56);        // field 64-120px
+  const off=Math.round(-fsz/2+sz/2);
+  const dur=(2.6-inten*.7).toFixed(2);
+  const rings=ev.verified&&inten>.5?`
+    <div class="pf-ring" style="width:${fsz}px;height:${fsz}px;top:${off}px;left:${off}px;border-color:${col};animation-duration:${dur}s"></div>
+    <div class="pf-ring" style="width:${fsz}px;height:${fsz}px;top:${off}px;left:${off}px;border-color:${col};animation-duration:${dur}s;animation-delay:.87s"></div>
+    <div class="pf-ring" style="width:${fsz}px;height:${fsz}px;top:${off}px;left:${off}px;border-color:${col};animation-duration:${dur}s;animation-delay:1.74s"></div>`:'';
+  const html=`<div style="position:relative;width:${sz}px;height:${sz}px">
+    ${rings}
+    <div class="pf-core" style="width:${sz}px;height:${sz}px;background:${col};
+      box-shadow:0 0 ${sz}px ${col},0 0 ${sz*2}px ${col}40;
+      border:2px solid rgba(255,255,255,.45)"></div>
+  </div>`;
+  return L.divIcon({className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
+    popupAnchor:[0,-sz/2-6],html});
+}
+
+const S = {
+  view:'home',
+  theme: localStorage.getItem('pnd-t')||'dark',
+  clubActive: JSON.parse(localStorage.getItem('pnd-ca')?? 'true'),
+  user: JSON.parse(localStorage.getItem('pnd-u')||'null'),
+  events: JSON.parse(localStorage.getItem('pnd-ev')||'null') || defaultEvents(),
+  mapInit:false,
+  radarZoom:1,
+  compassAngle:0
+};
+
+document.documentElement.setAttribute('data-theme',S.theme);
+
+/* ── SVG Generators ─────────────────────────────────────── */
+function clubSVG(color, size=32){
+  // Wrestling mat — top-down view with passive zone and competition halves
+  return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="24" cy="24" r="22" fill="#12082a" stroke="${color}" stroke-width="2.5"/>
+    <circle cx="24" cy="24" r="14.5" fill="none" stroke="#c8922a" stroke-width="2" opacity="0.9"/>
+    <path d="M 9.5 24 A 14.5 14.5 0 0 1 38.5 24 Z" fill="#2563eb" opacity="0.55"/>
+    <path d="M 9.5 24 A 14.5 14.5 0 0 0 38.5 24 Z" fill="#dc2626" opacity="0.55"/>
+    <circle cx="24" cy="24" r="4.5" fill="${color}" opacity="0.95"/>
+    <circle cx="24" cy="24" r="4.5" stroke="rgba(255,255,255,0.6)" stroke-width="1" fill="none"/>
+    <line x1="9.5" y1="24" x2="38.5" y2="24" stroke="${color}" stroke-width="1" opacity="0.4"/>
+  </svg>`;
+}
+
+function compassSVG(outer, inner, size=40, isAdmin=false){
+  // Compass with north arrow always pointing up
+  const gold = '#fbbf24';
+  const ro = isAdmin ? gold : outer;
+  const ri = isAdmin ? '#ef4444' : inner;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="24" cy="24" r="22" fill="${ro}18" stroke="${ro}" stroke-width="2.5"/>
+    <circle cx="24" cy="24" r="14" fill="#080c1a" stroke="${ro}60" stroke-width="1"/>
+    <polygon points="24,11 20.5,24 24,21 27.5,24" fill="#ef4444"/>
+    <polygon points="24,37 20.5,24 24,27 27.5,24" fill="${ri}"/>
+    <circle cx="24" cy="24" r="2.8" fill="white" opacity="0.9"/>
+    <text x="24" y="9" text-anchor="middle" fill="#ef4444" font-size="5.5" font-weight="900" font-family="Orbitron,monospace">N</text>
+  </svg>`;
+}
+
+function guestBlipSVG(size=24){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="10" fill="#ef444430" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="12" cy="12" r="4" fill="#ef4444" opacity="0.8"/>
+  </svg>`;
+}
+
+/* ── User color helpers ─────────────────────────────────── */
+function getUserColorObj(){
+  if(!S.user) return {o:'#ef4444',i:'#b91c1c'};
+  if(S.user.role==='admin') return {o:'#fbbf24',i:'#ef4444'};
+  const cid = S.user.colorId || 'cyan';
+  return USER_COLORS.find(c=>c.id===cid) || USER_COLORS[0];
+}
+
+function saveUserLocation(lat,lng){
+  if(!S.user || S.user.role==='admin') return;
+  const users = JSON.parse(localStorage.getItem('pnd-users')||'{}');
+  if(users[S.user.email]){
+    users[S.user.email].lat = lat;
+    users[S.user.email].lng = lng;
+    users[S.user.email].lastSeen = Date.now();
+    users[S.user.email].statusMsg = S.user.statusMsg || '';
+    users[S.user.email].colorId = S.user.colorId || 'cyan';
+    localStorage.setItem('pnd-users',JSON.stringify(users));
+  }
+}
+
+/* ── Navigation ─────────────────────────────────────────── */
+function go(v){
+  if(v===S.view && v!=='map') return;
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(el=>el.classList.remove('active'));
+  const ids={home:'vh',map:'vm',events:'ve',profile:'vp',admin:'vad',space:'vspace'};
+  const el=document.getElementById(ids[v]);
+  if(el) el.classList.add('active');
+  const ni=document.querySelector(`.ni[data-v="${v}"]`);
+  if(ni) ni.classList.add('active');
+  S.view=v;
+  const nav=document.getElementById('nav');
+  if(v==='map'||v==='space'){nav.style.display='none';if(v==='map')initMap();}
+  else nav.style.display='flex';
+  if(v==='home' && _minimap) setTimeout(()=>_minimap.invalidateSize(),80);
+  if(v==='events') renderEvents();
+  if(v==='profile') renderProfile();
+  if(v==='admin') renderAdmin();
+}
+function goMap(){go('map');}
+
+/* ── Theme ──────────────────────────────────────────────── */
+function toggleTheme(){
+  S.theme=S.theme==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',S.theme);
+  localStorage.setItem('pnd-t',S.theme);
+  const tileUrl=S.theme==='dark'
+    ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  if(S.mapInit && window._ml) window._ml.setUrl(tileUrl);
+  // Radar minimap always stays dark_all — its CSS filter is theme-independent
+}
+function toggleSchumann(){
+  _schumannOn=!_schumannOn;
+  const btn=document.getElementById('schumann-btn');
+  if(btn){btn.style.opacity=_schumannOn?'1':'0.28';btn.style.boxShadow=_schumannOn?'0 0 8px rgba(0,255,80,0.4)':'';}
+}
+
+/* ── Helpers ────────────────────────────────────────────── */
+function toast(msg){
+  const c=document.getElementById('toasts');
+  const t=document.createElement('div');
+  t.className='toast';t.textContent=msg;
+  c.appendChild(t);setTimeout(()=>t.remove(),3100);
+}
+function saveEv(){
+  localStorage.setItem('pnd-ev',JSON.stringify(S.events));
+  document.getElementById('sv').textContent=S.events.filter(e=>e.verified).length;
+  document.getElementById('sp').textContent=S.events.filter(e=>!e.verified).length;
+}
+function fmtDate(d){
+  if(!d)return'—';
+  return new Date(d).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+function clubStatusUI(){
+  const dot=document.getElementById('cs-dot'),lbl=document.getElementById('cs-lbl');
+  if(S.clubActive){dot.style.color='var(--ag)';lbl.textContent='Тренировка';}
+  else{dot.style.color='var(--cl)';lbl.textContent='Закрыто';}
+}
+function updateUID(){
+  const el=document.getElementById('uid');
+  if(el) el.textContent=S.user?(S.user.role==='admin'?'⚡ admin':S.user.email.split('@')[0]):'';
+}
+
+/* ── Zoom pills ─────────────────────────────────────────── */
+function setZoom(i,e){
+  e.stopPropagation();
+  S.radarZoom=i;
+  document.querySelectorAll('.zpill').forEach((p,pi)=>p.classList.toggle('active',pi===i));
+}
+
+/* ── Events render ──────────────────────────────────────── */
+function renderEvents(){
+  const c=document.getElementById('evlist');if(!c)return;
+  const vf=S.events.filter(e=>e.verified),pd=S.events.filter(e=>!e.verified);
+  let h=`<div class="sec-lbl"><span class="sec-lbl-t">Верифицированные</span><div class="sec-line"></div></div>`;
+  if(!vf.length) h+=`<div style="font-size:.75rem;color:var(--tm);padding:12px 0;text-align:center">Нет верифицированных ивентов</div>`;
+  vf.forEach(e=>h+=evCard(e));
+  h+=`<div class="sec-lbl" style="margin-top:8px"><span class="sec-lbl-t">На проверке</span><div class="sec-line"></div></div>`;
+  if(!pd.length) h+=`<div style="font-size:.75rem;color:var(--tm);padding:12px 0;text-align:center">Нет ивентов на проверке</div>`;
+  pd.forEach(e=>h+=evCard(e));
+  c.innerHTML=h;
+}
+function evCard(ev){
+  const ic=EV_ICONS[ev.type]||'📍';
+  return`<div class="ev-card" onclick="jumpToEv('${ev.id}')">
+    <div class="ev-card-top">
+      <div class="ev-card-t">${ic} ${ev.title}</div>
+      <span class="badge ${ev.verified?'bv':'bp'}">${ev.verified?'✓':'⏳'} ${ev.verified?'Верифицировано':'Ожидание'}</span>
+    </div>
+    <div class="ev-card-m"><span>📅 ${fmtDate(ev.date)}</span><span>👤 ${ev.addedBy}</span>${ev.loc?`<span>📍 ${ev.loc}</span>`:''}</div>
+    ${ev.desc?`<div class="ev-card-d">${ev.desc}</div>`:''}
+  </div>`;
+}
+function jumpToEv(id){
+  const ev=S.events.find(e=>e.id===id);if(!ev)return;
+  go('map');
+  setTimeout(()=>{if(window._map)window._map.setView([ev.lat,ev.lng],16);},600);
+}
+
+/* ── Add Event ──────────────────────────────────────────── */
+function openSheet(){
+  if(!S.user){toast('Войдите чтобы добавить ивент');go('profile');return;}
+  const now=new Date();now.setHours(now.getHours()+1,0,0,0);
+  document.getElementById('ed').value=now.toISOString().slice(0,16);
+  document.getElementById('sheet').classList.add('open');
+}
+function closeSheet(){document.getElementById('sheet').classList.remove('open');}
+function submitEv(){
+  const title=document.getElementById('et').value.trim();
+  if(!title){toast('Введите название');return;}
+  const ev={
+    id:'e'+Date.now(),title,type:document.getElementById('ety').value,
+    date:document.getElementById('ed').value,
+    loc:document.getElementById('eloc').value.trim(),
+    desc:document.getElementById('edesc').value.trim(),
+    msg:document.getElementById('emsg').value.trim(),
+    lat:CLUB.lat+(Math.random()-.5)*.012,lng:CLUB.lng+(Math.random()-.5)*.012,
+    verified:false,addedBy:S.user.email
+  };
+  S.events.push(ev);saveEv();triggerSeismicWave(ev.lat,ev.lng,ev.type);closeSheet();renderEvents();
+  toast('Ивент отправлен на верификацию ✓');
+  ['et','eloc','edesc','emsg'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+}
+
+/* ── Map ────────────────────────────────────────────────── */
+const LV={v:true,p:true,c:true,q:true};
+let _mapAngle=0;
+
+function initMap(){
+  if(S.mapInit)return;S.mapInit=true;
+  // Start with neutral view; pans to user on first GPS fix
+  const map=L.map('map-container',{center:[45.0811,13.6387],zoom:4,
+    zoomControl:false,attributionControl:false});
+  window._map=map;
+  const turl=S.theme==='dark'
+    ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  window._ml=L.tileLayer(turl,{maxZoom:19,subdomains:'abcd'}).addTo(map);
+  // invalidateSize so Leaflet loads tiles for the oversized (141.5%) container
+  setTimeout(()=>map.invalidateSize(),200);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  L.control.attribution({position:'bottomleft',prefix:false})
+    .addAttribution('© CartoDB · © OSM').addTo(map);
+  addEvMarkers(map);
+  setTimeout(()=>{if(typeof ED!=='undefined')ED._renderMap();},400);
+  // Позиция — из единого PM (один watchPosition на всё приложение)
+  let firstFix=true;
+  PM.sub(pos=>{
+    addUserMarker(map,pos.lat,pos.lng);
+    if(firstFix){firstFix=false;map.setView([pos.lat,pos.lng],16);}
+  });
+
+  // Компас: вращаем стрелку пользователя, НЕ контейнер карты.
+  // CSS-поворот #map-container ломал координаты касаний Leaflet
+  // (драг шёл не туда при любом повороте) и подгрузку тайлов по углам;
+  // а requestPermission() без жеста на iOS падал всегда — поворот был мёртв.
+  // Теперь: общий OM (шлюз разрешения — оверлей радара), карта — подписчик.
+  OM.sub(h=>{
+    document.querySelectorAll('.cmarker-inner').forEach(el=>{
+      el.style.transform=`rotate(${h}deg)`;
+    });
+  });
+
+  // Day/night terminator — real astronomy, always present at every zoom
+  // Reality doesn't switch off. Proximity changes what you can see.
+  function _nightOp(z){return z<7?Math.max(0,(7-z)/4*0.38):0;}
+  function _lineOp(z){return Math.max(0.10,0.50-z*0.03);}
+  const _initPoly=nightPolygon(new Date()),_initZ=map.getZoom();
+  const _nightPoly=L.polygon(_initPoly,{
+    fillColor:'#000820',fillOpacity:_nightOp(_initZ),stroke:false,interactive:false
+  }).addTo(map);
+  const _termLine=L.polyline(_initPoly.slice(1,_initPoly.length-1),{
+    color:'rgba(255,155,20,1)',opacity:_lineOp(_initZ),
+    weight:1.5,dashArray:'4,7',interactive:false
+  }).addTo(map);
+  function _updateNight(){
+    const poly=nightPolygon(new Date()),z=map.getZoom();
+    _nightPoly.setLatLngs(poly).setStyle({fillOpacity:_nightOp(z)});
+    _termLine.setLatLngs(poly.slice(1,poly.length-1)).setStyle({opacity:_lineOp(z)});
+  }
+  map.on('zoomend',()=>{
+    const z=map.getZoom();
+    _nightPoly.setStyle({fillOpacity:_nightOp(z)});
+    _termLine.setStyle({opacity:_lineOp(z)});
+  });
+  setInterval(_updateNight,120000);
+
+  // === COSMIC LAYER — Sun & Moon at real geographic positions (global zoom only) ===
+  // Subsolar point = where Sun is directly overhead. Sublunar = same for Moon.
+  // Both are 100% real computed positions — no approximation, no decoration.
+  function _mkSunIcon(){
+    return L.divIcon({className:'',iconSize:[52,52],iconAnchor:[26,26],html:
+      '<div style="width:52px;height:52px;position:relative;pointer-events:none">'+
+      '<div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(255,230,80,0.88)0%,rgba(255,160,0,0.38)42%,transparent 70%);"></div>'+
+      '<div style="position:absolute;top:50%;left:50%;width:20px;height:20px;margin:-10px;border-radius:50%;background:rgba(255,248,120,1);box-shadow:0 0 16px 8px rgba(255,210,0,0.60);"></div>'+
+      '</div>'});
+  }
+  function _mkMoonIcon(){
+    const ph=moonPhase(new Date())/29.53;
+    const ofs=ph<0.5?((-42+42*ph*2).toFixed(1)+'px'):((42-42*(ph-0.5)*2).toFixed(1)+'px');
+    return L.divIcon({className:'',iconSize:[38,38],iconAnchor:[19,19],html:
+      '<div style="width:38px;height:38px;overflow:hidden;border-radius:50%;position:relative;pointer-events:none;box-shadow:0 0 10px 5px rgba(180,200,240,0.30)">'+
+      '<div style="position:absolute;inset:0;border-radius:50%;background:rgba(210,220,245,0.75);"></div>'+
+      '<div style="position:absolute;top:0;left:'+ofs+';width:38px;height:38px;border-radius:50%;background:rgba(4,7,16,0.97);"></div>'+
+      '</div>'});
+  }
+  const _spI=subsolarPoint(new Date()),_slI=sublunarPoint(new Date());
+  const _sunMk=L.marker([_spI.lat,_spI.lng],{icon:_mkSunIcon(),interactive:false,zIndexOffset:9000}).addTo(map);
+  const _moonMk=L.marker([_slI.lat,_slI.lng],{icon:_mkMoonIcon(),interactive:false,zIndexOffset:8900}).addTo(map);
+  function _cosmicOp(z){return z<=4?1:0;}
+  _sunMk.setOpacity(_cosmicOp(map.getZoom()));
+  _moonMk.setOpacity(_cosmicOp(map.getZoom()));
+  function _updateCosmic(){
+    const z=map.getZoom(),op=_cosmicOp(z);
+    _sunMk.setOpacity(op);_moonMk.setOpacity(op);
+    if(op>0){
+      const sp=subsolarPoint(new Date()),sl=sublunarPoint(new Date());
+      _sunMk.setLatLng([sp.lat,sp.lng]).setIcon(_mkSunIcon());
+      _moonMk.setLatLng([sl.lat,sl.lng]).setIcon(_mkMoonIcon());
+    }
+  }
+  map.on('zoomend',_updateCosmic);
+  map.on('zoomend',()=>{if(map.getZoom()===0&&!_spaceActive)setTimeout(openSpaceView,300);});
+  setInterval(()=>{if(_cosmicOp(map.getZoom())>0)_updateCosmic();},300000);
+}
+
+function makeCompassMarker(outerColor, innerColor, size, isAdmin, label){
+  const html=`<div class="cmarker-inner" style="width:${size}px;height:${size}px">
+    ${compassSVG(outerColor,innerColor,size,isAdmin)}
+  </div>
+  <style>
+    @keyframes cpulse{0%,100%{filter:drop-shadow(0 0 5px ${outerColor})}50%{filter:drop-shadow(0 0 14px ${outerColor})}}
+    .cmarker-inner{animation:cpulse 2s ease-in-out infinite}
+  </style>`;
+  return L.divIcon({className:'',iconSize:[size,size],iconAnchor:[size/2,size/2],
+    popupAnchor:[0,-size/2-4],html});
+}
+
+function addUserMarker(map,lat,lng){
+  if(window._um) map.removeLayer(window._um);
+  let icon,popHtml;
+  if(S.user){
+    const {o,i}=getUserColorObj();
+    const isAdmin=S.user.role==='admin';
+    icon=makeCompassMarker(o,i,40,isAdmin);
+    const name=S.user.name||S.user.email.split('@')[0];
+    const msg=S.user.statusMsg||'';
+    popHtml=`<div class="user-pop">
+      <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:6px">${isAdmin?'⚡ ':''} ${name}</div>
+      ${msg?`<div style="font-size:.72rem;color:var(--td);font-style:italic">"${msg}"</div>`:''}
+      ${isAdmin?'<div style="font-size:.6rem;color:var(--ng);margin-top:6px;letter-spacing:.1em">ADMIN</div>':''}
+    </div>`;
+    saveUserLocation(lat,lng);
+  } else {
+    // Guest: pulsing red dot, no compass
+    icon=L.divIcon({className:'',iconSize:[24,24],iconAnchor:[12,12],popupAnchor:[0,-16],
+      html:`<div style="width:24px;height:24px;position:relative">
+        <div style="position:absolute;inset:0;border-radius:50%;background:#ef444440;animation:gp 1.5s ease-in-out infinite"></div>
+        <div style="position:absolute;inset:6px;border-radius:50%;background:#ef4444"></div>
+      </div>
+      <style>@keyframes gp{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.6);opacity:.2}}</style>`
+    });
+    popHtml=`<div class="user-pop">
+      <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:8px">👤 Гость</div>
+      <div style="font-size:.68rem;color:var(--pnd);line-height:1.5">Зарегистрируйтесь — получите уникальный компас и возможность скрывать метки других пользователей</div>
+    </div>`;
+  }
+  window._um=L.marker([lat,lng],{icon,zIndexOffset:1000}).addTo(map)
+    .bindPopup(popHtml,{maxWidth:240});
+  document.getElementById('hcoords').textContent=`${lat.toFixed(4)}°N · ${lng.toFixed(4)}°E`;
+}
+
+function showOtherUsers(map){
+  if(window._ouMarkers){window._ouMarkers.forEach(m=>map.removeLayer(m));window._ouMarkers=[];}
+  else window._ouMarkers=[];
+  if(!S.user) return; // only registered users see others
+  const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
+  const cutoff=Date.now()-3600000*2; // 2 hours
+  Object.entries(users).forEach(([email,u])=>{
+    if(!u.lat||!u.lng) return;
+    if(u.lastSeen<cutoff) return;
+    if(S.user&&email===S.user.email) return;
+    const c=USER_COLORS.find(x=>x.id===u.colorId)||USER_COLORS[0];
+    const icon=makeCompassMarker(c.o,c.i,34,false);
+    const name=u.name||email.split('@')[0];
+    const pop=`<div class="user-pop">
+      <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:6px">${name}</div>
+      ${u.statusMsg?`<div style="font-size:.72rem;color:var(--td);font-style:italic">"${u.statusMsg}"</div>`:''}
+    </div>`;
+    const m=L.marker([u.lat,u.lng],{icon}).addTo(map).bindPopup(pop,{maxWidth:220});
+    window._ouMarkers.push(m);
+  });
+}
+
+function divIcon(color,sz=11,pulse=false){
+  const ps=pulse?'animation:mp 1.5s ease-in-out infinite;':'';
+  return L.divIcon({className:'',iconSize:[sz+10,sz+10],iconAnchor:[(sz+10)/2,(sz+10)/2],
+    popupAnchor:[0,-(sz+10)/2-4],
+    html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${color};
+      box-shadow:0 0 ${sz}px ${color},0 0 ${sz*2}px ${color}40;
+      border:2px solid rgba(255,255,255,.5);margin:5px;${ps}"></div>
+    <style>@keyframes mp{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.7}}</style>`
+  });
+}
+
+function addClubMarker(map){
+  const c=S.clubActive?'#a855f7':'#64748b';
+  const icon=L.divIcon({className:'',iconSize:[52,52],iconAnchor:[26,26],popupAnchor:[0,-32],
+    html:`<div style="width:52px;height:52px;border-radius:50%;
+      background:radial-gradient(circle,${c}28,${c}08);border:2px solid ${c};
+      box-shadow:0 0 18px ${c},0 0 36px ${c}40;
+      display:flex;align-items:center;justify-content:center;
+      ${S.clubActive?'animation:cp 2s ease-in-out infinite;':''}">
+      ${clubSVG(c,34)}</div>
+    <style>@keyframes cp{0%,100%{box-shadow:0 0 18px ${c},0 0 36px ${c}40}50%{box-shadow:0 0 28px ${c},0 0 56px ${c}60}}</style>`
+  });
+  const srows=CLUB.schedule.map(s=>`<div class="srow"><span class="sday">${s.d}</span><span class="stime">${s.t}</span></div>`).join('');
+  const pop=`<div class="club-pop">
+    <div class="club-hd">
+      <div class="club-logo">${clubSVG(c,32)}</div>
+      <div>
+        <div class="club-nm">${CLUB.name}</div>
+        <div class="club-sub">${CLUB.sub}</div>
+        <div style="margin-top:6px">${S.clubActive
+          ?'<span class="badge ba"><span class="pdot"></span>Тренировка идёт</span>'
+          :'<span class="badge" style="background:rgba(100,116,139,.1);color:var(--cl);border:1px solid rgba(100,116,139,.3)">⚫ Закрыто</span>'}</div>
+      </div>
+    </div>
+    <div class="club-bd">
+      <div class="label" style="margin-bottom:8px">Расписание</div>
+      ${srows}
+      <div style="margin-top:10px;font-size:.7rem;color:var(--td)">📞 ${CLUB.contact}</div>
+    </div>
+  </div>`;
+  const m=L.marker([CLUB.lat,CLUB.lng],{icon}).addTo(map).bindPopup(pop,{maxWidth:300});
+  window._clubMarker=m;
+}
+
+function addEvMarkers(map){
+  (window._ems||[]).forEach(m=>map.removeLayer(m));
+  window._ems=[];
+  S.events.forEach(ev=>{
+    const icon=pulseEventIcon(ev);
+    const pop=`<div class="ev-pop">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div class="ev-pop-t">${EV_ICONS[ev.type]||'📍'} ${ev.title}</div>
+        <span class="badge ${ev.verified?'bv':'bp'}" style="flex-shrink:0;margin-left:8px">${ev.verified?'✓':'⏳'}</span>
+      </div>
+      <div class="ev-pop-m">
+        ${ev.date?`<div>📅 ${fmtDate(ev.date)}</div>`:''}
+        ${ev.loc?`<div>📍 ${ev.loc}</div>`:''}
+        ${ev.desc?`<div style="margin-top:5px">${ev.desc}</div>`:''}
+        <div style="margin-top:5px;color:var(--tm)">👤 ${ev.addedBy}</div>
+      </div>
+    </div>`;
+    const m=L.marker([ev.lat,ev.lng],{icon}).addTo(map).bindPopup(pop,{maxWidth:270});
+    window._ems.push(m);
+  });
+}
+
+function refreshGeo(){
+  toast('Определяю позицию…');
+  PM.refresh(pos=>{
+    if(window._setRadarPos) window._setRadarPos(pos.lat,pos.lng);
+    if(window._map){
+      addUserMarker(window._map,pos.lat,pos.lng);
+      window._map.setView([pos.lat,pos.lng],Math.max(window._map.getZoom(),15));
+    }
+    toast('Позиция обновлена ✓');
+  },()=>toast('Не удалось получить позицию'));
+}
+function locate(){
+  PM.refresh(pos=>{addUserMarker(window._map,pos.lat,pos.lng);
+      window._map.setView([pos.lat,pos.lng],15);toast('Позиция обновлена');},
+    ()=>toast('Не удалось получить позицию'));
+}
+
+function toggleL(l){
+  LV[l]=!LV[l];
+  document.getElementById('l'+l)?.classList.toggle('active',LV[l]);
+  if(l==='q'&&typeof ED!=='undefined')ED._renderMap();
+  toast(LV[l]?'Слой включён':'Слой выключен');
+}
+
+/* ── Auth ───────────────────────────────────────────────── */
+let aMode='login';
+let _selColor='cyan';
+
+function renderProfile(){
+  const c=document.getElementById('profcont');if(!c)return;
+  if(S.user){
+    const isA=S.user.role==='admin';
+    const myEvs=S.events.filter(e=>e.addedBy===S.user.email);
+    const {o,i}=getUserColorObj();
+    const msg=S.user.statusMsg||'';
+    c.innerHTML=`
+    <div style="text-align:center;padding:16px 0">
+      <div style="width:72px;height:72px;border-radius:50%;margin:0 auto;
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:0 0 24px ${o}60;border:2px solid ${o}80">
+        ${isA?compassSVG(o,i,64,true):compassSVG(o,i,64,false)}
+      </div>
+      <div style="margin-top:12px;font-family:'Orbitron',monospace;font-size:.85rem;letter-spacing:.08em">${S.user.name||S.user.email.split('@')[0]}</div>
+      <div style="font-size:.65rem;color:var(--tm);margin-top:2px">${S.user.email}</div>
+      <div style="margin-top:6px"><span class="badge ${isA?'ba':'bv'}">${isA?'⚡ Администратор':'✓ Пользователь'}</span></div>
+    </div>
+    <div class="island island-s">
+      <div class="label" style="margin-bottom:8px">Статусное сообщение</div>
+      <textarea class="input" id="pmsg" placeholder="Напишите что-нибудь о себе..." style="min-height:60px">${msg}</textarea>
+      <button class="btn btn-p" style="width:100%;margin-top:8px;font-size:.7rem" onclick="saveUserMsg()">Сохранить сообщение</button>
+    </div>
+    <div class="island island-s">
+      <div class="label" style="margin-bottom:10px">Мои ивенты (${myEvs.length})</div>
+      ${myEvs.length?myEvs.map(ev=>`<div style="font-size:.8rem;padding:6px 0;border-bottom:1px solid var(--border);color:var(--td);display:flex;justify-content:space-between;align-items:center">
+        <span>${EV_ICONS[ev.type]||'📍'} ${ev.title}</span>
+        <span class="badge ${ev.verified?'bv':'bp'}" style="font-size:.52rem">${ev.verified?'✓':'⏳'}</span>
+      </div>`).join(''):'<div style="font-size:.75rem;color:var(--tm)">Вы ещё не добавляли ивенты</div>'}
+    </div>
+    ${isA?`<button class="btn" style="width:100%" onclick="go('admin')">⚡ Панель администратора</button>`:''}
+    <button class="btn" style="width:100%" onclick="logout()">Выйти из аккаунта</button>`;
+  } else {
+    const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
+    const takenColors=Object.values(users).map(u=>u.colorId).filter(Boolean);
+    const swatches=USER_COLORS.map(col=>{
+      const taken=takenColors.includes(col.id);
+      return `<div class="cswatch${_selColor===col.id?' selected':''}"
+        onclick="selectColor('${col.id}',this)"
+        style="background:${col.o};box-shadow:0 0 8px ${col.o}80;${taken?'opacity:.4':''};"
+        title="${col.id}${taken?' (занят)':''}"></div>`;
+    }).join('');
+
+    c.innerHTML=`
+    <div style="text-align:center;padding:16px 0">
+      <div style="font-size:2.5rem">👤</div>
+      <div style="margin-top:8px;font-size:.8rem;color:var(--td)">Войдите чтобы добавлять<br>ивенты и участвовать в сообществе</div>
+    </div>
+    <div class="island">
+      <div class="label" style="margin-bottom:14px" id="aml">ВХОД</div>
+      <div class="auth-form">
+        <div class="fg"><label class="flbl">Email</label>
+          <input class="input" id="ae" type="email" placeholder="your@email.com"></div>
+        <div class="fg"><label class="flbl">Пароль</label>
+          <input class="input" id="apw" type="password" placeholder="••••••••"></div>
+        <div class="fg" id="ang" style="display:none"><label class="flbl">Имя</label>
+          <input class="input" id="an" type="text" placeholder="Ваше имя"></div>
+        <div class="fg" id="aclr" style="display:none">
+          <label class="flbl">Цвет вашего компаса</label>
+          <div class="color-swatches" id="cswatches">${swatches}</div>
+        </div>
+        <button class="btn btn-p" style="width:100%" onclick="authDo()">Войти</button>
+        <button class="btn btn-g" style="width:100%;font-size:.7rem" onclick="toggleAMode()">Нет аккаунта? Зарегистрироваться</button>
+      </div>
+    </div>
+    <div style="font-size:.62rem;color:var(--tm);text-align:center;padding:8px;line-height:1.7">
+      Демо-вход: <strong style="color:var(--td)">admin@pneuraden.com</strong> / <strong style="color:var(--td)">admin123</strong><br>
+      Или зарегистрируйтесь с любым email
+    </div>`;
+  }
+}
+
+function selectColor(id,el){
+  _selColor=id;
+  document.querySelectorAll('#cswatches .cswatch').forEach(s=>s.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function toggleAMode(){
+  aMode=aMode==='login'?'register':'login';
+  const lbl=document.getElementById('aml');
+  const ang=document.getElementById('ang');
+  const aclr=document.getElementById('aclr');
+  const btn=document.querySelector('#vp .btn-p');
+  const tog=document.querySelector('#vp .btn-g');
+  if(lbl) lbl.textContent=aMode==='login'?'ВХОД':'РЕГИСТРАЦИЯ';
+  if(ang) ang.style.display=aMode==='register'?'block':'none';
+  if(aclr) aclr.style.display=aMode==='register'?'block':'none';
+  if(btn) btn.textContent=aMode==='login'?'Войти':'Зарегистрироваться';
+  if(tog) tog.textContent=aMode==='login'?'Нет аккаунта? Зарегистрироваться':'Уже есть аккаунт? Войти';
+}
+
+function saveUserMsg(){
+  const msg=(document.getElementById('pmsg')?.value||'').trim();
+  S.user.statusMsg=msg;
+  localStorage.setItem('pnd-u',JSON.stringify(S.user));
+  // Update in users store
+  const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
+  if(users[S.user.email]){
+    users[S.user.email].statusMsg=msg;
+    localStorage.setItem('pnd-users',JSON.stringify(users));
+  }
+  // Update marker popup if map is open
+  if(window._um) window._um.setPopupContent(`<div class="user-pop">
+    <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:6px">${S.user.name||S.user.email.split('@')[0]}</div>
+    ${msg?`<div style="font-size:.72rem;color:var(--td);font-style:italic">"${msg}"</div>`:''}
+  </div>`);
+  toast('Сообщение сохранено ✓');
+}
+
+function authDo(){
+  const email=(document.getElementById('ae')?.value||'').trim().toLowerCase();
+  const pw=document.getElementById('apw')?.value||'';
+  if(!email||!pw){toast('Введите email и пароль');return;}
+  const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
+  if(aMode==='login'){
+    if(email==='admin@pneuraden.com'&&pw==='admin123'){
+      S.user={email,role:'admin'};
+    } else if(users[email]&&users[email].pw===btoa(pw)){
+      S.user={email,role:'user',name:users[email].name,colorId:users[email].colorId||'cyan',statusMsg:users[email].statusMsg||''};
+    } else {toast('Неверный email или пароль');return;}
+  } else {
+    if(pw.length<6){toast('Пароль минимум 6 символов');return;}
+    const name=(document.getElementById('an')?.value||'').trim()||email.split('@')[0];
+    users[email]={pw:btoa(pw),name,colorId:_selColor,statusMsg:''};
+    localStorage.setItem('pnd-users',JSON.stringify(users));
+    S.user={email,role:'user',name,colorId:_selColor,statusMsg:''};
+  }
+  localStorage.setItem('pnd-u',JSON.stringify(S.user));
+  updateUID();renderProfile();
+  toast(aMode==='login'?'Добро пожаловать!':'Аккаунт создан ✓');
+}
+
+function logout(){
+  S.user=null;localStorage.removeItem('pnd-u');
+  updateUID();renderProfile();toast('Вы вышли из системы');
+}
+
+/* ── Admin ──────────────────────────────────────────────── */
+function renderAdmin(){
+  if(!S.user||S.user.role!=='admin'){go('profile');toast('Доступ запрещён');return;}
+  const c=document.getElementById('admcont');if(!c)return;
+  const pd=S.events.filter(e=>!e.verified),vf=S.events.filter(e=>e.verified);
+  let h=`
+  <div class="island island-s">
+    <div class="label" style="margin-bottom:10px">Статус клуба</div>
+    <div class="status-tog">
+      <label class="tog">
+        <input type="checkbox" ${S.clubActive?'checked':''} onchange="setClub(this.checked)">
+        <span class="tog-sl"></span>
+      </label>
+      <div>
+        <div style="font-size:.88rem;font-weight:700">${S.clubActive?'🟢 Тренировка идёт':'⚫ Закрыто'}</div>
+        <div class="label">HK Rovinj Rovigno</div>
+      </div>
+    </div>
+  </div>
+  <div class="island island-s">
+    <div class="label" style="margin-bottom:10px">Локация клуба</div>
+    <div style="display:flex;gap:8px">
+      <input class="input" id="clat" type="number" step="0.00001" placeholder="Широта" value="${CLUB.lat.toFixed(5)}" style="flex:1;font-size:.8rem">
+      <input class="input" id="clng" type="number" step="0.00001" placeholder="Долгота" value="${CLUB.lng.toFixed(5)}" style="flex:1;font-size:.8rem">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn" style="flex:1;font-size:.65rem" onclick="setClubLocGeo()">📍 Моя геолокация</button>
+      <button class="btn btn-p" style="flex:1;font-size:.65rem" onclick="saveClubLoc()">Сохранить</button>
+    </div>
+    <div style="font-size:.6rem;color:var(--tm);margin-top:6px;line-height:1.5">
+      Координаты: ${CLUB.lat.toFixed(5)}°N · ${CLUB.lng.toFixed(5)}°E
+    </div>
+  </div>
+  <div class="sec-lbl"><span class="sec-lbl-t">Очередь верификации (${pd.length})</span><div class="sec-line"></div></div>`;
+  if(!pd.length){
+    h+=`<div class="island island-s" style="text-align:center">
+      <div style="font-size:1.5rem">✓</div>
+      <div style="font-size:.75rem;color:var(--tm);margin-top:4px">Очередь пуста</div>
+    </div>`;
+  } else {
+    pd.forEach(ev=>{
+      h+=`<div class="qcard">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="font-weight:700;font-size:.88rem">${EV_ICONS[ev.type]||'📍'} ${ev.title}</div>
+          <span class="badge bp">⏳</span>
+        </div>
+        <div style="font-size:.7rem;color:var(--td)">📅 ${fmtDate(ev.date)} · 👤 ${ev.addedBy}${ev.loc?` · 📍 ${ev.loc}`:''}</div>
+        ${ev.desc?`<div style="font-size:.74rem;color:var(--td)">${ev.desc}</div>`:''}
+        ${ev.msg?`<div style="font-size:.7rem;padding:8px;border-radius:8px;background:var(--surface2);color:var(--td)">"${ev.msg}"</div>`:''}
+        <div class="adm-acts">
+          <button class="btn btn-ok" onclick="verEv('${ev.id}')">✓ Верифицировать</button>
+          <button class="btn btn-no" onclick="delEv('${ev.id}')">✕ Отклонить</button>
+        </div>
+      </div>`;
+    });
+  }
+  h+=`<div class="sec-lbl" style="margin-top:8px"><span class="sec-lbl-t">Верифицировано (${vf.length})</span><div class="sec-line"></div></div>`;
+  vf.forEach(ev=>{
+    h+=`<div class="ev-card" style="border-color:rgba(52,211,153,.2)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:.85rem;font-weight:700">${EV_ICONS[ev.type]||'📍'} ${ev.title}</div>
+        <button class="btn" style="font-size:.6rem;padding:4px 8px;color:var(--dng);border-color:rgba(244,63,94,.3)" onclick="delEv('${ev.id}')">✕</button>
+      </div>
+    </div>`;
+  });
+  c.innerHTML=h;
+}
+
+function setClub(v){
+  S.clubActive=v;localStorage.setItem('pnd-ca',JSON.stringify(v));
+  clubStatusUI();renderAdmin();toast(v?'🟢 Тренировка началась!':'⚫ Клуб закрыт');
+  if(S.mapInit){S.mapInit=false;document.getElementById('map-container').innerHTML='';
+    window._map=null;_minimap=null;}
+}
+
+function saveClubLoc(){
+  const lat=parseFloat(document.getElementById('clat')?.value);
+  const lng=parseFloat(document.getElementById('clng')?.value);
+  if(isNaN(lat)||isNaN(lng)||lat<-90||lat>90||lng<-180||lng>180){
+    toast('Некорректные координаты');return;
+  }
+  localStorage.setItem('pnd-club',JSON.stringify({lat,lng}));
+  if(S.mapInit){S.mapInit=false;document.getElementById('map-container').innerHTML='';
+    window._map=null;_minimap=null;}
+  renderAdmin();
+  toast(`Локация клуба сохранена ✓ ${lat.toFixed(5)}°N`);
+}
+
+function setClubLocGeo(){
+  if(!navigator.geolocation){toast('Геолокация недоступна');return;}
+  navigator.geolocation.getCurrentPosition(p=>{
+    const lat=p.coords.latitude,lng=p.coords.longitude;
+    const el1=document.getElementById('clat'),el2=document.getElementById('clng');
+    if(el1) el1.value=lat.toFixed(5);
+    if(el2) el2.value=lng.toFixed(5);
+    toast('Координаты получены — нажмите «Сохранить»');
+  },()=>toast('Не удалось получить геолокацию'));
+}
+
+function verEv(id){
+  const ev=S.events.find(e=>e.id===id);
+  if(ev){ev.verified=true;saveEv();triggerSeismicWave(ev.lat,ev.lng,ev.type);renderAdmin();renderEvents();
+    if(S.mapInit&&window._map)addEvMarkers(window._map);
+    toast('Ивент верифицирован ✓');}
+}
+function delEv(id){
+  S.events=S.events.filter(e=>e.id!==id);saveEv();renderAdmin();renderEvents();
+  if(S.mapInit&&window._map)addEvMarkers(window._map);
+  toast('Ивент удалён');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RADAR — GTA 4 Liberty City Style + Real Map
+   ═══════════════════════════════════════════════════════════ */
+const ZOOM_R=[0.002,0.005,0.011];
+const ZOOM_MAP=[17,16,15];
+let RAF=null;
+let _minimap=null;
+
+(function initRadar(){
+  const cv=document.getElementById('radar');
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=W/2-6;
+  let angle=0,targetAngle=0,hasGyro=false;
+  let uLat=CLUB.lat,uLng=CLUB.lng;
+  // Expose setter so refreshGeo() can push a new fix into the radar
+  window._setRadarPos=(lat,lng)=>{
+    uLat=lat;uLng=lng;
+    if(_minimap) _minimap.setView([lat,lng],ZOOM_MAP[S.radarZoom],{animate:false});
+    else initMinimap(lat,lng);
+  };
+  window._getUserPos=()=>({lat:uLat,lng:uLng});
+
+  // Leaflet minimap behind canvas
+  function initMinimap(lat,lng){
+    if(_minimap) return;
+    _minimap=L.map('radar-minimap',{
+      center:[lat,lng],zoom:ZOOM_MAP[S.radarZoom],
+      zoomControl:false,attributionControl:false,
+      dragging:false,touchZoom:false,scrollWheelZoom:false,
+      doubleClickZoom:false,boxZoom:false,keyboard:false,
+      fadeAnimation:false,zoomAnimation:false,tap:false
+    });
+    window._minimapTL=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+      {maxZoom:19,subdomains:'abcd'}).addTo(_minimap);
+    // Multiple invalidateSize calls — circular container sometimes needs extra nudge
+    setTimeout(()=>_minimap.invalidateSize(),100);
+    setTimeout(()=>_minimap.invalidateSize(),500);
+    setTimeout(()=>_minimap.invalidateSize(),1200);
+  }
+  initMinimap(uLat,uLng);
+
+  // Device orientation
+  // webkitCompassHeading (iOS): 0..360 CW from magnetic North — use directly
+  // e.alpha (Android): device rotation CCW (positive=CCW), convert to CW heading
+  // Ориентация — через общий OM (одно разрешение на всё приложение)
+  OM.sub(h=>{hasGyro=true;angle=h;});
+  if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+    // iOS 13+: пробуем сразу (сработает, если уже выдано), иначе оверлей с тапом
+    OM.request().then(p=>{if(p!=='granted')throw 0;}).catch(()=>{
+      const ov=document.getElementById('gyro-overlay');
+      ov.classList.remove('hidden');
+      ov.addEventListener('click',async()=>{
+        try{await OM.request();}catch{}
+        ov.classList.add('hidden');
+      },{once:true});
+    });
+  } else {
+    OM.attach();
+  }
+
+  // Desktop mouse fallback — disabled on touch devices (they use gyroscope instead)
+  const _isTouchDevice=navigator.maxTouchPoints>0||('ontouchstart' in window);
+  if(!_isTouchDevice){
+    window.addEventListener('mousemove',e=>{
+      if(!hasGyro){
+        const dx=e.clientX-window.innerWidth/2,dy=e.clientY-window.innerHeight/2;
+        targetAngle=Math.atan2(dx,-dy)*180/Math.PI;
+      }
+    });
+  }
+
+  // User location — watchPosition for continuous GPS-grade accuracy
+  PM.sub(pos=>{
+    uLat=pos.lat;uLng=pos.lng;
+    if(_minimap) _minimap.setView([uLat,uLng],ZOOM_MAP[S.radarZoom],{animate:false});
+    else initMinimap(uLat,uLng);
+  });
+
+  function blipXY(lat,lng){
+    const r=ZOOM_R[S.radarZoom];
+    return{bx:cx+(lng-uLng)/r*R*.85,by:cy-(lat-uLat)/r*R*.85};
+  }
+
+  function frame(){
+    if(S.view!=='home'){RAF=requestAnimationFrame(frame);return;} // радар виден только на HOME — не жжём GPU зря
+    if(!hasGyro) angle+=(targetAngle-angle)*.05;
+    ctx.clearRect(0,0,W,H);
+
+    // Schumann pulse — 7.83 Hz with subtle natural irregularity
+    const _sT=Date.now()*0.001;
+    _sPulse=(Math.sin(_sT*7.83*Math.PI*2)*(.9+.1*Math.sin(_sT*.17*Math.PI*2)))*_schumannBase;
+    const _af=0.82+0.18*Math.sin(_sT*0.32*Math.PI*2); // slow 3s breath, no flicker
+    document.documentElement.style.setProperty('--aura-a1',(_af*0.20).toFixed(3));
+    document.documentElement.style.setProperty('--aura-a2',(_af*0.17).toFixed(3));
+
+    // Rotate minimap to keep North up relative to canvas (angle is CW heading)
+    if(_minimap){
+      const el=document.getElementById('radar-minimap');
+      if(el) el.style.transform=`rotate(${-angle}deg)`;
+      // setView is called by watchPosition only — not here (would be 60fps Leaflet ops)
+    }
+
+    /* clip */
+    ctx.save();
+    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.clip();
+
+    /* subtle dark overlay so rings are visible over tiles */
+    ctx.fillStyle='rgba(4,7,16,0.07)';ctx.fillRect(0,0,W,H);
+
+    /* rings — Schumann pulse at 7.83 Hz when enabled via toggle */
+    [.33,.66,1].forEach((s,i)=>{
+      const _sSlow=Math.sin(_sT*0.32*Math.PI*2);
+      const pf=_schumannOn?_sSlow*0.05:0;
+      const pr=0;
+      ctx.beginPath();ctx.arc(cx,cy,R*s+pr,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(0,255,80,${Math.max(.03,.10+i*.06+pf).toFixed(3)})`;ctx.lineWidth=1;ctx.stroke();
+    });
+
+    /* cross */
+    ctx.strokeStyle='rgba(0,255,80,.09)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(cx,cy-R);ctx.lineTo(cx,cy+R);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.stroke();
+
+    /* rotating compass ring — angle is CW heading, so ring rotates CCW by heading */
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(-angle*Math.PI/180);
+    for(let d=0;d<360;d+=5){
+      const r=d*Math.PI/180,ic=d%90===0,is=d%45===0;
+      const tl=ic?16:is?10:5,op=ic?.9:is?.55:.25;
+      const x1=Math.sin(r)*(R-tl),y1=-Math.cos(r)*(R-tl);
+      const x2=Math.sin(r)*R,y2=-Math.cos(r)*R;
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
+      ctx.strokeStyle=`rgba(0,255,80,${op})`;ctx.lineWidth=ic?2.5:1;ctx.stroke();
+    }
+    ctx.font=`900 ${W*.07}px Orbitron,monospace`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ['N','E','S','W'].forEach((l,i)=>{
+      const r=i*90*Math.PI/180,x=Math.sin(r)*(R-30),y=-Math.cos(r)*(R-30);
+      ctx.fillStyle=l==='N'?'rgba(255,55,55,.98)':'rgba(0,255,80,.92)';
+      ctx.shadowColor=l==='N'?'rgba(255,50,50,.7)':'rgba(0,255,80,.5)';
+      ctx.shadowBlur=12;ctx.fillText(l,x,y);
+    });
+    ctx.shadowBlur=0;ctx.restore();
+
+    /* celestial bodies — sun + moon at actual sky azimuth/altitude */
+    {const _now2=new Date(),_mp01=moonPhase(_now2)/29.53;
+    const _sol=solarPosition(_now2,uLat,uLng);
+    const _mpos=moonPos(_now2,uLat,uLng);
+    const skyXY=(az,alt)=>{const r=Math.max(0,(90-alt)/90*(R-18));return[Math.sin(az*Math.PI/180)*r,-Math.cos(az*Math.PI/180)*r];};
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(-angle*Math.PI/180);
+    /* sun */
+    if(_sol.alt>-12){
+      const[sx,sy]=skyXY(_sol.az,_sol.alt);
+      const sA=_sol.alt<0?Math.max(0,1+_sol.alt/12):.9;
+      const sC=_sol.alt>8?'255,240,140':_sol.alt>0?'255,170,55':'255,90,20';
+      const sg=ctx.createRadialGradient(sx,sy,4,sx,sy,24);
+      sg.addColorStop(0,`rgba(${sC},${sA.toFixed(2)})`);
+      sg.addColorStop(.45,`rgba(${sC},${(sA*.3).toFixed(2)})`);
+      sg.addColorStop(1,`rgba(${sC},0)`);
+      ctx.fillStyle=sg;ctx.beginPath();ctx.arc(sx,sy,24,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(sx,sy,12,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${sC},${(sA*.98).toFixed(2)})`;ctx.fill();
+    }
+    /* moon crescent — sized by phase */
+    const[mx,my]=skyXY(_mpos.az,_mpos.alt);
+    const _mr=15;
+    const mg=ctx.createRadialGradient(mx,my,_mr*.6,mx,my,_mr*2.5);
+    mg.addColorStop(0,`rgba(235,228,195,${(.18+_mp01*.25).toFixed(2)})`);
+    mg.addColorStop(1,'rgba(235,228,195,0)');
+    ctx.fillStyle=mg;ctx.beginPath();ctx.arc(mx,my,_mr*2.5,0,Math.PI*2);ctx.fill();
+    ctx.save();ctx.beginPath();ctx.arc(mx,my,_mr,0,Math.PI*2);ctx.clip();
+    ctx.fillStyle='rgba(235,228,195,.95)';ctx.fillRect(mx-_mr,my-_mr,_mr*2,_mr*2);
+    ctx.fillStyle='rgba(10,16,32,.97)';ctx.beginPath();
+    if(_mp01<=0.5){ctx.arc(mx-4*_mr*_mp01,my,_mr,0,Math.PI*2);}
+    else{ctx.arc(mx+4*_mr*(1-_mp01),my,_mr,0,Math.PI*2);}
+    ctx.fill();ctx.restore();
+    ctx.restore();}
+
+    /* city pulse — energy sectors for active verified events */
+    const _cd=circadianFactor();
+    S.events.forEach(ev=>{
+      if(!ev.verified) return;
+      const inten=eventIntensity(ev);
+      if(inten<.5) return;
+      const {bx,by}=blipXY(ev.lat,ev.lng);
+      const dx=bx-cx,dy=by-cy;
+      if(dx*dx+dy*dy>R*R*1.15) return;
+      const rgb=EV_COLS[ev.type]||'129,140,248';
+      const evAng=Math.atan2(dx,-dy);
+      const span=.26+inten*.12;
+      const g=ctx.createRadialGradient(cx,cy,0,cx,cy,R*.92);
+      g.addColorStop(0,`rgba(${rgb},0)`);
+      g.addColorStop(.5,`rgba(${rgb},${(.13*inten*_cd).toFixed(3)})`);
+      g.addColorStop(1,`rgba(${rgb},${(.05*inten*_cd).toFixed(3)})`);
+      ctx.save();ctx.translate(cx,cy);
+      ctx.beginPath();ctx.moveTo(0,0);
+      ctx.arc(0,0,R*.92,evAng-span/2,evAng+span/2);
+      ctx.closePath();ctx.fillStyle=g;ctx.fill();
+      ctx.restore();
+    });
+
+    /* event blips */
+    const t=Date.now();
+    S.events.forEach(ev=>{
+      const {bx,by}=blipXY(ev.lat,ev.lng);
+      const dx=bx-cx,dy=by-cy;
+      if(dx*dx+dy*dy>R*R*1.05) return;
+      const col=ev.verified?'#4ade80':'#fbbf24';
+      const g=ctx.createRadialGradient(bx,by,0,bx,by,10);
+      g.addColorStop(0,col+'cc');g.addColorStop(1,col+'00');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(bx,by,10,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(bx,by,4.5,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();
+    });
+
+
+    /* field interference — neural resonance between nearby verified events */
+    const _vev=S.events.filter(ev=>ev.verified&&eventIntensity(ev)>=.5);
+    for(let _i=0;_i<_vev.length;_i++){
+      for(let _j=_i+1;_j<_vev.length;_j++){
+        const ea=_vev[_i],eb=_vev[_j];
+        const {bx:ax,by:ay}=blipXY(ea.lat,ea.lng);
+        const {bx:bx2,by:by2}=blipXY(eb.lat,eb.lng);
+        const dd=(ax-bx2)*(ax-bx2)+(ay-by2)*(ay-by2);
+        if(dd>R*R*.49) continue;
+        const fa=1-Math.sqrt(dd)/(R*.7);
+        const ia=Math.min(eventIntensity(ea),eventIntensity(eb));
+        const alpha=fa*ia*_cd*.55;
+        const pdx=-(by2-ay),pdy=bx2-ax;
+        const pl=Math.sqrt(pdx*pdx+pdy*pdy)||1;
+        const pnx=pdx/pl,pny=pdy/pl;
+        const phase=(t*.0018+_i*2.1+_j*1.3)%(Math.PI*2);
+        ctx.beginPath();
+        for(let s=0;s<=24;s++){
+          const tp=s/24;
+          const px=ax+(bx2-ax)*tp,py=ay+(by2-ay)*tp;
+          const wave=Math.sin(tp*Math.PI*3.5+phase)*7*ia;
+          s===0?ctx.moveTo(px+pnx*wave,py+pny*wave):ctx.lineTo(px+pnx*wave,py+pny*wave);
+        }
+        const gr=ctx.createLinearGradient(ax,ay,bx2,by2);
+        gr.addColorStop(0,`rgba(${EV_COLS[ea.type]||'129,140,248'},${alpha})`);
+        gr.addColorStop(1,`rgba(${EV_COLS[eb.type]||'129,140,248'},${alpha})`);
+        ctx.strokeStyle=gr;ctx.lineWidth=1.5;ctx.stroke();
+        const mx=(ax+bx2)/2,my=(ay+by2)/2;
+        const nr=2.5+Math.sin(t*.003+_i+_j)*1.2;
+        ctx.beginPath();ctx.arc(mx,my,nr,0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,255,255,${alpha*2})`;ctx.fill();
+      }
+    }
+
+    /* seismic waves — pressure rings from new/verified events */
+    _seismic=_seismic.filter(w=>(t-w.t)<2600);
+    _seismic.forEach(w=>{
+      const el=(t-w.t)/1000;
+      const wr=el*200,wa=Math.max(0,.75-el*.3);
+      const {bx:wbx,by:wby}=blipXY(w.lat,w.lng);
+      ctx.beginPath();ctx.arc(wbx,wby,wr,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(${w.rgb},${wa})`;ctx.lineWidth=2;ctx.stroke();
+      if(wr>20){
+        ctx.beginPath();ctx.arc(wbx,wby,wr*.5,0,Math.PI*2);
+        ctx.strokeStyle=`rgba(${w.rgb},${wa*.3})`;ctx.lineWidth=1;ctx.stroke();
+      }
+    });
+
+    /* GPS accuracy aura — ionospheric uncertainty field */
+    if(_gpsAccuracy!=null){
+      const acc=Math.min(_gpsAccuracy,150);
+      const aR=8+acc*.45,qA=Math.max(.025,.1*(acc/150));
+      const ag=ctx.createRadialGradient(cx,cy,aR*.35,cx,cy,aR);
+      ag.addColorStop(0,'rgba(100,200,255,0)');
+      ag.addColorStop(.65,`rgba(100,200,255,${(qA*.4).toFixed(3)})`);
+      ag.addColorStop(1,`rgba(100,200,255,${qA.toFixed(3)})`);
+      ctx.fillStyle=ag;ctx.beginPath();ctx.arc(cx,cy,aR,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(cx,cy,aR,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(100,200,255,${(qA*3).toFixed(3)})`;ctx.lineWidth=.5;ctx.stroke();
+    }
+
+    /* player dot — compass style */
+    const ps=5+1.8*Math.sin(t*.004);
+    const {o:uo}=getUserColorObj();
+    const userCol=S.user?(S.user.role==='admin'?'#fbbf24':uo):'#ef4444';
+    const pg=ctx.createRadialGradient(cx,cy,0,cx,cy,ps*3);
+    pg.addColorStop(0,'rgba(255,255,255,1)');
+    pg.addColorStop(.3,userCol+'cc');
+    pg.addColorStop(1,userCol+'00');
+    ctx.fillStyle=pg;ctx.beginPath();ctx.arc(cx,cy,ps*3,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
+
+    /* heading chevron */
+    ctx.save();ctx.translate(cx,cy);
+    ctx.beginPath();ctx.moveTo(0,-16);ctx.lineTo(-6,0);ctx.lineTo(6,0);ctx.closePath();
+    ctx.fillStyle='rgba(255,255,255,.6)';ctx.fill();ctx.restore();
+
+    ctx.restore(); /* end clip */
+
+    /* Schumann arc — NW indicator, planetary pulse phase, outside clip */
+    if(_schumannOn){const sx=cx-R*.65,sy=cy-R*.65,sr=9;
+    const aS=-2.2,aE=1.0,aP=aS+((_sPulse+1)*.5)*(aE-aS);
+    ctx.beginPath();ctx.arc(sx,sy,sr,aS,aE,false);
+    ctx.strokeStyle='rgba(0,255,80,0.1)';ctx.lineWidth=1;ctx.stroke();
+    if(aP>aS){ctx.beginPath();ctx.arc(sx,sy,sr,aS,aP,false);
+    ctx.strokeStyle=`rgba(0,255,80,${(.28+_sPulse*.12).toFixed(2)})`;ctx.lineWidth=1.5;ctx.stroke();}
+    ctx.font='7px monospace';ctx.fillStyle='rgba(0,255,80,0.28)';
+    ctx.textAlign='center';ctx.fillText('7.83',sx,sy+sr+9);}
+
+    /* solar ring — outer ring color based on sun angle */
+    const _now=new Date(),_sol=solarElevation(_now,uLat,uLng);
+    let _rR=0,_rG=200,_rB=75,_rA=.7;
+    if(_sol<0){_rR=20;_rG=100;_rB=220;_rA=.45;}  // night: blue ring
+    else if(_sol<=8){const f=1-_sol/8;_rR=Math.round(255*f);_rG=Math.round(100+90*(1-f)+10*f);_rB=Math.round(75*(1-f));_rA=.7+.08*f;}  // golden hour: amber→green
+    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(${_rR},${_rG},${_rB},${_rA})`;ctx.lineWidth=2.5;ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,R+6,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(${_rR},${_rG},${_rB},.14)`;ctx.lineWidth=5;ctx.stroke();
+
+    RAF=requestAnimationFrame(frame);
+  }
+  frame();
+
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){cancelAnimationFrame(RAF);}
+    else{frame();}
+  });
+  // Schumann base: update planetary storm activity every minute
+  _schumannBase=schumannFactor(new Date());
+  setInterval(()=>{_schumannBase=schumannFactor(new Date());},60000);
+})();
+
+/* ── Pull-to-refresh on home/radar view ─────────────────── */
+(function(){
+  const THRESHOLD=72;
+  const vh=document.getElementById('vh');
+  const ptr=document.getElementById('ptr');
+  const arc=ptr.querySelector('.ptr-arc');
+  let startY=0,pulling=false,triggered=false;
+
+  vh.addEventListener('touchstart',e=>{
+    if(S.view!=='home') return;
+    startY=e.touches[0].clientY;
+    pulling=true;triggered=false;
+  },{passive:true});
+
+  vh.addEventListener('touchmove',e=>{
+    if(!pulling||S.view!=='home') return;
+    const dy=e.touches[0].clientY-startY;
+    if(dy<=0){ptr.classList.remove('visible','ready');return;}
+    ptr.classList.add('visible');
+    const ratio=Math.min(dy/THRESHOLD,1);
+    arc.style.transform=`rotate(${ratio*300}deg)`;
+    if(dy>=THRESHOLD&&!triggered){
+      ptr.classList.add('ready');
+      triggered=true;
+    } else if(dy<THRESHOLD){
+      ptr.classList.remove('ready');
+      triggered=false;
+    }
+  },{passive:true});
+
+  vh.addEventListener('touchend',()=>{
+    if(!pulling) return;
+    pulling=false;
+    if(triggered){
+      ptr.classList.remove('visible','ready');
+      refreshGeo();
+    } else {
+      ptr.classList.remove('visible','ready');
+    }
+  });
+})();
+
+/* ── Migration v3: seed demo events if map is empty ─────── */
+if(!localStorage.getItem('pnd-v3')){
+  localStorage.setItem('pnd-v3','1');
+  if(S.events.length===0){
+    const n=Date.now();
+    const h=t=>new Date(n+t*3600000).toISOString().slice(0,16);
+    S.events=[
+      {id:'demo1',title:'Тренировка по борьбе',type:'training',
+       date:h(1.5),lat:CLUB.lat+.0002,lng:CLUB.lng+.0001,
+       loc:'HK Rovinj Rovigno',desc:'Открытая тренировка · все уровни',
+       verified:true,addedBy:'demo'},
+      {id:'demo2',title:'Концерт на набережной',type:'concert',
+       date:h(4),lat:CLUB.lat+.0031,lng:CLUB.lng-.0048,
+       loc:'Набережная Ровиня',desc:'Живая музыка у моря',
+       verified:true,addedBy:'demo'},
+      {id:'demo3',title:'Воскресный маркет',type:'market',
+       date:h(7),lat:CLUB.lat-.0038,lng:CLUB.lng+.0029,
+       loc:'Центр города',desc:'Местные производители',
+       verified:false,addedBy:'demo'},
+    ];
+    localStorage.setItem('pnd-ev',JSON.stringify(S.events));
+  }
+}
+
+/* ── Init ───────────────────────────────────────────────── */
+saveEv();
+clubStatusUI();
+updateUID();
+const _rv=sessionStorage.getItem('pnd-rv');
+if(_rv){sessionStorage.removeItem('pnd-rv');go(_rv);}
+
+// ═══ FIREBASE — Social Presence Layer ═══════════════════════════════════
+// Fill FB_CONFIG with your Firebase project settings.
+// Setup: firebase.google.com → Create project → Realtime Database + Anonymous Auth
+// DB rules: users/$uid { ".read":true, ".write":"auth.uid===$uid" }
+const FB_CONFIG={
+  apiKey:"AIzaSyCjNAjEDmkQFplLta9bAKcV812Yf3utVXQ",
+  authDomain:"pneuron-app.firebaseapp.com",
+  databaseURL:"https://pneuron-app-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"pneuron-app",
+  storageBucket:"pneuron-app.firebasestorage.app",
+  messagingSenderId:"950975182775",
+  appId:"1:950975182775:web:7f5a8dbab8d432bc461a32"
+};
+let _fbDb=null,_fbUid=null,_fsDb=null;
+
+function initFirebase(){
+  // Конфиг проверяем ДО загрузки SDK: раньше четыре compat-бандла (~450КБ)
+  // грузились даже с пустым конфигом; firestore грузился, но не использовался вовсе.
+  if(!FB_CONFIG.apiKey||FB_CONFIG.apiKey==='YOUR_API_KEY')return;
+  function _seq(srcs,i,cb){if(i>=srcs.length){cb();return;}const s=document.createElement('script');s.src=srcs[i];s.onload=()=>_seq(srcs,i+1,cb);document.head.appendChild(s);}
+  _seq(['https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js'],0,_fbSetup);
+}
+function _fbSetup(){
+  if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
+  _fbDb=firebase.database();
+  firebase.auth().signInAnonymously().then(c=>{_fbUid=c.user.uid;_fbWrite();}).catch(()=>{});
+}
+function _fbWrite(){
+  if(!_fbDb||!_fbUid)return;
+  const ref=_fbDb.ref('users/'+_fbUid);
+  const _push=()=>{const p=window._getUserPos?window._getUserPos():{lat:45.08,lng:13.64};ref.update({lat:p.lat,lng:p.lng,ts:Date.now()});};
+  _push();ref.onDisconnect().remove();if(!window._fbPushIv)window._fbPushIv=setInterval(_push,30000);
+}
+
+// ═══ SPACE VIEW — Three.js 3D Globe ═══════════════════════════════════
+// Real astronomy: subsolarPoint → sun direction → terminator automatic
+// sublunarPoint → moon 3D position → correct phase from lighting
+let _spaceInited=false,_spaceActive=false,_kpGlow=0;
+window._setAuroraKp=k=>{_kpGlow=Math.min(1,(k||0)/9);}; // реальный Kp → дыхание атмосферы
+function openSpaceView(){
+  if(typeof THREE==='undefined'){setTimeout(openSpaceView,200);return;}
+  go('space');_spaceActive=true;
+  if(!_spaceInited){initSpaceView();_spaceInited=true;}
+  else if(!window._spaceRAF&&window._spaceAnim)window._spaceAnim(); // рестарт остановленного цикла
+  _whisperStart();
+}
+function closeSpaceView(){
+  _spaceActive=false;
+  _whisperStop();
+  go('map');
+  if(window._map) setTimeout(()=>window._map.setZoom(2),100);
+}
+function initSpaceView(){
+  const wrap=document.getElementById('space-canvas-wrap');
+  const W=window.innerWidth,H=window.innerHeight;
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(50,W/H,0.01,1000);
+  camera.position.set(0,0.2,3.2);
+  const renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(W,H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setClearColor(0x000008,1);
+  wrap.appendChild(renderer.domElement);
+  // Stars — 5000 points on large sphere
+  const sG=new THREE.BufferGeometry(),sP=new Float32Array(5000*3);
+  for(let i=0;i<5000;i++){const t=Math.random()*Math.PI*2,p=Math.acos(2*Math.random()-1),r=350+Math.random()*150;sP[i*3]=r*Math.sin(p)*Math.cos(t);sP[i*3+1]=r*Math.sin(p)*Math.sin(t);sP[i*3+2]=r*Math.cos(p);}
+  sG.setAttribute('position',new THREE.BufferAttribute(sP,3));
+  scene.add(new THREE.Points(sG,new THREE.PointsMaterial({color:0xffffff,size:0.55})));
+  // Placeholder ocean+grid texture — real countries load async
+  function _mkETex(){const c=document.createElement('canvas');c.width=512;c.height=256;const x=c.getContext('2d');x.fillStyle='#0a1f3e';x.fillRect(0,0,512,256);x.strokeStyle='rgba(80,160,255,0.2)';x.lineWidth=1;for(let i=1;i<8;i++){const y=i*256/8;x.beginPath();x.moveTo(0,y);x.lineTo(512,y);x.stroke();}for(let i=1;i<16;i++){const p=i*512/16;x.beginPath();x.moveTo(p,0);x.lineTo(p,256);x.stroke();}return new THREE.CanvasTexture(c);}
+  function _mkMTex(){const c=document.createElement('canvas');c.width=256;c.height=128;const x=c.getContext('2d');x.fillStyle='#747474';x.fillRect(0,0,256,128);for(let i=0;i<28;i++){const cx=(i*97+30)%256,cy=(i*73+20)%128,r=1.5+i%5;x.beginPath();x.arc(cx,cy,r,0,Math.PI*2);x.fillStyle='rgba(45,45,45,0.5)';x.fill();}return new THREE.CanvasTexture(c);}
+  function _mkCloudTex(){const c=document.createElement('canvas');c.width=1024;c.height=512;const x=c.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,1024,512);for(let i=0;i<700;i++){const cx=Math.random()*1024,cy=Math.random()*512,rx=10+Math.random()*55,ry=5+Math.random()*25,a=0.12+Math.random()*0.62;x.save();x.translate(cx,cy);x.scale(rx,ry);const g=x.createRadialGradient(0,0,0,0,0,1);g.addColorStop(0,`rgba(255,255,255,${a})`);g.addColorStop(0.5,`rgba(255,255,255,${a*0.45})`);g.addColorStop(1,'rgba(255,255,255,0)');x.beginPath();x.arc(0,0,1,0,Math.PI*2);x.fillStyle=g;x.fill();x.restore();}return new THREE.CanvasTexture(c);}
+  // Earth sphere (Earth stays fixed — camera orbits)
+  const earth=new THREE.Mesh(new THREE.SphereGeometry(1,64,64),new THREE.MeshPhongMaterial({map:_mkETex(),specular:new THREE.Color(0x0a1020),shininess:5}));
+  scene.add(earth);
+  const atmo=new THREE.Mesh(new THREE.SphereGeometry(1.03,32,32),new THREE.ShaderMaterial({uniforms:{glowColor:{value:new THREE.Color(0x4488ff)},glowOpacity:{value:0.4}},vertexShader:'varying vec3 vNormal;void main(){vNormal=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'uniform vec3 glowColor;uniform float glowOpacity;varying vec3 vNormal;void main(){float r=pow(max(0.0,1.0-dot(vNormal,vec3(0.0,0.0,1.0))),4.0);gl_FragColor=vec4(glowColor,r*glowOpacity);}',transparent:true,side:THREE.FrontSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+  earth.add(atmo);
+  // GOES-East_ABI_GeoColor overlay — geostationary satellite, 10-min updates, NO orbital seams
+  // Geostationary = fixed point in space → same viewing angle always → physically impossible to have sweep artifacts
+  // Coverage: Americas + Atlantic + W.Europe/Africa. Non-coverage areas = black → transparent → Blue Marble shows
+  // GeoColor: daytime true color + nighttime IR (city lights, lightning) — always something to show
+  const _blk=new THREE.DataTexture(new Uint8Array([0,0,0,255]),1,1,THREE.RGBAFormat);_blk.needsUpdate=true;
+  const _satVert='varying vec2 vUv;void main(){vUv=vec2(1.0-uv.x,uv.y);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}';
+  const _goesFrag='uniform sampler2D modisMap;varying vec2 vUv;void main(){vec4 c=texture2D(modisMap,vUv);float lum=dot(c.rgb,vec3(0.299,0.587,0.114));float mx=max(c.r,max(c.g,c.b));float sat=mx>0.01?(mx-min(c.r,min(c.g,c.b)))/mx:0.0;float a=smoothstep(0.30,0.55,lum)*smoothstep(0.30,0.05,sat);gl_FragColor=vec4(c.rgb,a);}';
+  // Cloud detection: bright (lum>0.30) AND desaturated (sat<0.30) → clouds visible
+  // Ocean dark (low lum) → transparent | Land/desert colorful (high sat) → transparent | Seams dim → transparent
+  const goesMat=new THREE.ShaderMaterial({uniforms:{modisMap:{value:_blk}},vertexShader:_satVert,fragmentShader:_goesFrag,transparent:true,depthWrite:false});
+  const goesOverlay=new THREE.Mesh(new THREE.SphereGeometry(1.001,64,64),goesMat);
+  scene.add(goesOverlay);
+  // Moon
+  const moon=new THREE.Mesh(new THREE.SphereGeometry(0.272,32,32),new THREE.MeshPhongMaterial({map:_mkMTex()}));
+  scene.add(moon);
+  // Sun mesh
+  const sunMesh=new THREE.Mesh(new THREE.SphereGeometry(2.8,16,16),new THREE.MeshBasicMaterial({color:0xffffbb}));
+  scene.add(sunMesh);
+  // Lighting
+  scene.add(new THREE.AmbientLight(0x112244,0.32));
+  const sunLight=new THREE.DirectionalLight(0xffffff,1.4);
+  scene.add(sunLight);
+  // Geo → THREE.js 3D: lng=0→+X, lng=90E→+Z, lng=180→-X
+  function geo3D(lat,lng){const phi=(90-lat)*Math.PI/180,th=lng*Math.PI/180;return new THREE.Vector3(Math.sin(phi)*Math.cos(th),Math.cos(phi),Math.sin(phi)*Math.sin(th));}
+  function updateAstro(){const now=new Date(),sp=subsolarPoint(now),sl=sublunarPoint(now);const sd=geo3D(sp.lat,sp.lng);sunLight.position.copy(sd).multiplyScalar(100);sunMesh.position.copy(sd).multiplyScalar(48);moon.position.copy(geo3D(sl.lat,sl.lng)).multiplyScalar(6);}
+  updateAstro();setInterval(()=>{if(_spaceActive)updateAstro();},120000);
+  // Orbital camera — Earth fixed with real astronomy, camera orbits around it
+  let camTheta=0,camPhi=0.1,camDist=3.2;
+  function updateCam(){camera.position.set(camDist*Math.cos(camPhi)*Math.sin(camTheta),camDist*Math.sin(camPhi),camDist*Math.cos(camPhi)*Math.cos(camTheta));camera.lookAt(0,0,0);}
+  // Start facing lit side
+  const _sp0=subsolarPoint(new Date()),_sd0=geo3D(_sp0.lat,_sp0.lng);
+  camTheta=Math.atan2(_sd0.x,_sd0.z);camPhi=Math.asin(Math.max(-0.5,Math.min(0.5,_sd0.y)));
+  updateCam();
+  // Observer on Earth — stable point within globally pulsing Schumann field
+  const _upos=window._getUserPos?window._getUserPos():{lat:45.08,lng:13.64};
+  const _ug=geo3D(_upos.lat,_upos.lng);
+  const _udot=new THREE.Mesh(new THREE.SphereGeometry(0.013,10,10),new THREE.MeshBasicMaterial({color:0x88eeff}));
+  _udot.position.copy(_ug);scene.add(_udot);
+  const _uhalo=new THREE.Mesh(new THREE.SphereGeometry(0.036,10,10),new THREE.MeshBasicMaterial({color:0x4499ff,transparent:true,opacity:0.15}));
+  _uhalo.position.copy(_ug);scene.add(_uhalo);
+  let _diving=false;
+  // Pointer Events — orbit camera + zoom-IN to close (dive into map)
+  let drag=false,px=0,py=0,lp=0;
+  const ptrs=new Map();
+  const cvs=renderer.domElement;
+  cvs.style.touchAction='none';
+  cvs.addEventListener('pointerdown',e=>{cvs.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.size===1){drag=true;px=e.clientX;py=e.clientY;}else{drag=false;if(ptrs.size===2){const[a,b]=[...ptrs.values()];lp=Math.hypot(a.x-b.x,a.y-b.y);}}});
+  cvs.addEventListener('pointermove',e=>{ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});if(ptrs.size===1&&drag){camTheta-=(e.clientX-px)*0.006;camPhi=Math.max(-1.3,Math.min(1.3,camPhi-(e.clientY-py)*0.004));px=e.clientX;py=e.clientY;updateCam();}else if(ptrs.size===2){const[a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(lp>0){camDist=Math.max(1.3,Math.min(12,camDist*lp/d));if(camDist<=1.35&&!_diving){_diving=true;drag=false;const _tu=Math.atan2(_ug.x,_ug.z),_pu=Math.asin(Math.max(-1.3,Math.min(1.3,_ug.y)));const _t0=performance.now();(function _df(now){const p=Math.min(1,(now-_t0)/280);camTheta+=(_tu-camTheta)*0.2;camPhi+=(_pu-camPhi)*0.2;updateCam();p<1?requestAnimationFrame(_df):closeSpaceView();})(_t0);}updateCam();}lp=d;}});
+  cvs.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(ptrs.size===0){drag=false;lp=0;}else if(ptrs.size===1){const[p]=[...ptrs.values()];px=p.x;py=p.y;drag=true;lp=0;}});
+  cvs.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);if(ptrs.size===0){drag=false;lp=0;}});
+  // Real satellite texture — NASA/NOAA composite via three-globe npm (CORS via jsdelivr)
+  // THREE.js sphere UV: U=0→-X(lng=180)…U=0.5→+X(lng=0). Standard equirect: left=lng=-180.
+  // Fix: repeat.x=-1, offset.x=1 → mirrors texture horizontally → correct geo alignment
+  function _loadRealTex(){
+    const tl=new THREE.TextureLoader();
+    const _base='https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=CRS:84&BBOX=-180,-90,180,90&WIDTH=2048&HEIGHT=1024&FORMAT=image/jpeg';
+    // LAYER 1 — Blue Marble base (full sphere, no gaps) → earth sphere r=1.0
+    tl.load(_base+'&LAYERS=BlueMarble_NextGeneration',
+      tex=>{tex.wrapS=THREE.RepeatWrapping;tex.repeat.x=-1;tex.offset.x=1;earth.material.map=tex;earth.material.needsUpdate=true;},
+      undefined,
+      ()=>{
+        tl.load('https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-day.jpg',
+          tex=>{tex.wrapS=THREE.RepeatWrapping;tex.repeat.x=-1;tex.offset.x=1;earth.material.map=tex;earth.material.needsUpdate=true;},
+          undefined,
+          ()=>{
+            const loadLib=typeof topojson!=='undefined'?Promise.resolve():new Promise(res=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js';s.onload=res;document.head.appendChild(s);});
+            Promise.all([loadLib,fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r=>r.json())])
+              .then(([,w])=>{
+                const c=document.createElement('canvas');c.width=2048;c.height=1024;
+                const ctx=c.getContext('2d');ctx.fillStyle='#0a1f3e';ctx.fillRect(0,0,2048,1024);
+                topojson.feature(w,w.objects.countries).features.forEach(f=>{
+                  const polys=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;
+                  polys.forEach(poly=>{ctx.beginPath();poly[0].forEach(([lng,lat],i)=>{const x=(180-lng)/360*2048,y=(90-lat)/180*1024;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.closePath();ctx.fillStyle='#2d6a2d';ctx.fill();ctx.strokeStyle='rgba(80,160,80,0.5)';ctx.lineWidth=0.8;ctx.stroke();});
+                });
+                ctx.fillStyle='rgba(220,240,255,0.92)';ctx.fillRect(0,0,2048,55);ctx.fillRect(0,969,2048,55);
+                earth.material.map=new THREE.CanvasTexture(c);earth.material.needsUpdate=true;
+              }).catch(()=>{});
+          }
+        );
+      }
+    );
+    // LAYER 2 — GOES satellite overlay (Phase B: toggle button, loaded on demand)
+    // goesOverlay stays invisible until GOES toggle activated: _blk tex → lum=0 → alpha=0 in shader
+  }
+  _loadRealTex();
+  // ── ISS TRACKING — real-time position via public API, no auth needed, CORS ok ──────────────
+  let _issLat=0,_issLng=0,_issCamTheta=0,_issCamPhi=0,_issActive=false,_issState=0,_issAlt=0,_issSpd=0,_issVis='';
+  const _issDot=new THREE.Mesh(new THREE.SphereGeometry(0.016,10,10),new THREE.MeshBasicMaterial({color:0x88ff44}));
+  const _issRing=new THREE.Mesh(new THREE.SphereGeometry(0.044,10,10),new THREE.MeshBasicMaterial({color:0x55ee22,transparent:true,opacity:0.13}));
+  scene.add(_issDot);scene.add(_issRing);
+  // ── АНТИПОД — точка напрямую сквозь ядро Земли ──────────────────────────
+  const _apDot=new THREE.Mesh(new THREE.SphereGeometry(0.013,10,10),new THREE.MeshBasicMaterial({color:0xff6633,transparent:true,opacity:0.85}));
+  const _apHalo=new THREE.Mesh(new THREE.SphereGeometry(0.032,10,10),new THREE.MeshBasicMaterial({color:0xff4400,transparent:true,opacity:0.12}));
+  const _coreLineGeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,0)]);
+  const _coreLine=new THREE.Line(_coreLineGeo,new THREE.LineBasicMaterial({color:0xff6633,transparent:true,opacity:0.22}));
+  scene.add(_apDot);scene.add(_apHalo);scene.add(_coreLine);
+  (function(){const aLat=-_upos.lat,aLng=(((_upos.lng+180)%360)+360)%360-180;const ap=geo3D(aLat,aLng);_apDot.position.copy(ap);_apHalo.position.copy(ap);const up=geo3D(_upos.lat,_upos.lng);const arr=_coreLineGeo.attributes.position.array;arr[0]=up.x;arr[1]=up.y;arr[2]=up.z;arr[3]=ap.x;arr[4]=ap.y;arr[5]=ap.z;_coreLineGeo.attributes.position.needsUpdate=true;const elLat=document.getElementById('antipode-lat'),elLng=document.getElementById('antipode-lng');if(elLat)elLat.textContent=(aLat>=0?'+':'')+aLat.toFixed(1)+'\u00b0';if(elLng)elLng.textContent=(aLng>=0?'+':'')+aLng.toFixed(1)+'\u00b0';})();
+  // ── ГРАВИТАЦИОННЫЙ ПРИЛИВ КОРЫ (Solid Earth Tide) ───────────────────────
+  function _solidTide(){const t=Date.now()/1000;return 0.25*Math.cos(2*Math.PI*(t%44712)/44712)+0.11*Math.cos(2*Math.PI*(t%43200)/43200);}
+  function _updateTide(){const v=_solidTide(),cm=(v*100).toFixed(1),el=document.getElementById('tidal-cm');if(el)el.textContent=(v>=0?'+':'')+cm;}
+  setInterval(()=>{if(_spaceActive)_updateTide();},8000);_updateTide();
+  function _setISSPos(lat,lng){_issLat=lat;_issLng=lng;const p=geo3D(lat,lng);_issDot.position.copy(p).multiplyScalar(1.016);_issRing.position.copy(p).multiplyScalar(1.016);_issCamTheta=Math.atan2(p.x,p.z);_issCamPhi=Math.asin(Math.max(-0.95,Math.min(0.95,p.y)));}
+  function _fetchISS(){fetch('https://api.wheretheiss.at/v1/satellites/25544').then(r=>r.json()).then(d=>{_setISSPos(d.latitude,d.longitude);_issAlt=Math.round(d.altitude||0);_issSpd=Math.round(d.velocity||0);_issVis=d.visibility||'';const ea=document.getElementById('iss-alt'),es=document.getElementById('iss-spd'),ev=document.getElementById('iss-vis');if(ea)ea.textContent=_issAlt.toLocaleString();if(es)es.textContent=_issSpd.toLocaleString();if(ev)ev.textContent=_issVis==='daylight'?'\u2600 ДЕНЬ':'\u25d7 ТЕНЬ';}).catch(()=>{});}
+  _fetchISS();setInterval(()=>{if(_spaceActive)_fetchISS();},15000); // МКС опрашиваем только когда космос открыт
+  // ISS panel state: 0=closed 1=half-screen 2=full-screen
+  // NASA ISS live stream: "Live Video from the International Space Station (Official NASA Stream)"
+  // If stream shows "video unavailable" → go to youtube.com, search "NASA ISS live", copy video ID, update here
+  const _ISS_YT='zPH5KtjJFaQ'; // NASA ISS live — verified 2026-03-04
+  function _issSetState(s){_issState=s;_issActive=(s>0);const panel=document.getElementById('iss-panel'),btn=document.getElementById('iss-open-btn');if(!panel)return;if(s===0){panel.style.height='0';btn.style.display='block';const slot=document.getElementById('iss-video-slot'),f=slot&&slot.querySelector('iframe');if(f)f.remove();const poster=document.getElementById('iss-poster');if(poster)poster.style.display='flex';}else{panel.style.height=(s===1?'50vh':'100vh');btn.style.display='none';const lnk=document.getElementById('iss-ytlink');if(lnk)lnk.href='https://www.youtube.com/watch?v='+_ISS_YT;}}
+  window.issOpen=()=>_issSetState(1);window.issResize=()=>_issSetState(_issState===1?2:1);window.issClose=()=>_issSetState(0);
+  window.issPlayVideo=function(){const slot=document.getElementById('iss-video-slot');const poster=document.getElementById('iss-poster');if(!slot||slot.querySelector('iframe'))return;if(poster)poster.style.display='none';const f=document.createElement('iframe');f.style.cssText='position:absolute;inset:0;width:100%;height:100%;border:none;background:#000008;display:block';f.src='https://www.youtube.com/embed/'+_ISS_YT+'?autoplay=1&playsinline=1&rel=0';f.setAttribute('allow','autoplay;fullscreen');f.allowFullscreen=true;slot.appendChild(f);};
+  // Community dots — other users' positions on globe (warm orange, distinct from own cyan)
+  const _cdots=new Map();
+  function _loadCommunity(){
+    if(!_fbDb){setTimeout(_loadCommunity,2000);return;}
+    _fbDb.ref('users').on('value',snap=>{
+      const now=Date.now(),data=snap.val()||{};
+      _cdots.forEach((m,uid)=>{if(!data[uid]||now-(data[uid].ts||0)>180000){scene.remove(m);_cdots.delete(uid);}});
+      Object.entries(data).forEach(([uid,d])=>{
+        if(uid===_fbUid||now-(d.ts||0)>180000)return;
+        if(!_cdots.has(uid)){const m=new THREE.Mesh(new THREE.SphereGeometry(0.011,8,8),new THREE.MeshBasicMaterial({color:0xff9966}));scene.add(m);_cdots.set(uid,m);}
+        _cdots.get(uid).position.copy(geo3D(d.lat,d.lng));
+      });
+    });
+  }
+  _loadCommunity();
+  // Render loop — auto-orbits normally; when ISS panel open → camera tracks ISS position
+  window._spaceAnim=function _anim(){if(!_spaceActive){window._spaceRAF=null;return;}window._spaceRAF=requestAnimationFrame(_anim);if(!drag&&!_diving){if(_issActive){let _dt=_issCamTheta-camTheta;while(_dt>Math.PI)_dt-=2*Math.PI;while(_dt<-Math.PI)_dt+=2*Math.PI;camTheta+=_dt*0.025;camPhi+=(_issCamPhi-camPhi)*0.025;}else{camTheta+=0.0003;}updateCam();}const _t=Date.now(),_sch=0.5+0.5*Math.sin(_t*0.04917);atmo.material.uniforms.glowOpacity.value=Math.min(0.85,0.18+0.22*_sch+0.3*_kpGlow);_uhalo.material.opacity=0.1+0.12*(0.5+0.5*Math.sin(_t*0.04917+Math.PI));renderer.render(scene,camera);};window._spaceAnim();
+}
+
+// ── PHYSICS WHISPER — воплощённый голос физических сил ──────────────────
+const _WHISPERS=[
+  'Прямо сквозь твои ноги — 12,742 км расплавленного железа. На другой стороне — другой океан.',
+  'За последние 60 секунд сквозь твоё тело прошло около 6,000 частиц от звёзд умерших миллионы лет назад.',
+  'Земля под тобой сейчас медленно поднимается — лунная гравитация деформирует кору планеты.',
+  'Твой компас отклонён от истинного Севера. Это делает расплавленное железо вращающееся в 2,900 км под тобой.',
+  'МКС огибает Землю каждые 92 минуты. Сейчас там люди движутся со скоростью 27,600 км/ч.',
+  'Луна которую ты видишь — образ из прошлого. Настоящая луна на 1.3 секунды впереди.',
+  'Солнечный свет достигающий Земли сейчас покинул Солнце 8 минут 20 секунд назад.',
+  'Ты стоишь на тектонической плите движущейся со скоростью ногтя — несколько сантиметров в год.',
+  'Земля вращается. Прямо сейчас ты движешься на восток со скоростью около 1,200 км/ч.',
+  'Атмосфера давит с силой 10 тонн на каждый квадратный метр твоего тела. Ты не чувствуешь — внутри то же давление.',
+  'Каждый атом кислорода который ты вдыхаешь был создан внутри звезды которой давно нет.',
+  'Земное магнитное поле защищает тебя от солнечного ветра. Без него атмосфера испарилась бы за миллионы лет.',
+  'Полярное сияние происходит прямо сейчас в полярных регионах — солнечные частицы входят в магнитосферу.',
+  'Между тобой и ближайшей звездой после Солнца — 40,000,000,000,000 км пустоты.',
+  'Земля как планета существует 4,500,000,000 лет. Вся история людей — последние 0.000003% этого времени.'
+];
+let _whisperIdx=0,_whisperTimer=null,_whisperActive=false;
+function _whisperShow(){const el=document.getElementById('physics-whisper');if(!el||!_whisperActive)return;const sp=el.querySelector('span');if(!sp)return;sp.textContent=_WHISPERS[_whisperIdx%_WHISPERS.length];_whisperIdx++;el.style.transition='opacity 0.8s ease';el.style.opacity='1';setTimeout(()=>{if(el){el.style.transition='opacity 1.2s ease';el.style.opacity='0';}},4800);}
+function _whisperStart(){if(_whisperActive)return;_whisperActive=true;setTimeout(_whisperShow,1800);_whisperTimer=setInterval(_whisperShow,13000);}
+function _whisperStop(){_whisperActive=false;clearInterval(_whisperTimer);const el=document.getElementById('physics-whisper');if(el){el.style.transition='opacity 0.8s ease';el.style.opacity='0';}}
+/* ═══ EARTH LAYERS — живые данные планеты (без ключей, CORS открыт) ═══
+   USGS: реальные землетрясения суток → круги на карте + НАСТОЯЩИЕ
+   сейсмоволны на радаре (свежие M≥4.5 питают triggerSeismicWave).
+   NOAA SWPC: планетарный Kp-индекс → сияние атмосферы глобуса дышит
+   реальной геомагнитной погодой. Земля начинает питать свой портрет. ═══ */
+const ED={quakes:[],kp:null,_qLayer:null,_pulsed:{},
+  start(){
+    this._q();this._k();
+    setInterval(()=>{if(document.visibilityState==='visible')this._q();},300000);
+    setInterval(()=>{if(document.visibilityState==='visible')this._k();},600000);
+  },
+  _q(){fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson')
+    .then(r=>r.json()).then(d=>{
+      this.quakes=(d.features||[]).map(f=>({
+        id:f.id,lat:f.geometry.coordinates[1],lng:f.geometry.coordinates[0],
+        depth:f.geometry.coordinates[2]||0,mag:f.properties.mag||0,
+        place:f.properties.place||'',time:f.properties.time}));
+      this._renderMap();this._pulseRecent();
+      const el=document.getElementById('eq-chip');
+      if(el&&this.quakes.length){
+        const m=this.quakes.reduce((a,b)=>a.mag>b.mag?a:b);
+        el.textContent='🌋 M'+m.mag.toFixed(1);el.title=m.place;
+      }
+    }).catch(()=>{});},
+  _k(){fetch('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json')
+    .then(r=>r.json()).then(a=>{
+      if(!a||!a.length)return;
+      const last=a[a.length-1];
+      this.kp=parseFloat(last.kp_index??last.estimated_kp??0)||0;
+      const el=document.getElementById('kp-chip');
+      if(el)el.textContent='Kp '+this.kp.toFixed(1)+(this.kp>=5?' ⚡':'');
+      window._setAuroraKp&&window._setAuroraKp(this.kp);
+    }).catch(()=>{});},
+  _renderMap(){if(!window._map)return;
+    if(this._qLayer){window._map.removeLayer(this._qLayer);this._qLayer=null;}
+    if(!LV.q||!this.quakes.length)return;
+    this._qLayer=L.layerGroup(this.quakes.map(q=>{
+      const r=Math.max(4,q.mag*2.6),age=(Date.now()-q.time)/3600000;
+      const op=Math.max(0.25,1-age/24);
+      return L.circleMarker([q.lat,q.lng],{radius:r,color:'#f43f5e',weight:1.5,
+        fillColor:'#f43f5e',fillOpacity:0.18*op,opacity:0.85*op,interactive:true})
+        .bindPopup(`<div class="user-pop"><b>M${q.mag.toFixed(1)}</b> · ${q.place}<br>`+
+          `<span style="font-size:.65rem;color:var(--td)">глубина ${Math.round(q.depth)} км · ${age<1?Math.round(age*60)+' мин':Math.round(age)+' ч'} назад · USGS</span></div>`);
+    })).addTo(window._map);},
+  _pulseRecent(){ // свежие сильные толчки (≤1 ч, M≥4.5) — настоящая волна на радаре
+    const now=Date.now();
+    this.quakes.filter(q=>now-q.time<3600000&&q.mag>=4.5&&!this._pulsed[q.id])
+      .forEach(q=>{this._pulsed[q.id]=1;triggerSeismicWave(q.lat,q.lng,'other');});}
+};
+
+// Start Firebase presence layer (loads SDK async, safe if FB_CONFIG not filled)
+initFirebase();
+ED.start();
+</script>
+
+<!-- SPACE VIEW — 3D Globe -->
+<div id="vspace" class="view" style="background:#000008;touch-action:none">
+  <button onclick="closeSpaceView()" style="position:absolute;top:14px;left:14px;z-index:9999;background:rgba(4,7,22,0.85);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.85);border-radius:10px;padding:10px 18px;cursor:pointer;font-family:inherit;font-size:.75rem;letter-spacing:.12em;pointer-events:auto">&#8592; КАРТА</button>
+  <!-- ISS button — visible when panel closed -->
+  <button id="iss-open-btn" onclick="issOpen()" style="position:absolute;bottom:18px;right:18px;z-index:9999;background:rgba(2,8,20,0.88);border:1px solid rgba(0,200,100,0.4);color:rgba(0,200,100,0.92);border-radius:10px;padding:10px 18px;cursor:pointer;font-family:inherit;font-size:.72rem;letter-spacing:.12em;pointer-events:auto">ISS &#9679; LIVE</button>
+  <div id="space-canvas-wrap" style="width:100%;height:100%;position:absolute;inset:0"></div>
+  <div style="position:absolute;top:14px;right:14px;z-index:9999;background:rgba(4,7,22,0.85);border:1px solid rgba(251,191,36,0.45);border-radius:10px;padding:8px 14px;font-family:inherit;font-size:0.6rem;letter-spacing:0.1em;color:rgba(255,215,100,0.92);pointer-events:none;line-height:1.7;text-align:right">&#9673; АНТИПОД<br><span id="antipode-lat">—</span> / <span id="antipode-lng">—</span></div>
+  <!-- ISS panel — slides up from bottom, 3 states: 0=hidden 1=half 2=full -->
+  <div id="iss-panel" style="position:absolute;bottom:0;left:0;width:100%;height:0;transition:height 0.35s cubic-bezier(0.4,0,0.2,1);overflow:hidden;z-index:9990;display:flex;flex-direction:column;background:#000008">
+    <div style="height:44px;min-height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(2,6,18,0.97);border-top:1px solid rgba(0,200,100,0.3);box-sizing:border-box;flex-shrink:0">
+      <span style="color:rgba(0,200,100,0.92);font-size:0.62rem;letter-spacing:0.13em;font-family:inherit">ISS &#9679; LIVE</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <a id="iss-ytlink" href="#" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.5);font-size:0.6rem;font-family:inherit;text-decoration:none;border:1px solid rgba(255,255,255,0.15);padding:5px 10px;border-radius:7px">YT&#8599;</a>
+        <button onclick="issResize()" style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.75);padding:5px 13px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-family:inherit">&#8597;</button>
+        <button onclick="issClose()" style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.75);padding:5px 13px;border-radius:7px;cursor:pointer;font-size:0.72rem;font-family:inherit">&#10005;</button>
+      </div>
+    </div>
+    <div style="padding:6px 14px;background:rgba(2,6,18,0.95);border-bottom:1px solid rgba(0,200,100,0.12);display:flex;gap:18px;align-items:center;box-sizing:border-box;flex-shrink:0">
+      <span style="color:rgba(0,200,100,0.65);font-size:0.58rem;letter-spacing:0.1em;font-family:inherit">&#9650; <span id="iss-alt">—</span> КМ</span>
+      <span style="color:rgba(0,200,100,0.65);font-size:0.58rem;letter-spacing:0.1em;font-family:inherit">&#9654; <span id="iss-spd">—</span> КМ/Ч</span>
+      <span id="iss-vis" style="color:rgba(0,200,100,0.45);font-size:0.58rem;letter-spacing:0.1em;font-family:inherit">—</span>
+      <span style="color:rgba(56,189,248,0.78);font-size:0.58rem;letter-spacing:0.1em;font-family:inherit;margin-left:auto" title="Деформация коры планеты (лунный прилив)">&#9662;&#9650; <span id="tidal-cm">—</span> СМ</span>
+    </div>
+    <div id="iss-video-slot" style="flex:1;width:100%;background:#000008;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden">
+      <div id="iss-poster" onclick="issPlayVideo()" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;background:radial-gradient(ellipse at 40% 35%,#071828 0%,#000008 100%);-webkit-tap-highlight-color:transparent">
+        <div style="width:70px;height:70px;border-radius:50%;background:radial-gradient(circle at 35% 32%,#1a5080 0%,#0a2840 55%,#03101e 100%);box-shadow:0 0 28px rgba(0,180,100,0.18),inset 0 0 14px rgba(0,100,200,0.25);margin-bottom:22px"></div>
+        <div style="width:52px;height:52px;border-radius:50%;border:1.5px solid rgba(0,200,100,0.5);display:flex;align-items:center;justify-content:center;background:rgba(0,200,100,0.07);margin-bottom:14px;box-shadow:0 0 18px rgba(0,200,100,0.12)">
+          <div style="width:0;height:0;border-top:9px solid transparent;border-bottom:9px solid transparent;border-left:15px solid rgba(0,200,100,0.85);margin-left:5px"></div>
+        </div>
+        <span style="color:rgba(0,200,100,0.65);font-size:0.58rem;letter-spacing:0.18em;font-family:inherit">НАЖМИТЕ ДЛЯ ПРОСМОТРА</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="physics-whisper"><span></span></div>
+</body>
+</html>
