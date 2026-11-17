@@ -63,6 +63,19 @@ input,select,textarea{font-family:inherit}
 #app{width:100vw;height:100vh;height:100dvh;position:relative;overflow:hidden}
 
 #depth-tunnel{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none}
+/* Стрелка-ядро в центре туннеля. Размеры в vh — те же, что были в шейдере (1 ед. = 1,3 % высоты). */
+#core-arrow{position:fixed;left:50%;top:50%;width:0;height:0;z-index:0;pointer-events:none}
+#core-arrow .ca-glow{position:absolute;left:-15vh;top:-15vh;width:30vh;height:30vh;mix-blend-mode:plus-lighter;
+  background:radial-gradient(circle at center,rgba(217,0,46,.2) 0,rgba(217,0,46,.074) 4vh,rgba(217,0,46,.027) 8vh,rgba(217,0,46,0) 15vh)}
+#core-arrow .ca-rot{position:absolute;left:-1.56vh;top:-1.69vh;width:3.12vh;height:3.38vh;will-change:transform}
+#core-arrow .ca-outer{position:absolute;inset:0;overflow:hidden;opacity:.92;
+  clip-path:polygon(50% 1.88%,95.33% 81.38%,50% 63.6%,4.67% 81.38%)}
+#core-arrow .ca-spin{position:absolute;inset:-60%;animation:caSpin 12.6s linear infinite;
+  background:conic-gradient(#f33,#ff3,#3f3,#3ff,#33f,#f3f,#f33,#ff3,#3f3,#3ff,#33f,#f3f,#f33,#ff3,#3f3,#3ff,#33f,#f3f,#f33)}
+@keyframes caSpin{to{transform:rotate(-360deg)}}
+body:not(.rainbow-arrows) #core-arrow .ca-spin{background:#ff0f38;animation:none}
+#core-arrow .ca-inner{position:absolute;inset:0;background:#ff0d38;opacity:.95;
+  clip-path:polygon(50% 14.62%,83.33% 73.08%,50% 60%,16.67% 73.08%)}
 
 .view{position:absolute;inset:0;display:none;flex-direction:column}
 .view.active{display:flex}
@@ -543,6 +556,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
 </div>
 <div id="app">
 <canvas id="depth-tunnel"></canvas>
+<div id="core-arrow" aria-hidden="true"><div class="ca-glow"></div><div class="ca-rot"><div class="ca-outer"><div class="ca-spin"></div></div><div class="ca-inner"></div></div></div>
 
 <!-- ═══ HOME ═══ -->
 <div id="vh" class="view active">
@@ -1375,24 +1389,12 @@ window._initTunnelGL = function(){
     '  float vig = 1.0 - 0.18*dot(uv,uv);',
     '  col *= vig;',
     '  col = pow(col, vec3(0.92));',
-    '  float aSize = 0.013;',
-    '  vec2 q = uv / aSize;',
-    '  q = rot(iNorth) * q;',
-    '  float inner = arrowMask(q);',
-    '  float outer = arrowMask(q / 1.36);',
-    '  float aglow = exp(-length(uv) / 0.04);',
-    '  col += vec3(0.85, 0.0, 0.18) * aglow * 0.20;',
-    '  float ang = atan(q.y, q.x);',
-    '  vec3 cPrism = 0.5 + 0.5*cos(iTime*1.5 + ang*3.0 + vec3(0.0, 2.094, 4.188));',
-    '  vec3 contourCol = mix(cPrism, vec3(1.0, 0.06, 0.22), iRuby);',
-    '  if(outer > 0.5 && inner < 0.5){ col = mix(col, contourCol, 0.92); }',
-    '  if(inner > 0.5){ col = mix(col, vec3(1.0, 0.05, 0.22), 0.95); }',
     '  gl_FragColor = vec4(col, 1.0);',
     '}'
   ].join('\n');
 
   const material = new THREE.ShaderMaterial({
-    uniforms: { iResolution:{value:new THREE.Vector2(1,1)}, iTime:{value:0}, iTex:{value:null}, iTexOn:{value:0.0}, iRuby:{value:0.0}, iNorth:{value:0.0} },
+    uniforms: { iResolution:{value:new THREE.Vector2(1,1)}, iTime:{value:0}, iTex:{value:null}, iTexOn:{value:0.0} },
     vertexShader: vert, fragmentShader: frag, depthTest:false, depthWrite:false
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2,2), material);
@@ -1407,18 +1409,33 @@ window._initTunnelGL = function(){
       window._tunnelTex=tex;
       material.uniforms.iTex.value=tex;
       material.uniforms.iTexOn.value=1.0;
+      if(window._tunnelGL) window._tunnelGL._lastT=null;
       if(window.drawDepthTunnel)window.drawDepthTunnel(window._bgT||0);
     };
     im.src=window._tunnelImg;
   }catch(e){}
-  const gl = { renderer, scene, camera, material, mesh };
+  const gl = { renderer, scene, camera, material, mesh, _lastT:null };
+  // Туннель рисуется прямо в уменьшенный холст (доля q по стороне), а растягивает его на весь
+  // экран сам браузер — бесплатно и с мягким сглаживанием. Стрелка-ядро — отдельный элемент
+  // #core-arrow поверх фона, поэтому остаётся резкой и крутится по компасу без перерисовки туннеля.
+  // q подстраивается вниз, если телефон не тянет, и запоминается для следующего запуска.
+  let q0 = 0.5;
+  try{ const s=parseFloat(localStorage.getItem('pnd-bgq')); if(s>=0.25&&s<=0.5) q0=s; }catch(e){}
+  gl.q = q0;
+  const _sz = new THREE.Vector2();
   gl.resize = function(){
     const W = cv.clientWidth || window.innerWidth;
     const H = cv.clientHeight || window.innerHeight;
     const pr = Math.min(1.25, window.devicePixelRatio||1);
-    renderer.setPixelRatio(pr);
+    renderer.setPixelRatio(pr*gl.q);
     renderer.setSize(W, H, false);
-    material.uniforms.iResolution.value.set(W*pr, H*pr);
+    renderer.getDrawingBufferSize(_sz);
+    material.uniforms.iResolution.value.set(_sz.x, _sz.y);
+    gl._lastT = null; // холст очищен — нужно перерисовать
+  };
+  gl.setQuality = function(q){
+    gl.q = q; gl.resize();
+    try{ localStorage.setItem('pnd-bgq', String(q)); }catch(e){}
   };
   gl.resize();
   window._tunnelGL = gl;
@@ -1428,29 +1445,60 @@ window._initTunnelGL = function(){
 window.drawDepthTunnel = function(time){
   const gl = window._initTunnelGL();
   if(!gl) return;
-  gl.material.uniforms.iTime.value = time || 0;
-  gl.material.uniforms.iNorth.value = (window._coreNorth||0);
-  try{ gl.renderer.render(gl.scene, gl.camera); }catch(e){}
+  const t = time || 0;
+  if(gl._lastT === t) return;   // туннель не сдвинулся — кадр уже на экране
+  gl.material.uniforms.iTime.value = t;
+  try{ gl.renderer.render(gl.scene, gl.camera); gl._lastT = t; }catch(e){}
+};
+
+// ── стрелка-ядро: лёгкий элемент поверх туннеля (раньше рисовалась в шейдере на каждом пикселе) ──
+window._coreArrowEl = null;
+window._setCoreArrow = function(rad){
+  const el = window._coreArrowEl || (window._coreArrowEl = document.querySelector('#core-arrow .ca-rot'));
+  if(el) el.style.transform = 'rotate(' + (-rad).toFixed(4) + 'rad)';
 };
 
 // ── переключатель статика / анимация (кнопка ❄/✦) ──
 window._bgAnim=true; window._bgRaf=null; window._bgT=0; window._tunnelRuby=false;
+// «Фон летит, когда летишь ты»: скорость полёта по туннелю = твоя скорость (TP.spd, м/с).
+// В покое — медленное дыхание; касание даёт короткий толчок.
+window._bgRate=0.35; window._bgBoost=0; window._bgLast=0; window._bgWin=0; window._bgCalls=0;
+window.bgKick=function(){ window._bgBoost=Math.min(1.6, window._bgBoost+0.9); };
 // курс для стрелки-ядра: подписка на компас (обновляется на каждом событии), знак как минимап (−head)
 window._coreNorth = 0;
-try{ if(window.OM && OM.sub){ OM.sub(function(h){ window._coreNorth = -h * Math.PI/180; if(!window._bgAnim){ window.drawDepthTunnel(window._bgT||0); } }); } }catch(e){}
+try{ if(window.OM && OM.sub){ OM.sub(function(h){ window._coreNorth = -h * Math.PI/180; window._setCoreArrow(window._coreNorth); }); } }catch(e){}
+window._bgLoopFn=function(now){
+  if(!window._bgAnim||(typeof S!=='undefined'&&S.view!=='home')){window._bgRaf=null;return;}
+  window._bgRaf=requestAnimationFrame(window._bgLoopFn);
+  // самоподстройка: браузер зовёт этот цикл с частотой экрана. Если за 2 с вызовов меньше
+  // 48 в секунду — страница не успевает (телефон греется): уменьшаем холст туннеля.
+  if(!window._bgWin) window._bgWin=now;
+  window._bgCalls=(window._bgCalls||0)+1;
+  if(now-window._bgWin>=2000){
+    const rate=window._bgCalls*1000/(now-window._bgWin), g=window._tunnelGL;
+    if(g && rate<48 && g.q>0.26 && !document.hidden) g.setQuality(Math.max(0.25, +(g.q-0.08).toFixed(2)));
+    window._bgWin=now; window._bgCalls=0;
+  }
+  const last=window._bgLast||now, dt=Math.min(250, now-last);
+  if(window._bgLast && dt<31) return;          // ~30 кадров в секунду хватает фону
+  window._bgLast=now;
+  const spd=(typeof TP!=='undefined'&&TP.spd)||0;
+  window._bgBoost*=Math.pow(0.5, dt/700);
+  const target=0.35 + Math.min(1.65, spd/4) + window._bgBoost;
+  window._bgRate+=(target-window._bgRate)*Math.min(1, dt/900);
+  window._bgT+=0.016*(dt/16.67)*window._bgRate;
+  window.drawDepthTunnel(window._bgT);
+};
 window._startBgLoop=function(){
   if(!window._bgAnim||window._bgRaf) return;
   if(typeof S!=='undefined'&&S.view!=='home') return;
-  const loop=()=>{ if(!window._bgAnim||(typeof S!=='undefined'&&S.view!=='home')){window._bgRaf=null;return;}
-    window._bgT+=0.016; window.drawDepthTunnel(window._bgT);
-    window._bgRaf=requestAnimationFrame(loop); };
-  loop();
+  window._bgLast=0; window._bgWin=0; window._bgCalls=0;
+  window._bgRaf=requestAnimationFrame(window._bgLoopFn);
 };
 // единый режим: рубин ↔ радуга для ядра-туннеля И стрелок пользователя во всех режимах
 window.setCoreMode=function(ruby){
   window._tunnelRuby=ruby;
   const gl=window._tunnelGL;
-  if(gl){ gl.material.uniforms.iRuby.value=ruby?1.0:0.0; if(!window._bgAnim)window.drawDepthTunnel(window._bgT||0); }
   // стрелки пользователя: радужный ободок когда НЕ рубин
   document.body.classList.toggle('rainbow-arrows', !ruby);
   if(typeof toast==='function')toast(ruby?'Режим · рубин':'Режим · радуга');
@@ -1458,6 +1506,7 @@ window.setCoreMode=function(ruby){
 // двойной тап по центру (стрелка-ядро) → линии радуга ↔ рубин
 window._initCoreTap=function(){
   const vh=document.getElementById('vh'); if(!vh||vh._coreTapBound) return; vh._coreTapBound=true;
+  vh.addEventListener('pointerdown', function(){ window.bgKick&&window.bgKick(); }, {passive:true}); // касание = толчок полёта
   let lastTap=0;
   vh.addEventListener('click', function(e){
     // игнорируем интерактивные элементы (кнопки/карточки/радар)
@@ -1479,10 +1528,7 @@ window.toggleBgAnim=function(){
   const b=document.getElementById('bg-anim-btn');
   if(b){b.textContent=window._bgAnim?'✦':'❄';b.style.opacity=window._bgAnim?'1':'0.5';}
   if(window._bgAnim){
-    const loop=()=>{ if(!window._bgAnim||(typeof S!=='undefined'&&S.view!=='home')){window._bgRaf=null;return;}
-      window._bgT+=0.016; window.drawDepthTunnel(window._bgT);
-      window._bgRaf=requestAnimationFrame(loop); };
-    loop();
+    window._startBgLoop();
     if(typeof toast==='function')toast('Фон: анимация');
   } else {
     if(window._bgRaf)cancelAnimationFrame(window._bgRaf);window._bgRaf=null;
@@ -1520,11 +1566,7 @@ function go(v){
   if(typeof drawDepthTunnel==='function'){
     if(v==='home'){
       setTimeout(()=>drawDepthTunnel(window._bgT||0),60);
-      if(window._bgAnim&&!window._bgRaf){ // возобновить анимацию при возврате на home
-        const loop=()=>{if(!window._bgAnim||S.view!=='home'){window._bgRaf=null;return;}
-          window._bgT+=0.016;drawDepthTunnel(window._bgT);window._bgRaf=requestAnimationFrame(loop);};
-        loop();
-      }
+      if(window._bgAnim&&!window._bgRaf) window._startBgLoop(); // возобновить анимацию при возврате на home
     } else if(window._bgRaf){ // ушли с home — стоп RAF
       cancelAnimationFrame(window._bgRaf);window._bgRaf=null;
     }
@@ -2335,17 +2377,21 @@ let _minimap=null;
     return{bx:cx+(lng-uLng)/r*R*.85,by:cy-(lat-uLat)/r*R*.85};
   }
 
-  function frame(){
+  let _rLast=0;
+  function frame(now){
     if(S.view!=='home'){RAF=requestAnimationFrame(frame);return;} // радар виден только на HOME — не жжём GPU зря
-    if(!hasGyro) angle+=(targetAngle-angle)*.05;
+    // 30 кадров в секунду: глаз разницы на радаре не видит, а работы вдвое меньше
+    now=now||performance.now();
+    if(_rLast&&now-_rLast<31){RAF=requestAnimationFrame(frame);return;}
+    const _rK=_rLast?Math.min(4,(now-_rLast)/16.67):1; _rLast=now; // сколько «старых» кадров прошло
+    if(!hasGyro) angle+=(targetAngle-angle)*(1-Math.pow(.95,_rK));
     ctx.clearRect(0,0,W,H);
 
     // Schumann pulse — 7.83 Hz with subtle natural irregularity
     const _sT=Date.now()*0.001;
     _sPulse=(Math.sin(_sT*7.83*Math.PI*2)*(.9+.1*Math.sin(_sT*.17*Math.PI*2)))*_schumannBase;
-    const _af=0.82+0.18*Math.sin(_sT*0.32*Math.PI*2); // slow 3s breath, no flicker
-    document.documentElement.style.setProperty('--aura-a1',(_af*0.20).toFixed(3));
-    document.documentElement.style.setProperty('--aura-a2',(_af*0.17).toFixed(3));
+    // (переменные --aura-a1/a2 больше нигде не читаются; их запись 60 раз в секунду
+    //  заставляла браузер пересчитывать стили всей страницы — убрано)
 
     // Rotate minimap to keep North up relative to canvas (angle is CW heading)
     if(_minimap){
@@ -2569,7 +2615,7 @@ let _minimap=null;
     // и бегущая метка — её скорость и направление = темп и знак твоего хода
     ctx.beginPath();ctx.arc(cx,cy,R+1,0,Math.PI*2);
     ctx.strokeStyle=TP.tint(0.22);ctx.lineWidth=1.5;ctx.stroke();
-    TP._ang+=TP.omega;
+    TP._ang+=TP.omega*_rK;
     const _tpx=cx+(R+1)*Math.sin(TP._ang),_tpy=cy-(R+1)*Math.cos(TP._ang);
     ctx.beginPath();ctx.arc(_tpx,_tpy,3,0,Math.PI*2);
     ctx.fillStyle=TP.tint(0.95);ctx.shadowColor=TP.tint(0.9);ctx.shadowBlur=9;ctx.fill();ctx.shadowBlur=0;
@@ -2580,7 +2626,7 @@ let _minimap=null;
 
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden){cancelAnimationFrame(RAF);}
-    else{frame();}
+    else{cancelAnimationFrame(RAF);_rLast=0;frame();}
   });
   // Schumann base: update planetary storm activity every minute
   _schumannBase=schumannFactor(new Date());
