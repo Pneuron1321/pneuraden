@@ -693,6 +693,7 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
         <div class="lbtn" id="lo" onclick="toggleL('o')" title="Места · OSM">📍</div>
         <div class="lbtn" id="lcam" onclick="toggleL('cam')" title="Камеры · OSM">📸</div>
         <div class="lbtn" id="lair" onclick="toggleL('air')" title="Самолёты · ADS-B">✈️</div>
+        <div class="lbtn active" id="ltr" onclick="toggleL('tr')" title="Следы города · где бывают люди">👣</div>
         <div class="lbtn" id="llt" onclick="LT.toggle()" title="Молнии">⚡</div>
         <div class="lbtn" onclick="openTraffic()" title="Пробки · Waze">🚦</div>
         <div class="lbtn" id="pin-btn" onclick="togglePinMode()" title="Метка цели">🎯</div>
@@ -1216,7 +1217,9 @@ const S = {
   view:'home',
   theme: localStorage.getItem('pnd-t')||'dark',
   clubActive: JSON.parse(localStorage.getItem('pnd-ca')?? 'true'),
-  user: JSON.parse(localStorage.getItem('pnd-u')||'null'),
+  // кэш профиля для мгновенного UI; без uid (старый локальный вход) — сброс. Роль всегда
+  // 'user', пока сервер не подтвердит admins/<uid> (FB._onAuth).
+  user: (u=>u&&u.uid?{...u,role:'user'}:null)((()=>{try{return JSON.parse(localStorage.getItem('pnd-u')||'null');}catch(e){return null;}})()),
   events: JSON.parse(localStorage.getItem('pnd-ev')||'null') || defaultEvents(),
   mapInit:false,
   radarZoom:1,
@@ -1269,18 +1272,9 @@ function getUserColorObj(){
   return USER_COLORS.find(c=>c.id===cid) || USER_COLORS[0];
 }
 
-function saveUserLocation(lat,lng){
-  if(!S.user || S.user.role==='admin') return;
-  const users = JSON.parse(localStorage.getItem('pnd-users')||'{}');
-  if(users[S.user.email]){
-    users[S.user.email].lat = lat;
-    users[S.user.email].lng = lng;
-    users[S.user.email].lastSeen = Date.now();
-    users[S.user.email].statusMsg = S.user.statusMsg || '';
-    users[S.user.email].colorId = S.user.colorId || 'cyan';
-    localStorage.setItem('pnd-users',JSON.stringify(users));
-  }
-}
+// Аккаунты теперь в Firebase Auth; точные координаты людей нигде не копятся.
+// Присутствие в общей базе — огрублено до ~1 км (см. _fbWrite).
+function saveUserLocation(lat,lng){}
 
 /* ── Navigation ─────────────────────────────────────────── */
 // ═══ 3D-ВОРОНКА ИЗ ПЛИТОК на HOME (глобальная, статичная — рисуется один раз) ═══
@@ -1638,8 +1632,11 @@ function toast(msg){
   t.className='toast';t.textContent=msg;
   c.appendChild(t);setTimeout(()=>t.remove(),3100);
 }
+// Любой текст от людей (ивенты, имена, статусы) — только через esc(): ивенты теперь
+// общие, и без экранирования один ивент мог бы запустить свой скрипт у всех.
+function esc(s){return String(s==null?'':s).replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c]));}
 function saveEv(){
-  localStorage.setItem('pnd-ev',JSON.stringify(S.events));
+  try{localStorage.setItem('pnd-ev',JSON.stringify(S.events));}catch(e){}
   document.getElementById('sv').textContent=S.events.filter(e=>e.verified).length;
   document.getElementById('sp').textContent=S.events.filter(e=>!e.verified).length;
 }
@@ -1654,7 +1651,7 @@ function clubStatusUI(){
 }
 function updateUID(){
   const el=document.getElementById('uid');
-  if(el) el.textContent=S.user?(S.user.role==='admin'?'⚡ admin':S.user.email.split('@')[0]):'';
+  if(el) el.textContent=S.user?(S.user.role==='admin'?'⚡ admin':(S.user.name||String(S.user.email||'').split('@')[0])):'';
 }
 
 /* ── Zoom pills ─────────────────────────────────────────── */
@@ -1678,13 +1675,13 @@ function renderEvents(){
 }
 function evCard(ev){
   const ic=EV_ICONS[ev.type]||'📍';
-  return`<div class="ev-card" onclick="jumpToEv('${ev.id}')">
+  return`<div class="ev-card" onclick="jumpToEv('${esc(ev.id)}')">
     <div class="ev-card-top">
-      <div class="ev-card-t">${ic} ${ev.title}</div>
+      <div class="ev-card-t">${ic} ${esc(ev.title)}</div>
       <span class="badge ${ev.verified?'bv':'bp'}">${ev.verified?'✓':'⏳'} ${ev.verified?'Верифицировано':'Ожидание'}</span>
     </div>
-    <div class="ev-card-m"><span>📅 ${fmtDate(ev.date)}</span><span>👤 ${ev.addedBy}</span>${ev.loc?`<span>📍 ${ev.loc}</span>`:''}</div>
-    ${ev.desc?`<div class="ev-card-d">${ev.desc}</div>`:''}
+    <div class="ev-card-m"><span>📅 ${fmtDate(ev.date)}</span><span>👤 ${esc(ev.ownerName||ev.addedBy||'—')}</span>${ev.loc?`<span>📍 ${esc(ev.loc)}</span>`:''}</div>
+    ${ev.desc?`<div class="ev-card-d">${esc(ev.desc)}</div>`:''}
   </div>`;
 }
 function jumpToEv(id){
@@ -1701,25 +1698,44 @@ function openSheet(){
   document.getElementById('sheet').classList.add('open');
 }
 function closeSheet(){document.getElementById('sheet').classList.remove('open');}
+// Где ивент: адрес → геокодер Photon (с привязкой к тебе), иначе твоя позиция, иначе клуб
+function _evPlace(loc){
+  const me=(typeof PM!=='undefined'&&PM.last)||null;
+  const fallback=me?{lat:me.lat,lng:me.lng}:{lat:CLUB.lat+(Math.random()-.5)*.006,lng:CLUB.lng+(Math.random()-.5)*.006};
+  if(!loc)return Promise.resolve(fallback);
+  const c=me||{lat:CLUB.lat,lng:CLUB.lng},ac=new AbortController(),tm=setTimeout(()=>ac.abort(),4000);
+  return fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(loc)+'&limit=1&lat='+c.lat.toFixed(3)+'&lon='+c.lng.toFixed(3),{signal:ac.signal})
+    .then(r=>r.json()).then(d=>{const g=d.features&&d.features[0]&&d.features[0].geometry;
+      return g?{lat:+g.coordinates[1],lng:+g.coordinates[0]}:fallback;})
+    .catch(()=>fallback).finally(()=>clearTimeout(tm));
+}
+let _evSending=false;
 function submitEv(){
   const title=document.getElementById('et').value.trim();
   if(!title){toast('Введите название');return;}
-  const ev={
-    id:'e'+Date.now(),title,type:document.getElementById('ety').value,
-    date:document.getElementById('ed').value,
-    loc:document.getElementById('eloc').value.trim(),
-    desc:document.getElementById('edesc').value.trim(),
-    msg:document.getElementById('emsg').value.trim(),
-    lat:CLUB.lat+(Math.random()-.5)*.012,lng:CLUB.lng+(Math.random()-.5)*.012,
-    verified:false,addedBy:S.user.email
-  };
-  S.events.push(ev);saveEv();triggerSeismicWave(ev.lat,ev.lng,ev.type);closeSheet();renderEvents();
-  toast('Ивент отправлен на верификацию ✓');
-  ['et','eloc','edesc','emsg'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  if(!S.user||!S.user.uid){toast('Войдите чтобы добавить ивент');go('profile');return;}
+  if(!_fbDb||!window.firebase){toast('Нет связи с сервером — попробуйте чуть позже');return;}
+  if(_evSending)return;_evSending=true;
+  const type=document.getElementById('ety').value,loc=document.getElementById('eloc').value.trim();
+  const msg=document.getElementById('emsg').value.trim();
+  _evPlace(loc).then(pos=>{
+    const ref=_fbDb.ref('events').push();
+    const ev={title:title.slice(0,80),type,date:String(document.getElementById('ed').value||'').slice(0,20),
+      loc:loc.slice(0,120),desc:document.getElementById('edesc').value.trim().slice(0,600),
+      lat:pos.lat,lng:pos.lng,owner:S.user.uid,ownerName:String(S.user.name||'').slice(0,40),
+      verified:false,createdAt:firebase.database.ServerValue.TIMESTAMP};
+    return ref.set(ev).then(()=>{
+      // сообщение админу — отдельно и закрыто: его читают только админы
+      if(msg)_fbDb.ref('eventMsgs/'+ref.key).set(msg.slice(0,500)).catch(()=>{});
+      triggerSeismicWave(pos.lat,pos.lng,type);closeSheet();
+      toast('Ивент отправлен на верификацию ✓');
+      ['et','eloc','edesc','emsg'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    });
+  }).catch(e=>toast('Не удалось отправить: '+(e&&(e.code||e.message)||'ошибка'))).finally(()=>{_evSending=false;});
 }
 
 /* ── Map ────────────────────────────────────────────────── */
-const LV={v:true,p:true,c:true,q:false,o:false,cam:false,air:false};
+const LV={v:true,p:true,c:true,q:false,o:false,cam:false,air:false,tr:true};
 let _mapAngle=0;
 
 function initMap(){
@@ -1818,6 +1834,7 @@ function initMap(){
   L.control.attribution({position:'bottomleft',prefix:false})
     .addAttribution('© CartoDB · © OSM').addTo(map);
   addEvMarkers(map);
+  if(typeof TR!=='undefined')TR.draw(); // следы города
   setTimeout(()=>{if(typeof ED!=='undefined')ED._renderMap();},400);
   if(typeof PO!=='undefined')PO.hook(map);
   // Позиция — из единого PM (один watchPosition на всё приложение)
@@ -1938,8 +1955,8 @@ function addUserMarker(map,lat,lng){
   if(S.user){
     const isAdmin=S.user.role==='admin';
     icon=makeCompassMarker('#ff0033','#ff3355',40,isAdmin);
-    const name=S.user.name||S.user.email.split('@')[0];
-    const msg=S.user.statusMsg||'';
+    const name=esc(S.user.name||String(S.user.email||'').split('@')[0]);
+    const msg=esc(S.user.statusMsg||'');
     popHtml=`<div class="user-pop">
       <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:6px">${isAdmin?'⚡ ':''} ${name}</div>
       ${msg?`<div style="font-size:.72rem;color:var(--td);font-style:italic">"${msg}"</div>`:''}
@@ -1959,26 +1976,13 @@ function addUserMarker(map,lat,lng){
   document.getElementById('hcoords').textContent=`${lat.toFixed(4)}°N · ${lng.toFixed(4)}°E`;
 }
 
+// Раньше показывал аккаунты из localStorage этого же телефона (то есть почти никого).
+// Живых людей с именами на карте не показываем: вместо слежки — «Следы города» (TR):
+// где люди бывают, но не кто. Видимость друзей — отдельное решение, с согласием обеих сторон.
 function showOtherUsers(map){
-  if(window._ouMarkers){window._ouMarkers.forEach(m=>map.removeLayer(m));window._ouMarkers=[];}
-  else window._ouMarkers=[];
-  if(!S.user) return; // only registered users see others
-  const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
-  const cutoff=Date.now()-3600000*2; // 2 hours
-  Object.entries(users).forEach(([email,u])=>{
-    if(!u.lat||!u.lng) return;
-    if(u.lastSeen<cutoff) return;
-    if(S.user&&email===S.user.email) return;
-    const c=USER_COLORS.find(x=>x.id===u.colorId)||USER_COLORS[0];
-    const icon=makeCompassMarker(c.o,c.i,34,false);
-    const name=u.name||email.split('@')[0];
-    const pop=`<div class="user-pop">
-      <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:6px">${name}</div>
-      ${u.statusMsg?`<div style="font-size:.72rem;color:var(--td);font-style:italic">"${u.statusMsg}"</div>`:''}
-    </div>`;
-    const m=L.marker([u.lat,u.lng],{icon}).addTo(map).bindPopup(pop,{maxWidth:220});
-    window._ouMarkers.push(m);
-  });
+  if(window._ouMarkers){window._ouMarkers.forEach(m=>map.removeLayer(m));}
+  window._ouMarkers=[];
+  if(typeof TR!=='undefined')TR.draw();
 }
 
 function divIcon(color,sz=11,pulse=false){
@@ -2032,14 +2036,14 @@ function addEvMarkers(map){
     const icon=pulseEventIcon(ev);
     const pop=`<div class="ev-pop">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div class="ev-pop-t">${EV_ICONS[ev.type]||'📍'} ${ev.title}</div>
+        <div class="ev-pop-t">${EV_ICONS[ev.type]||'📍'} ${esc(ev.title)}</div>
         <span class="badge ${ev.verified?'bv':'bp'}" style="flex-shrink:0;margin-left:8px">${ev.verified?'✓':'⏳'}</span>
       </div>
       <div class="ev-pop-m">
         ${ev.date?`<div>📅 ${fmtDate(ev.date)}</div>`:''}
-        ${ev.loc?`<div>📍 ${ev.loc}</div>`:''}
-        ${ev.desc?`<div style="margin-top:5px">${ev.desc}</div>`:''}
-        <div style="margin-top:5px;color:var(--tm)">👤 ${ev.addedBy}</div>
+        ${ev.loc?`<div>📍 ${esc(ev.loc)}</div>`:''}
+        ${ev.desc?`<div style="margin-top:5px">${esc(ev.desc)}</div>`:''}
+        <div style="margin-top:5px;color:var(--tm)">👤 ${esc(ev.ownerName||ev.addedBy||'—')}</div>
       </div>
     </div>`;
     const m=L.marker([ev.lat,ev.lng],{icon}).addTo(map).bindPopup(pop,{maxWidth:270});
@@ -2070,19 +2074,30 @@ function toggleL(l){
   if(l==='q'&&typeof ED!=='undefined')ED._renderMap();
   if((l==='o'||l==='cam')&&typeof PO!=='undefined')PO.refresh();
   if(l==='air'&&typeof SKY!=='undefined')SKY.apply();
+  if(l==='tr'&&typeof TR!=='undefined')TR.draw();
   if(l==='o'&&LV.o&&window._map&&window._map.getZoom()<16){toast('Места появятся при приближении · зум 16+');return;}
   toast(LV[l]?'Слой включён':'Слой выключен');
 }
 
 /* ── Auth ───────────────────────────────────────────────── */
+// Аккаунты — Firebase Auth (email + пароль). Пароли никогда не хранятся в телефоне;
+// роль админа живёт на сервере (admins/<uid> = true) и проверяется правилами базы,
+// поэтому «стать админом», подменив localStorage, нельзя. См. firebase/database.rules.json.
 let aMode='login';
 let _selColor='cyan';
+const AUTH_ERR={'auth/invalid-email':'Неверный формат email','auth/user-not-found':'Неверный email или пароль',
+  'auth/wrong-password':'Неверный email или пароль','auth/invalid-credential':'Неверный email или пароль',
+  'auth/invalid-login-credentials':'Неверный email или пароль','auth/email-already-in-use':'Этот email уже зарегистрирован',
+  'auth/weak-password':'Пароль минимум 6 символов','auth/too-many-requests':'Слишком много попыток — подождите немного',
+  'auth/network-request-failed':'Нет сети','auth/operation-not-allowed':'Вход по email не включён в Firebase (см. README)'};
+function _authErr(e){return AUTH_ERR[e&&e.code]||('Ошибка: '+(e&&(e.code||e.message)||'неизвестно'));}
+function _fbAuthReady(){if(window.firebase&&firebase.auth&&FB.ready)return true;toast('Нет связи с сервером входа — попробуйте чуть позже');return false;}
 
 function renderProfile(){
   const c=document.getElementById('profcont');if(!c)return;
   if(S.user){
     const isA=S.user.role==='admin';
-    const myEvs=S.events.filter(e=>e.addedBy===S.user.email);
+    const myEvs=S.events.filter(e=>e.owner&&e.owner===S.user.uid);
     const {o,i}=getUserColorObj();
     const msg=S.user.statusMsg||'';
     c.innerHTML=`
@@ -2092,60 +2107,65 @@ function renderProfile(){
         box-shadow:0 0 24px ${o}60;border:2px solid ${o}80">
         ${isA?compassSVG(o,i,64,true):compassSVG(o,i,64,false)}
       </div>
-      <div style="margin-top:12px;font-family:'Orbitron',monospace;font-size:.85rem;letter-spacing:.08em">${S.user.name||S.user.email.split('@')[0]}</div>
-      <div style="font-size:.65rem;color:var(--tm);margin-top:2px">${S.user.email}</div>
+      <div style="margin-top:12px;font-family:'Orbitron',monospace;font-size:.85rem;letter-spacing:.08em">${esc(S.user.name||String(S.user.email||'').split('@')[0])}</div>
+      <div style="font-size:.65rem;color:var(--tm);margin-top:2px">${esc(S.user.email)}</div>
       <div style="margin-top:6px"><span class="badge ${isA?'ba':'bv'}">${isA?'⚡ Администратор':'✓ Пользователь'}</span></div>
     </div>
     <div class="island island-s">
       <div class="label" style="margin-bottom:8px">Статусное сообщение</div>
-      <textarea class="input" id="pmsg" placeholder="Напишите что-нибудь о себе..." style="min-height:60px">${msg}</textarea>
+      <textarea class="input" id="pmsg" maxlength="200" placeholder="Напишите что-нибудь о себе..." style="min-height:60px">${esc(msg)}</textarea>
       <button class="btn btn-p" style="width:100%;margin-top:8px;font-size:.7rem" onclick="saveUserMsg()">Сохранить сообщение</button>
     </div>
     <div class="island island-s">
+      <div class="status-tog">
+        <label class="tog"><input type="checkbox" ${TR.on?'checked':''} onchange="TR.set(this.checked)"><span class="tog-sl"></span></label>
+        <div>
+          <div style="font-size:.84rem;font-weight:700">👣 Оставлять след в городе</div>
+          <div style="font-size:.64rem;color:var(--td);line-height:1.5;margin-top:3px">Город увидит, <b>где</b> люди бывают, но не <b>кто</b>: клетки ~150 м, только пока ты в движении,
+          клетка загорается, если за день через неё прошли минимум двое. Клетки между собой не связаны — путь по ним не восстановить. Выключено по умолчанию.</div>
+        </div>
+      </div>
+    </div>
+    <div class="island island-s">
       <div class="label" style="margin-bottom:10px">Мои ивенты (${myEvs.length})</div>
-      ${myEvs.length?myEvs.map(ev=>`<div style="font-size:.8rem;padding:6px 0;border-bottom:1px solid var(--border);color:var(--td);display:flex;justify-content:space-between;align-items:center">
-        <span>${EV_ICONS[ev.type]||'📍'} ${ev.title}</span>
-        <span class="badge ${ev.verified?'bv':'bp'}" style="font-size:.52rem">${ev.verified?'✓':'⏳'}</span>
+      ${myEvs.length?myEvs.map(ev=>`<div style="font-size:.8rem;padding:6px 0;border-bottom:1px solid var(--border);color:var(--td);display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <span>${EV_ICONS[ev.type]||'📍'} ${esc(ev.title)}</span>
+        <span style="display:flex;gap:6px;align-items:center"><span class="badge ${ev.verified?'bv':'bp'}" style="font-size:.52rem">${ev.verified?'✓':'⏳'}</span>
+        ${ev.verified?'':`<button class="btn" style="font-size:.6rem;padding:3px 7px" onclick="delEv('${esc(ev.id)}')" title="Отозвать">✕</button>`}</span>
       </div>`).join(''):'<div style="font-size:.75rem;color:var(--tm)">Вы ещё не добавляли ивенты</div>'}
     </div>
     ${isA?`<button class="btn" style="width:100%" onclick="go('admin')">⚡ Панель администратора</button>`:''}
-    <button class="btn" style="width:100%" onclick="logout()">Выйти из аккаунта</button>`;
+    <button class="btn" style="width:100%" onclick="logout()">Выйти из аккаунта</button>
+    <div style="font-size:.58rem;color:var(--tm);text-align:center;padding:10px 4px;line-height:1.6;word-break:break-all">
+      ID аккаунта: <span id="myuid">${esc(S.user.uid||'')}</span>
+      <button class="btn" style="font-size:.55rem;padding:2px 7px;margin-left:4px" onclick="navigator.clipboard&&navigator.clipboard.writeText(S.user.uid).then(()=>toast('ID скопирован'))">копировать</button><br>
+      нужен владельцу, чтобы выдать права админа (README)</div>`;
   } else {
-    const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
-    const takenColors=Object.values(users).map(u=>u.colorId).filter(Boolean);
-    const swatches=USER_COLORS.map(col=>{
-      const taken=takenColors.includes(col.id);
-      return `<div class="cswatch${_selColor===col.id?' selected':''}"
+    const swatches=USER_COLORS.map(col=>`<div class="cswatch${_selColor===col.id?' selected':''}"
         onclick="selectColor('${col.id}',this)"
-        style="background:${col.o};box-shadow:0 0 8px ${col.o}80;${taken?'opacity:.4':''};"
-        title="${col.id}${taken?' (занят)':''}"></div>`;
-    }).join('');
-
+        style="background:${col.o};box-shadow:0 0 8px ${col.o}80;" title="${col.id}"></div>`).join('');
     c.innerHTML=`
     <div style="text-align:center;padding:16px 0">
       <div style="font-size:2.5rem">👤</div>
       <div style="margin-top:8px;font-size:.8rem;color:var(--td)">Войдите чтобы добавлять<br>ивенты и участвовать в сообществе</div>
     </div>
     <div class="island">
-      <div class="label" style="margin-bottom:14px" id="aml">ВХОД</div>
+      <div class="label" style="margin-bottom:14px" id="aml">${aMode==='login'?'ВХОД':'РЕГИСТРАЦИЯ'}</div>
       <div class="auth-form">
         <div class="fg"><label class="flbl">Email</label>
-          <input class="input" id="ae" type="email" placeholder="your@email.com"></div>
+          <input class="input" id="ae" type="email" autocomplete="email" placeholder="your@email.com"></div>
         <div class="fg"><label class="flbl">Пароль</label>
-          <input class="input" id="apw" type="password" placeholder="••••••••"></div>
-        <div class="fg" id="ang" style="display:none"><label class="flbl">Имя</label>
-          <input class="input" id="an" type="text" placeholder="Ваше имя"></div>
-        <div class="fg" id="aclr" style="display:none">
+          <input class="input" id="apw" type="password" autocomplete="${aMode==='login'?'current-password':'new-password'}" placeholder="••••••••"></div>
+        <div class="fg" id="ang" style="display:${aMode==='register'?'block':'none'}"><label class="flbl">Имя</label>
+          <input class="input" id="an" type="text" maxlength="40" placeholder="Ваше имя"></div>
+        <div class="fg" id="aclr" style="display:${aMode==='register'?'block':'none'}">
           <label class="flbl">Цвет вашего компаса</label>
           <div class="color-swatches" id="cswatches">${swatches}</div>
         </div>
-        <button class="btn btn-p" style="width:100%" onclick="authDo()">Войти</button>
-        <button class="btn btn-g" style="width:100%;font-size:.7rem" onclick="toggleAMode()">Нет аккаунта? Зарегистрироваться</button>
+        <button class="btn btn-p" style="width:100%" onclick="authDo()">${aMode==='login'?'Войти':'Зарегистрироваться'}</button>
+        <button class="btn btn-g" style="width:100%;font-size:.7rem" onclick="toggleAMode()">${aMode==='login'?'Нет аккаунта? Зарегистрироваться':'Уже есть аккаунт? Войти'}</button>
+        <button class="btn btn-g" style="width:100%;font-size:.62rem;opacity:.75" onclick="resetPw()">Забыли пароль?</button>
       </div>
-    </div>
-    <div style="font-size:.62rem;color:var(--tm);text-align:center;padding:8px;line-height:1.7">
-      Демо-вход: <strong style="color:var(--td)">admin@pneuraden.com</strong> / <strong style="color:var(--td)">admin123</strong><br>
-      Или зарегистрируйтесь с любым email
     </div>`;
   }
 }
@@ -2158,32 +2178,17 @@ function selectColor(id,el){
 
 function toggleAMode(){
   aMode=aMode==='login'?'register':'login';
-  const lbl=document.getElementById('aml');
-  const ang=document.getElementById('ang');
-  const aclr=document.getElementById('aclr');
-  const btn=document.querySelector('#vp .btn-p');
-  const tog=document.querySelector('#vp .btn-g');
-  if(lbl) lbl.textContent=aMode==='login'?'ВХОД':'РЕГИСТРАЦИЯ';
-  if(ang) ang.style.display=aMode==='register'?'block':'none';
-  if(aclr) aclr.style.display=aMode==='register'?'block':'none';
-  if(btn) btn.textContent=aMode==='login'?'Войти':'Зарегистрироваться';
-  if(tog) tog.textContent=aMode==='login'?'Нет аккаунта? Зарегистрироваться':'Уже есть аккаунт? Войти';
+  renderProfile();
 }
 
 function saveUserMsg(){
-  const msg=(document.getElementById('pmsg')?.value||'').trim();
-  S.user.statusMsg=msg;
-  localStorage.setItem('pnd-u',JSON.stringify(S.user));
-  // Update in users store
-  const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
-  if(users[S.user.email]){
-    users[S.user.email].statusMsg=msg;
-    localStorage.setItem('pnd-users',JSON.stringify(users));
-  }
-  // Update marker popup if map is open
+  if(!S.user||!S.user.uid)return;
+  const msg=(document.getElementById('pmsg')?.value||'').trim().slice(0,200);
+  S.user.statusMsg=msg;FB.cacheUser();
+  if(_fbDb)_fbDb.ref('profiles/'+S.user.uid+'/statusMsg').set(msg).catch(e=>toast(_authErr(e)));
   if(window._um) window._um.setPopupContent(`<div class="user-pop">
-    <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:6px">${S.user.name||S.user.email.split('@')[0]}</div>
-    ${msg?`<div style="font-size:.72rem;color:var(--td);font-style:italic">"${msg}"</div>`:''}
+    <div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-bottom:6px">${esc(S.user.name||'')}</div>
+    ${msg?`<div style="font-size:.72rem;color:var(--td);font-style:italic">"${esc(msg)}"</div>`:''}
   </div>`);
   toast('Сообщение сохранено ✓');
 }
@@ -2192,27 +2197,31 @@ function authDo(){
   const email=(document.getElementById('ae')?.value||'').trim().toLowerCase();
   const pw=document.getElementById('apw')?.value||'';
   if(!email||!pw){toast('Введите email и пароль');return;}
-  const users=JSON.parse(localStorage.getItem('pnd-users')||'{}');
+  if(!_fbAuthReady())return;
+  const auth=firebase.auth();
   if(aMode==='login'){
-    if(email==='admin@pneuraden.com'&&pw==='admin123'){
-      S.user={email,role:'admin'};
-    } else if(users[email]&&users[email].pw===btoa(pw)){
-      S.user={email,role:'user',name:users[email].name,colorId:users[email].colorId||'cyan',statusMsg:users[email].statusMsg||''};
-    } else {toast('Неверный email или пароль');return;}
+    auth.signInWithEmailAndPassword(email,pw).then(()=>toast('Добро пожаловать!')).catch(e=>toast(_authErr(e)));
   } else {
     if(pw.length<6){toast('Пароль минимум 6 символов');return;}
-    const name=(document.getElementById('an')?.value||'').trim()||email.split('@')[0];
-    users[email]={pw:btoa(pw),name,colorId:_selColor,statusMsg:''};
-    localStorage.setItem('pnd-users',JSON.stringify(users));
-    S.user={email,role:'user',name,colorId:_selColor,statusMsg:''};
+    const name=((document.getElementById('an')?.value||'').trim()||email.split('@')[0]).slice(0,40);
+    FB._pendingProfile={name,colorId:_selColor,statusMsg:''};
+    auth.createUserWithEmailAndPassword(email,pw).then(c=>{
+      c.user.updateProfile({displayName:name}).catch(()=>{});
+      return _fbDb.ref('profiles/'+c.user.uid).set({name,colorId:_selColor,statusMsg:''});
+    }).then(()=>{aMode='login';toast('Аккаунт создан ✓');})
+      .catch(e=>{FB._pendingProfile=null;toast(_authErr(e));});
   }
-  localStorage.setItem('pnd-u',JSON.stringify(S.user));
-  updateUID();renderProfile();
-  toast(aMode==='login'?'Добро пожаловать!':'Аккаунт создан ✓');
+}
+function resetPw(){
+  const email=(document.getElementById('ae')?.value||'').trim().toLowerCase();
+  if(!email){toast('Впишите email — пришлю ссылку для нового пароля');return;}
+  if(!_fbAuthReady())return;
+  firebase.auth().sendPasswordResetEmail(email).then(()=>toast('Письмо отправлено ✓')).catch(e=>toast(_authErr(e)));
 }
 
 function logout(){
-  S.user=null;localStorage.removeItem('pnd-u');
+  if(window.firebase&&firebase.auth&&FB.ready)firebase.auth().signOut().catch(()=>{});
+  S.user=null;FB.isAdmin=false;localStorage.removeItem('pnd-u');
   updateUID();renderProfile();toast('Вы вышли из системы');
 }
 
@@ -2220,6 +2229,10 @@ function logout(){
 function renderAdmin(){
   if(!S.user||S.user.role!=='admin'){go('profile');toast('Доступ запрещён');return;}
   const c=document.getElementById('admcont');if(!c)return;
+  // сообщения авторов админу лежат отдельно (читают только админы) — подгружаем раз в 30 с
+  if(_fbDb&&(!FB._msgsT||Date.now()-FB._msgsT>30000)){FB._msgsT=Date.now();
+    _fbDb.ref('eventMsgs').once('value').then(s=>{FB._msgs=s.val()||{};if(S.view==='admin')renderAdmin();}).catch(()=>{});}
+  const msgs=FB._msgs||{};
   const pd=S.events.filter(e=>!e.verified),vf=S.events.filter(e=>e.verified);
   let h=`
   <div class="island island-s">
@@ -2231,7 +2244,7 @@ function renderAdmin(){
       </label>
       <div>
         <div style="font-size:.88rem;font-weight:700">${S.clubActive?'🟢 Тренировка идёт':'⚫ Закрыто'}</div>
-        <div class="label">HK Rovinj Rovigno</div>
+        <div class="label">HK Rovinj Rovigno · видят все</div>
       </div>
     </div>
   </div>
@@ -2257,17 +2270,18 @@ function renderAdmin(){
     </div>`;
   } else {
     pd.forEach(ev=>{
+      const id=esc(ev.id),m=msgs[ev.id];
       h+=`<div class="qcard">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div style="font-weight:700;font-size:.88rem">${EV_ICONS[ev.type]||'📍'} ${ev.title}</div>
+          <div style="font-weight:700;font-size:.88rem">${EV_ICONS[ev.type]||'📍'} ${esc(ev.title)}</div>
           <span class="badge bp">⏳</span>
         </div>
-        <div style="font-size:.7rem;color:var(--td)">📅 ${fmtDate(ev.date)} · 👤 ${ev.addedBy}${ev.loc?` · 📍 ${ev.loc}`:''}</div>
-        ${ev.desc?`<div style="font-size:.74rem;color:var(--td)">${ev.desc}</div>`:''}
-        ${ev.msg?`<div style="font-size:.7rem;padding:8px;border-radius:8px;background:var(--surface2);color:var(--td)">"${ev.msg}"</div>`:''}
+        <div style="font-size:.7rem;color:var(--td)">📅 ${fmtDate(ev.date)} · 👤 ${esc(ev.ownerName||ev.addedBy||'—')}${ev.loc?` · 📍 ${esc(ev.loc)}`:''}</div>
+        ${ev.desc?`<div style="font-size:.74rem;color:var(--td)">${esc(ev.desc)}</div>`:''}
+        ${m?`<div style="font-size:.7rem;padding:8px;border-radius:8px;background:var(--surface2);color:var(--td)">"${esc(m)}"</div>`:''}
         <div class="adm-acts">
-          <button class="btn btn-ok" onclick="verEv('${ev.id}')">✓ Верифицировать</button>
-          <button class="btn btn-no" onclick="delEv('${ev.id}')">✕ Отклонить</button>
+          <button class="btn btn-ok" onclick="verEv('${id}')">✓ Верифицировать</button>
+          <button class="btn btn-no" onclick="delEv('${id}')">✕ Отклонить</button>
         </div>
       </div>`;
     });
@@ -2276,19 +2290,24 @@ function renderAdmin(){
   vf.forEach(ev=>{
     h+=`<div class="ev-card" style="border-color:rgba(52,211,153,.2)">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div style="font-size:.85rem;font-weight:700">${EV_ICONS[ev.type]||'📍'} ${ev.title}</div>
-        <button class="btn" style="font-size:.6rem;padding:4px 8px;color:var(--dng);border-color:rgba(244,63,94,.3)" onclick="delEv('${ev.id}')">✕</button>
+        <div style="font-size:.85rem;font-weight:700">${EV_ICONS[ev.type]||'📍'} ${esc(ev.title)}</div>
+        <button class="btn" style="font-size:.6rem;padding:4px 8px;color:var(--dng);border-color:rgba(244,63,94,.3)" onclick="delEv('${esc(ev.id)}')">✕</button>
       </div>
     </div>`;
   });
   c.innerHTML=h;
 }
 
-function setClub(v){
-  S.clubActive=v;localStorage.setItem('pnd-ca',JSON.stringify(v));
-  clubStatusUI();renderAdmin();toast(v?'🟢 Тренировка началась!':'⚫ Клуб закрыт');
+function _resetMap(){
   if(S.mapInit){S.mapInit=false;document.getElementById('map-container').innerHTML='';
     window._map=null;_minimap=null;}
+}
+function setClub(v){
+  S.clubActive=v;localStorage.setItem('pnd-ca',JSON.stringify(v));
+  if(_fbDb&&S.user&&S.user.role==='admin')
+    _fbDb.ref('club').update({active:v,ts:firebase.database.ServerValue.TIMESTAMP}).catch(e=>toast(_authErr(e)));
+  clubStatusUI();renderAdmin();toast(v?'🟢 Тренировка началась!':'⚫ Клуб закрыт');
+  _resetMap();
 }
 
 function saveClubLoc(){
@@ -2298,8 +2317,8 @@ function saveClubLoc(){
     toast('Некорректные координаты');return;
   }
   localStorage.setItem('pnd-club',JSON.stringify({lat,lng}));
-  if(S.mapInit){S.mapInit=false;document.getElementById('map-container').innerHTML='';
-    window._map=null;_minimap=null;}
+  if(_fbDb&&S.user&&S.user.role==='admin')_fbDb.ref('club').update({lat,lng}).catch(e=>toast(_authErr(e)));
+  _resetMap();
   renderAdmin();
   toast(`Локация клуба сохранена ✓ ${lat.toFixed(5)}°N`);
 }
@@ -2316,15 +2335,17 @@ function setClubLocGeo(){
 }
 
 function verEv(id){
-  const ev=S.events.find(e=>e.id===id);
-  if(ev){ev.verified=true;saveEv();triggerSeismicWave(ev.lat,ev.lng,ev.type);renderAdmin();renderEvents();
-    if(S.mapInit&&window._map)addEvMarkers(window._map);
-    toast('Ивент верифицирован ✓');}
+  const ev=S.events.find(e=>e.id===id);if(!ev||!_fbDb)return;
+  _fbDb.ref('events/'+id+'/verified').set(true).then(()=>{
+    triggerSeismicWave(ev.lat,ev.lng,ev.type);toast('Ивент верифицирован ✓');
+  }).catch(e=>toast(_authErr(e)));
 }
 function delEv(id){
-  S.events=S.events.filter(e=>e.id!==id);saveEv();renderAdmin();renderEvents();
-  if(S.mapInit&&window._map)addEvMarkers(window._map);
-  toast('Ивент удалён');
+  if(!_fbDb)return;
+  _fbDb.ref('events/'+id).remove().then(()=>{
+    if(S.user&&S.user.role==='admin')_fbDb.ref('eventMsgs/'+id).remove().catch(()=>{});
+    toast('Ивент удалён');
+  }).catch(e=>toast(_authErr(e)));
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2739,6 +2760,60 @@ const FB_CONFIG={
 };
 let _fbDb=null,_fbUid=null,_fsDb=null;
 
+/* ═══ ОБЩИЙ МИР — Firebase: вход, ивенты, клуб, присутствие ═══
+   · без аккаунта — анонимная сессия (гость читает ивенты, его точка на глобусе);
+   · аккаунт — email+пароль, профиль в profiles/<uid>, админ — admins/<uid> на сервере;
+   · ивенты: events/<id> (все видят), сообщение админу — eventMsgs/<id> (только админы);
+   · клуб: club/{active,lat,lng} — меняет админ, видят все;
+   · правила доступа — firebase/database.rules.json (проверены эмулятором). ═══ */
+const FB={ready:false,isAdmin:false,_lis:false,_presRef:null,_msgs:null,_msgsT:0,_pendingProfile:null,
+  cacheUser(){if(!S.user)return;const {uid,email,name,colorId,statusMsg}=S.user;
+    try{localStorage.setItem('pnd-u',JSON.stringify({uid,email,name,colorId,statusMsg}));}catch(e){}},
+  _onAuth(u){
+    if(!u){firebase.auth().signInAnonymously().catch(()=>{});return;}
+    const prev=_fbUid;_fbUid=u.uid;
+    // старую анонимную точку удалить нельзя (правила: только владелец) — её снимет onDisconnect,
+    // а читатели и так игнорируют точки старше 3 минут
+    _fbWrite();this._listen();
+    if(u.isAnonymous){
+      if(S.user){S.user=null;this.isAdmin=false;localStorage.removeItem('pnd-u');updateUID();renderProfile();}
+      return;
+    }
+    const pp=this._pendingProfile||{};
+    S.user={uid:u.uid,email:u.email||'',name:pp.name||u.displayName||String(u.email||'').split('@')[0],
+      colorId:pp.colorId||(S.user&&S.user.uid===u.uid&&S.user.colorId)||'cyan',
+      statusMsg:(S.user&&S.user.uid===u.uid&&S.user.statusMsg)||'',role:'user'};
+    this.isAdmin=false;this._pendingProfile=null;this.cacheUser();updateUID();renderProfile();
+    _fbDb.ref('profiles/'+u.uid).once('value').then(s=>{const p=s.val();if(!p||!S.user||S.user.uid!==u.uid)return;
+      Object.assign(S.user,{name:p.name||S.user.name,colorId:p.colorId||'cyan',statusMsg:p.statusMsg||''});
+      this.cacheUser();updateUID();renderProfile();}).catch(()=>{});
+    _fbDb.ref('admins/'+u.uid).once('value').then(s=>{if(!S.user||S.user.uid!==u.uid)return;
+      this.isAdmin=s.val()===true;S.user.role=this.isAdmin?'admin':'user';updateUID();renderProfile();
+      if(this.isAdmin)TR.prune();}).catch(()=>{});
+  },
+  _listen(){
+    if(this._lis||!_fbDb)return;this._lis=true;
+    _fbDb.ref('events').on('value',snap=>{
+      const v=snap.val()||{};
+      // старые локальные ивенты (были видны только на этом телефоне) — один раз в резерв
+      try{if(!localStorage.getItem('pnd-ev-local-backup')){const o=localStorage.getItem('pnd-ev');
+        if(o&&o!=='[]'&&o!=='null')localStorage.setItem('pnd-ev-local-backup',o);}}catch(e){}
+      S.events=Object.entries(v).map(([id,e])=>({...e,id}));
+      saveEv();renderEvents();
+      if(S.mapInit&&window._map)addEvMarkers(window._map);
+      if(S.view==='admin')renderAdmin();else if(S.view==='profile')renderProfile();
+    },()=>{});
+    _fbDb.ref('club').on('value',snap=>{
+      const c=snap.val();if(!c)return;S._clubLive=true;
+      if(typeof c.active==='boolean'&&c.active!==S.clubActive){S.clubActive=c.active;
+        try{localStorage.setItem('pnd-ca',JSON.stringify(c.active));}catch(e){}
+        clubStatusUI();if(S.mapInit&&window._map&&window._clubMarker){window._map.removeLayer(window._clubMarker);addClubMarker(window._map);}}
+      if(isFinite(c.lat)&&isFinite(c.lng))try{localStorage.setItem('pnd-club',JSON.stringify({lat:c.lat,lng:c.lng}));}catch(e){}
+    },()=>{});
+    TR.listen();
+  }
+};
+
 function initFirebase(){
   // Конфиг проверяем ДО загрузки SDK: раньше четыре compat-бандла (~450КБ)
   // грузились даже с пустым конфигом; firestore грузился, но не использовался вовсе.
@@ -2748,15 +2823,79 @@ function initFirebase(){
 }
 function _fbSetup(){
   if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
-  _fbDb=firebase.database();
-  firebase.auth().signInAnonymously().then(c=>{_fbUid=c.user.uid;_fbWrite();}).catch(()=>{});
+  _fbDb=firebase.database();FB.ready=true;
+  firebase.auth().onAuthStateChanged(u=>FB._onAuth(u));
 }
+// Присутствие: точка на глобусе раз в 30 с. Огрублено до 0.01° (~1 км): на глобусе
+// разницы не видно, а дом по такой точке не найти. Уходит при закрытии (onDisconnect).
 function _fbWrite(){
   if(!_fbDb||!_fbUid)return;
   const ref=_fbDb.ref('users/'+_fbUid);
-  const _push=()=>{const p=window._getUserPos?window._getUserPos():{lat:45.08,lng:13.64};ref.update({lat:p.lat,lng:p.lng,ts:Date.now()});};
-  _push();ref.onDisconnect().remove();if(!window._fbPushIv)window._fbPushIv=setInterval(_push,30000);
+  if(FB._presRef&&FB._presRef.key!==ref.key)FB._presRef.onDisconnect().cancel().catch(()=>{});
+  FB._presRef=ref;ref.onDisconnect().remove().catch(()=>{});
+  const push=()=>{if(!FB._presRef)return;
+    const p=window._getUserPos?window._getUserPos():{lat:45.08,lng:13.64};
+    FB._presRef.set({lat:Math.round(p.lat*100)/100,lng:Math.round(p.lng*100)/100,
+      ts:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{});};
+  push();if(!window._fbPushIv)window._fbPushIv=setInterval(push,30000);
 }
+
+/* ═══ СЛЕДЫ ГОРОДА — где люди бывают, но не кто ═══
+   Только по согласию (профиль → «Оставлять след»), только в движении (TP._still — нет),
+   клетка ~150×160 м, раз в сутки на клетку. Ключ записи = sha256(uid|день|клетка) —
+   разный в каждой клетке, поэтому клетки одного человека между собой не связать.
+   Клетка показывается, если за ОДИН день в ней ≥ K разных людей. Читаем сегодня+вчера;
+   админский клиент удаляет дни старше вчерашнего. ═══ */
+const TR={on:false,K:2,CLAT:0.0015,CLNG:0.002,_day:'',_sent:new Set(),_t:0,_lis:false,cells:{},_layer:null,
+  init(){try{this.on=localStorage.getItem('pnd-trail')==='1';}catch(e){}PM.sub(p=>this._fix(p));},
+  set(v){this.on=!!v;try{localStorage.setItem('pnd-trail',v?'1':'0');}catch(e){}
+    toast(v?'👣 След включён: город видит где, но не кто':'След выключен');},
+  _key(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');},
+  _cell(lat,lng){return Math.floor(lat/this.CLAT)+'_'+Math.floor(lng/this.CLNG);},
+  async _hash(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
+    return Array.from(new Uint8Array(b)).slice(0,8).map(x=>x.toString(16).padStart(2,'0')).join('');},
+  async _fix(p){
+    if(!this.on||!_fbDb||!S.user||!S.user.uid||!window.crypto||!crypto.subtle)return;
+    if(p.acc!=null&&p.acc>60)return;                       // неточный фикс — мимо
+    if(typeof TP!=='undefined'&&(TP._still||TP.spd<0.6))return; // стоишь — не пишем (дом/работа не светятся)
+    const now=Date.now();if(now-this._t<60000)return;this._t=now;
+    const day=this._key();if(day!==this._day){this._day=day;this._sent=new Set();}
+    const cell=this._cell(p.lat,p.lng);if(this._sent.has(cell))return;this._sent.add(cell);
+    try{const h=await this._hash(S.user.uid+'|'+day+'|'+cell);
+      _fbDb.ref('trails/'+day+'/'+cell+'/'+h).set(true).catch(()=>{});}catch(e){}
+  },
+  listen(){
+    if(this._lis||!_fbDb)return;this._lis=true;
+    const d0=this._key(),d1=this._key(new Date(Date.now()-864e5)),agg={};
+    const upd=(d,v)=>{agg[d]=v||{};this._merge(agg);};
+    _fbDb.ref('trails/'+d0).on('value',s=>upd(d0,s.val()),()=>{});
+    _fbDb.ref('trails/'+d1).once('value').then(s=>upd(d1,s.val())).catch(()=>{});
+  },
+  _merge(agg){const c={};
+    Object.values(agg).forEach(day=>Object.entries(day).forEach(([cell,hs])=>{
+      const n=Object.keys(hs||{}).length;if(n>=this.K)c[cell]=(c[cell]||0)+n;}));
+    this.cells=c;this.draw();},
+  near(p,km){let n=0;const r=Math.PI/180;
+    for(const k in this.cells){const [i,j]=k.split('_').map(Number);
+      const la=(i+.5)*this.CLAT,lo=(j+.5)*this.CLNG;
+      const d=Math.hypot((lo-p.lng)*r*Math.cos(p.lat*r),(la-p.lat)*r)*6371;if(d<=km)n++;}
+    return n;},
+  draw(){
+    const map=window._map;if(!map||typeof L==='undefined')return;
+    if(this._layer){map.removeLayer(this._layer);this._layer=null;}
+    if(!LV.tr)return;
+    const rs=Object.entries(this.cells).map(([k,n])=>{const [i,j]=k.split('_').map(Number);
+      const col=n>=6?'#22d3ee':n>=4?'#a855f7':'#7c3aed';
+      return L.rectangle([[i*this.CLAT,j*this.CLNG],[(i+1)*this.CLAT,(j+1)*this.CLNG]],
+        {stroke:false,fillColor:col,fillOpacity:Math.min(.55,.14+n*.06),interactive:false});});
+    this._layer=L.layerGroup(rs).addTo(map);
+  },
+  prune(){ // админ: дни старше вчерашнего удаляются (хранение ≤ 2 суток при живом админе)
+    if(!_fbDb)return;const cut=this._key(new Date(Date.now()-2*864e5));
+    _fbDb.ref('trails').orderByKey().endAt(cut).once('value').then(s=>{
+      s.forEach(ch=>{ch.ref.remove().catch(()=>{});});}).catch(()=>{});
+  }
+};
 
 // ═══ SPACE VIEW — Three.js 3D Globe ═══════════════════════════════════
 // Real astronomy: subsolarPoint → sun direction → terminator automatic
@@ -4946,12 +5085,14 @@ const DIR={
   _ago(ms){const m=Math.round(ms/60000);return m<60?m+' мин назад':Math.round(m/60)+' ч назад';},
   // ближайшая тренировка клуба сегодня: идёт сейчас или начнётся в пределах 3 ч
   _training(now){
+    // живой статус от админа (Firebase club/active) главнее расписания
+    if(S._clubLive&&S.clubActive)return{on:true,start:new Date(now).setHours(0,0,0,0),end:0,live:true};
     const DW={'Вс':0,'Пн':1,'Вт':2,'Ср':3,'Чт':4,'Пт':5,'Сб':6},d=new Date(now);
     for(const s of (CLUB.schedule||[])){
       if(DW[s.d]!==d.getDay())continue;
       const m=String(s.t).match(/(\d{1,2}):(\d{2})\D+(\d{1,2}):(\d{2})/);if(!m)continue;
       const a=new Date(d),z=new Date(d);a.setHours(+m[1],+m[2],0,0);z.setHours(+m[3],+m[4],0,0);
-      if(now>=a&&now<z)return{on:true,start:+a,end:+z};
+      if(now>=a&&now<z){if(S._clubLive)continue; /* админ отметил «закрыто» */ return{on:true,start:+a,end:+z};}
       if(a>now&&a-now<=3*36e5)return{on:false,start:+a,end:+z};
     }
     return null;
@@ -5021,7 +5162,7 @@ const DIR={
     {const tr=this._training(now);if(tr){const d=this._km(p,CLUB),on=tr.on;
       add({id:'club:'+tr.start,icon:'🥋',tint:'#a855f7',now:on,at:on?0:tr.start,
         title:on?'Тренировка идёт':'Тренировка через {t}',
-        sub:CLUB.name+' · '+this._dist(d)+(on?' · до '+this._hm(new Date(tr.end)):''),
+        sub:CLUB.name+' · '+this._dist(d)+(on&&tr.end?' · до '+this._hm(new Date(tr.end)):''),
         R:.5,N:1/(1+d/2),U:on?1:Math.exp(-(tr.start-now)/36e5/1.2),
         act:()=>{go('map');setTimeout(()=>{if(window._map)window._map.setView([CLUB.lat,CLUB.lng],16);},600);}});}}
     // 7 · твоё тело в пространстве-времени
@@ -5043,6 +5184,11 @@ const DIR={
         sub:Math.round(best.alt)+' м · '+this._dist(bd)+' · '+Math.round(best.gs)+' км/ч',
         R:.45,N:1/(1+bd/5),U:1,act:()=>go('ar')});
     }
+    // 8½ · город живёт: следы людей за сутки вокруг (где бывают, но не кто)
+    if(typeof TR!=='undefined'){const n=TR.near(p,1.5);
+      if(n>0)add({id:'trails:'+this._day,icon:'👣',tint:'#a855f7',now:true,title:'Город живёт · '+n+' '+(n%10===1&&n%100!==11?'место':n%10>=2&&n%10<=4&&(n%100<12||n%100>14)?'места':'мест')+' рядом',
+        sub:'следы людей за сутки — где бывают, но не кто',R:cl(.22+n*.03),N:1,U:.7,
+        act:()=>{go('map');setTimeout(()=>{LV.tr=true;document.getElementById('ltr')?.classList.add('active');TR.draw();},600);}});}
     // 9 · тишина — всегда есть кадр
     const kp=(typeof ED!=='undefined'&&ED.kp!=null)?ED.kp.toFixed(1):'—';
     add({id:'calm',icon:'✦',tint:'#818cf8',calm:true,title:'Тихо вокруг',
@@ -5109,6 +5255,7 @@ SAT.start();
 LT.init();
 TT.start();
 SL.init();
+TR.init();
 DIR.start();
 </script>
 
