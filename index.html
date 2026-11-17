@@ -74,6 +74,28 @@ input,select,textarea{font-family:inherit}
   background:conic-gradient(#f33,#ff3,#3f3,#3ff,#33f,#f3f,#f33,#ff3,#3f3,#3ff,#33f,#f3f,#f33,#ff3,#3f3,#3ff,#33f,#f3f,#f33)}
 @keyframes caSpin{to{transform:rotate(-360deg)}}
 body:not(.rainbow-arrows) #core-arrow .ca-spin{background:#ff0f38;animation:none}
+/* ── Режиссёр: карточка кадра ── */
+#dir-card{--dir-tint:#818cf8;margin-top:12px;padding:9px 14px 8px;width:min(84vw,340px);box-sizing:border-box;
+  border:1px solid var(--border2);border:1px solid color-mix(in srgb,var(--dir-tint) 55%,transparent);border-radius:16px;background:var(--glass);
+  box-shadow:0 0 26px -10px var(--dir-tint),inset 0 0 18px -12px var(--dir-tint);cursor:pointer;text-align:left;
+  transition:border-color .8s ease,box-shadow .8s ease;-webkit-tap-highlight-color:transparent}
+#dir-card:active{transform:scale(.985)}
+#dir-card .dir-top{display:flex;justify-content:space-between;align-items:center}
+#dir-kick{font-size:.56rem;letter-spacing:.24em;text-transform:uppercase;color:var(--dir-tint);font-weight:700}
+#dir-card .dir-q{width:20px;height:20px;border-radius:50%;border:1px solid var(--border2);background:transparent;
+  color:var(--td);font-size:.62rem;line-height:1;padding:0}
+#dir-card .dir-main{display:flex;align-items:center;gap:11px;margin:4px 0 2px}
+#dir-card .dir-main.dir-in{animation:dirIn .6s cubic-bezier(.2,.8,.2,1)}
+@keyframes dirIn{from{opacity:0;transform:translateY(7px);filter:blur(3px)}to{opacity:1;transform:none;filter:none}}
+#dir-card .dir-ico{font-size:1.55rem;line-height:1;filter:drop-shadow(0 0 9px var(--dir-tint));flex:none}
+#dir-card .dir-txt{min-width:0}
+#dir-card .dir-title{font-family:'Orbitron',monospace;font-size:.88rem;font-weight:700;letter-spacing:.02em;color:var(--txt);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dir-card .dir-sub{font-size:.72rem;color:var(--td);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dir-card .dir-why{font-size:.5rem;color:var(--tm);letter-spacing:.03em;margin-top:3px}
+#dir-card .dir-det{margin-top:8px;border-top:1px solid var(--border);padding-top:6px;font-size:.64rem;color:var(--td);line-height:1.7}
+#dir-card .dir-det b{color:var(--dir-tint)}
+#dir-card .dir-h{font-size:.52rem;letter-spacing:.2em;text-transform:uppercase;color:var(--tm);margin:6px 0 2px}
 #core-arrow .ca-inner{position:absolute;inset:0;background:#ff0d38;opacity:.95;
   clip-path:polygon(50% 14.62%,83.33% 73.08%,50% 60%,16.67% 73.08%)}
 
@@ -586,6 +608,16 @@ input:checked+.tog-sl::before{background:var(--ag);transform:translateX(22px);
         <div class="zpill" onclick="setZoom(0,event)"></div>
         <div class="zpill active" onclick="setZoom(1,event)"></div>
         <div class="zpill" onclick="setZoom(2,event)"></div>
+      </div>
+      <!-- РЕЖИССЁР: один кадр — самое интересное в реальности вокруг тебя прямо сейчас -->
+      <div id="dir-card" onclick="DIR.act()">
+        <div class="dir-top"><span id="dir-kick">Вокруг</span><button class="dir-q" onclick="event.stopPropagation();DIR.toggleWhy()" aria-label="Почему этот кадр">?</button></div>
+        <div id="dir-main" class="dir-main">
+          <div id="dir-ico" class="dir-ico">✦</div>
+          <div class="dir-txt"><div id="dir-title" class="dir-title">Смотрю вокруг…</div><div id="dir-sub" class="dir-sub"></div></div>
+        </div>
+        <div id="dir-why" class="dir-why"></div>
+        <div id="dir-det" class="dir-det" style="display:none"></div>
       </div>
       <div id="tp-card" onclick="TP.toggle()" style="margin-top:12px;padding:10px 18px;border:1px solid var(--border2);border-radius:16px;background:var(--glass);text-align:center;cursor:pointer;min-width:236px;transition:border-color 0.8s ease">
         <div style="font-size:.56rem;letter-spacing:.22em;color:var(--td);text-transform:uppercase">Пульс времени · мировая линия</div>
@@ -4879,6 +4911,191 @@ function closeTraffic(){
   go('map');
 }
 
+/* ═══ РЕЖИССЁР — один кадр вместо десяти экранов ═══
+   Каждые 5 с собирает кандидатов из уже живых потоков: пролёты станций (SAT),
+   землетрясения и геомагнитная буря (ED), закат/восход и Луна, ивенты и клуб,
+   твоё движение и высота (TP), самолёты над тобой (SKY). Ставит ОДИН кадр:
+     интерес = 100 × редкость × близость × срочность × свежесть
+   · все множители 0…1 с явными якорями (видно в «?» на карточке);
+   · кадр держится ≥ 25 с и сменяется, только если новый сильнее на 25 %;
+   · свежесть: каждый показ того же кадра за сутки — ×0.7 (не надоедать);
+   · касание карточки — действие кадра (НАВЕСТИ, карта на эпицентре, ивент…).
+   Журнал «почему этот кадр» — в «?». ═══ */
+const DIR={
+  cur:null,_since:0,_day:'',_seen:{},log:[],_sunC:{t:0,v:null},_why:false,_last:[],
+  HOLD:25000,SWITCH:1.25,FATIGUE:0.7,
+  start(){
+    this._day=this._dayKey();
+    try{const s=JSON.parse(localStorage.getItem('pnd-dir')||'null');
+      if(s&&s.day===this._day){this._seen=s.seen||{};this.log=s.log||[];}}catch(e){}
+    setTimeout(()=>this.tick(),1500);
+    setInterval(()=>{if(!document.hidden&&S.view==='home')this.tick();},5000);
+    setInterval(()=>{if(!document.hidden&&S.view==='home')this._live();},1000);
+  },
+  _dayKey(){const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();},
+  _save(){try{localStorage.setItem('pnd-dir',JSON.stringify({day:this._day,seen:this._seen,log:this.log}));}catch(e){}},
+  _pos(){return (typeof PM!=='undefined'&&PM.last)||{lat:CLUB.lat,lng:CLUB.lng};},
+  _km(a,b){return TP._dist(a.lat,a.lng,b.lat,b.lng)/1000;},
+  _cl(x){return Math.max(0,Math.min(1,x));},
+  _dir(az){return['С','СВ','В','ЮВ','Ю','ЮЗ','З','СЗ'][Math.round(((az%360)+360)%360/45)%8];},
+  _dist(km){return km<1?Math.round(km*1000)+' м':km<1000?Math.round(km)+' км':(km/1000).toFixed(1)+' тыс. км';},
+  _hm(d){return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');},
+  _in(ms){if(ms<=0)return'сейчас';const s=ms/1000;if(s<120)return Math.ceil(s)+' с';
+    const m=Math.round(s/60);return m<60?m+' мин':Math.floor(m/60)+' ч '+(m%60)+' мин';},
+  _ago(ms){const m=Math.round(ms/60000);return m<60?m+' мин назад':Math.round(m/60)+' ч назад';},
+  // ближайшая тренировка клуба сегодня: идёт сейчас или начнётся в пределах 3 ч
+  _training(now){
+    const DW={'Вс':0,'Пн':1,'Вт':2,'Ср':3,'Чт':4,'Пт':5,'Сб':6},d=new Date(now);
+    for(const s of (CLUB.schedule||[])){
+      if(DW[s.d]!==d.getDay())continue;
+      const m=String(s.t).match(/(\d{1,2}):(\d{2})\D+(\d{1,2}):(\d{2})/);if(!m)continue;
+      const a=new Date(d),z=new Date(d);a.setHours(+m[1],+m[2],0,0);z.setHours(+m[3],+m[4],0,0);
+      if(now>=a&&now<z)return{on:true,start:+a,end:+z};
+      if(a>now&&a-now<=3*36e5)return{on:false,start:+a,end:+z};
+    }
+    return null;
+  },
+  // ближайший закат/восход в пределах 3 ч (скан по 2 мин, кэш на минуту)
+  _sunEvent(p){
+    const now=Date.now();if(now-this._sunC.t<60000)return this._sunC.v;
+    let prev=solarElevation(new Date(now),p.lat,p.lng),v=null;
+    for(let m=2;m<=180;m+=2){const t=now+m*60000,e=solarElevation(new Date(t),p.lat,p.lng);
+      if((prev>-0.833)!==(e>-0.833)){v={t,set:e<prev};break;}prev=e;}
+    this._sunC={t:now,v};return v;
+  },
+  candidates(){
+    const out=[],now=Date.now(),p=this._pos(),cl=this._cl.bind(this);
+    const add=f=>{if(f&&f.R>0&&f.N>0&&f.U>0)out.push(f);};
+    // 1 · станции над тобой
+    (typeof SAT!=='undefined'&&SAT.passes||[]).forEach(ps=>{
+      const st=+ps.start,en=+ps.end;if(!st||now>en)return;
+      const tS=(st-now)/60000;if(tS>90)return;
+      const on=now>=st;
+      let R={'МКС':.7,'Тяньгун':.6,'Hubble':.5,'Starlink-поезд':.85}[ps.s]||.5;
+      R=ps.vis?Math.min(1,R+.25):R*.5;
+      add({id:'pass:'+ps.s+':'+st,icon:ps.s==='Starlink-поезд'?'✨':'🛰️',tint:'#22d3ee',now:on,at:on?0:st,
+        title:on?ps.s+' над тобой':ps.s+' через {t}',
+        sub:(ps.vis?'видна глазом':'днём не видна')+' · до '+Math.round(ps.maxEl)+'° в '+this._hm(ps.maxT),
+        R,N:.45+.55*cl(ps.maxEl/90),U:on?1:Math.exp(-tS/25),act:()=>go('ar')});
+    });
+    // 2 · землетрясения за сутки
+    if(typeof ED!=='undefined'){
+      (ED.quakes||[]).forEach(q=>{const age=now-q.time;if(age>864e5||q.mag<2.5)return;
+        const d=this._km(p,q);
+        add({id:'eq:'+q.id,icon:'🌋',tint:'#fbbf24',now:age<36e5,
+          title:'M'+q.mag.toFixed(1)+' · '+this._dist(d)+' от тебя',sub:(q.place||'—')+' · '+this._ago(age),
+          R:cl((q.mag-2.5)/4.5),N:1/(1+d/1500),U:Math.exp(-age/288e5),
+          act:()=>{go('map');setTimeout(()=>{LV.q=true;ED._renderMap();if(window._map)window._map.setView([q.lat,q.lng],6);},600);}});
+      });
+      // 3 · геомагнитная буря
+      if(ED.kp!=null&&ED.kp>=4)add({id:'kp:'+Math.floor(ED.kp),icon:'🌌',tint:'#a855f7',now:true,
+        title:(ED.kp>=5?'Геомагнитная буря':'Возмущённое поле')+' · Kp '+ED.kp.toFixed(1),
+        sub:ED.kp>=7?'на севере возможны сияния — смотри низко над горизонтом':'атмосфера глобуса дышит бурей',
+        R:cl((ED.kp-3.5)/5),N:1,U:1,act:()=>{typeof openSpaceView==='function'?openSpaceView():go('space');}});
+    }
+    // 4 · закат / восход / золотой час
+    const sp=solarPosition(new Date(now),p.lat,p.lng),se=this._sunEvent(p);
+    if(se){const m=(se.t-now)/60000;
+      add({id:(se.set?'sunset:':'sunrise:')+this._day,icon:se.set?'🌅':'🌄',tint:'#fb923c',now:m<3,at:se.t,
+        title:(se.set?'Закат':'Восход')+' через {t}',
+        sub:'Солнце '+sp.alt.toFixed(1)+'° · '+this._dir(sp.az)+' '+Math.round(sp.az)+'°',
+        R:.4,N:1,U:Math.exp(-m/30),act:()=>go('ar')});}
+    else if(sp.alt>-4&&sp.alt<6)add({id:'golden:'+this._day+':'+(sp.az<180?'am':'pm'),icon:'✨',tint:'#fb923c',now:true,
+        title:'Золотой час',sub:'Солнце '+sp.alt.toFixed(1)+'° · '+this._dir(sp.az),R:.3,N:1,U:1,act:()=>go('ar')});
+    // 5 · Луна ночью
+    const pd=moonPhase(new Date(now)),ill=Math.round((1-Math.cos(2*Math.PI*pd/29.53))/2*100);
+    if(sp.alt<-6){const mp=moonPos(new Date(now),p.lat,p.lng);
+      if(Math.abs(pd-14.77)<1.3&&mp.alt>0)add({id:'fullmoon:'+this._day,icon:'🌕',tint:'#e5e0c8',now:true,
+        title:'Полнолуние над тобой',sub:'Луна '+Math.round(mp.alt)+'° · '+this._dir(mp.az),R:.45,N:1,U:.85,act:()=>go('ar')});
+      else if(ill<12)add({id:'dark:'+this._day,icon:'🌌',tint:'#818cf8',now:true,
+        title:'Безлунная ночь',sub:'лучшее небо для звёзд — наведи телефон вверх',R:.3,N:1,U:.8,act:()=>go('ar')});}
+    // 6 · ивенты и клуб
+    (S.events||[]).forEach(ev=>{if(!ev.verified||!ev.date||ev.lat==null)return;
+      const h=(new Date(ev.date).getTime()-now)/36e5;if(h<-1||h>6)return;
+      const d=this._km(p,ev),on=h<=0;
+      add({id:'ev:'+ev.id,icon:EV_ICONS[ev.type]||'⭐',tint:EV_HEX[ev.type]||'#818cf8',now:on,at:on?0:new Date(ev.date).getTime(),
+        title:ev.title||'Ивент',sub:(on?'идёт сейчас':'через {t}')+' · '+this._dist(d),
+        R:.6,N:1/(1+d/3),U:on?1:Math.exp(-h/1.5),act:()=>jumpToEv(ev.id)});});
+    // клуб — по расписанию (статус «открыт» пока хранится только на устройстве админа)
+    {const tr=this._training(now);if(tr){const d=this._km(p,CLUB),on=tr.on;
+      add({id:'club:'+tr.start,icon:'🥋',tint:'#a855f7',now:on,at:on?0:tr.start,
+        title:on?'Тренировка идёт':'Тренировка через {t}',
+        sub:CLUB.name+' · '+this._dist(d)+(on?' · до '+this._hm(new Date(tr.end)):''),
+        R:.5,N:1/(1+d/2),U:on?1:Math.exp(-(tr.start-now)/36e5/1.2),
+        act:()=>{go('map');setTimeout(()=>{if(window._map)window._map.setView([CLUB.lat,CLUB.lng],16);},600);}});}}
+    // 7 · твоё тело в пространстве-времени
+    if(typeof TP!=='undefined'){
+      const kmh=Math.round(TP.spd*3.6),nsd=TP.nsd||0;
+      const clk=Math.abs(nsd).toFixed(nsd&&Math.abs(nsd)<10?2:0)+' нс/сутки';
+      if(TP.spd>2)add({id:'move:'+(TP.spd>45?'fly':'go'),icon:TP.spd>45?'✈️':'➶',tint:'#22d3ee',now:true,
+        title:(TP.spd>45?'Полёт · ':'В движении · ')+kmh+' км/ч',
+        sub:'твои часы '+(nsd<0?'отстают':'спешат')+' на '+clk,
+        R:cl(.25+TP.spd/60),N:1,U:1,act:()=>{TP.toggle();document.getElementById('tp-card')?.scrollIntoView({behavior:'smooth',block:'center'});}});
+      if(TP.haveAlt&&TP.alt>300)add({id:'alt:'+Math.round(TP.alt/500),icon:'⛰️',tint:'#fbbf24',now:true,
+        title:'Высота '+Math.round(TP.alt)+' м',sub:'время здесь идёт быстрее на '+clk,
+        R:cl(TP.alt/3000),N:1,U:1,act:()=>TP.toggle()});
+    }
+    // 8 · самолёт над тобой (если слой уже что-то знает)
+    if(typeof SKY!=='undefined'&&SKY.list&&SKY.list.length){
+      let best=null,bd=1e9;SKY.list.forEach(a=>{if(a.alt<500)return;const d=this._km(p,a);if(d<bd){bd=d;best=a;}});
+      if(best&&bd<15)add({id:'air:'+best.id,icon:'✈️',tint:'#38bdf8',now:true,title:'Над тобой '+best.fl,
+        sub:Math.round(best.alt)+' м · '+this._dist(bd)+' · '+Math.round(best.gs)+' км/ч',
+        R:.45,N:1/(1+bd/5),U:1,act:()=>go('ar')});
+    }
+    // 9 · тишина — всегда есть кадр
+    const kp=(typeof ED!=='undefined'&&ED.kp!=null)?ED.kp.toFixed(1):'—';
+    add({id:'calm',icon:'✦',tint:'#818cf8',calm:true,title:'Тихо вокруг',
+      sub:'Солнце '+Math.round(sp.alt)+'° · Луна '+ill+'% · Kp '+kp,R:.12,N:1,U:1,act:()=>SL.open()});
+    return out;
+  },
+  _score(f){const n=(this._seen[f.id]||0)-(this.cur&&this.cur.id===f.id?1:0);
+    f.F=Math.pow(this.FATIGUE,Math.max(0,n));f.score=100*f.R*f.N*f.U*f.F;return f.score;},
+  tick(){
+    if(this._day!==this._dayKey()){this._day=this._dayKey();this._seen={};this.log=[];}
+    let c;try{c=this.candidates();}catch(e){return;}
+    c.forEach(f=>this._score(f));c.sort((a,b)=>b.score-a.score);this._last=c;
+    const best=c[0];if(!best)return;
+    const cur=this.cur&&c.find(f=>f.id===this.cur.id),now=Date.now();
+    if(!cur)this._show(best,false);
+    else if(best.id!==cur.id&&(cur.calm||now-this._since>=this.HOLD)&&best.score>cur.score*this.SWITCH)this._show(best,false); // «тишина» уступает сразу
+    else this._show(cur,true);
+  },
+  _show(f,refresh){
+    const card=document.getElementById('dir-card');if(!card)return;
+    this.cur=f;
+    if(!refresh){
+      this._since=Date.now();this._seen[f.id]=(this._seen[f.id]||0)+1;
+      this.log.unshift({t:Date.now(),title:f.title.replace('{t}',this._in((f.at||0)-Date.now())),s:Math.round(f.score)});
+      if(this.log.length>12)this.log.length=12;this._save();
+      card.style.setProperty('--dir-tint',f.tint);
+      const m=document.getElementById('dir-main');
+      if(m){m.classList.remove('dir-in');void m.offsetWidth;m.classList.add('dir-in');}
+    }
+    const k=document.getElementById('dir-kick');
+    if(k)k.textContent=f.calm?'Вокруг':f.now||f.U>=.95?'Сейчас':'Скоро';
+    const ic=document.getElementById('dir-ico');if(ic)ic.textContent=f.icon;
+    const w=document.getElementById('dir-why');
+    if(w)w.textContent='редкость '+f.R.toFixed(2)+' × близость '+f.N.toFixed(2)+' × срочность '+f.U.toFixed(2)
+      +(f.F<1?' × свежесть '+f.F.toFixed(2):'')+' = '+Math.round(f.score);
+    this._live();
+    if(this._why)this._renderWhy();
+  },
+  _live(){const f=this.cur;if(!f)return;const r=s=>s.replace('{t}',this._in((f.at||0)-Date.now()));
+    const t=document.getElementById('dir-title'),s=document.getElementById('dir-sub');
+    if(t)t.textContent=r(f.title);if(s)s.textContent=r(f.sub);},
+  act(){if(this.cur&&this.cur.act)try{this.cur.act();}catch(e){}},
+  toggleWhy(){this._why=!this._why;const d=document.getElementById('dir-det');
+    if(d)d.style.display=this._why?'block':'none';if(this._why)this._renderWhy();},
+  _renderWhy(){const d=document.getElementById('dir-det');if(!d)return;
+    const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    d.innerHTML='<div class="dir-h">Сейчас в очереди</div>'
+      +this._last.slice(0,6).map(f=>'<div>'+f.icon+' '+esc(f.title.replace('{t}',this._in((f.at||0)-Date.now())))+' <b>'+Math.round(f.score)+'</b></div>').join('')
+      +'<div class="dir-h">Показано сегодня</div>'
+      +(this.log.length?this.log.slice(0,8).map(l=>'<div>'+this._hm(new Date(l.t))+' · '+esc(l.title)+' <b>'+l.s+'</b></div>').join(''):'<div>—</div>')
+      +'<div class="dir-h">Как выбираю</div><div>интерес = 100 × редкость × близость × срочность × свежесть. Кадр держится ≥ 25 с; новый побеждает, если сильнее на 25 %.</div>';
+  }
+};
+
 // Start Firebase presence layer (loads SDK async, safe if FB_CONFIG not filled)
 initFirebase();
 ED.start();
@@ -4891,6 +5108,7 @@ SAT.start();
 LT.init();
 TT.start();
 SL.init();
+DIR.start();
 </script>
 
 <!-- SPACE VIEW — 3D Globe -->
