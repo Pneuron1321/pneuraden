@@ -157,8 +157,7 @@ const SUN={night:null,
     return Math.asin(Math.sin(lR)*sD+Math.cos(lR)*Math.sqrt(1-sD*sD)*Math.cos(ha))/U.R;},
   update(){const p=GEO.last||ROVINJ,n=this.alt(new Date(),p.lat,p.lng)<-4;
     if(n===this.night)return;this.night=n;document.body.dataset.night=n?'1':'0';RADAR.setTiles();MAPV.setTiles();},
-  tiles(){return this.night?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-    :'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';}
+  tiles(){return 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';}  // фирменная тёмная карта
 };
 
 /* ═══ Экран не гаснет, пока ведём по маршруту ═══ */
@@ -400,7 +399,7 @@ const RADAR={map:null,tile:null,line:null,glow:null,cv:null,cx:null,dirty:true,h
     this.map=L.map('mini',{zoomControl:false,attributionControl:false,dragging:false,touchZoom:false,doubleClickZoom:false,
       scrollWheelZoom:false,boxZoom:false,keyboard:false,tap:false,zoomAnimation:false,fadeAnimation:false,inertia:false,zoomSnap:.5})
       .setView([ROVINJ.lat,ROVINJ.lng],16);
-    $('mini').classList.add('cartoon');this.setTiles();
+    this.setTiles();
     this.cv=$('rc');this.cx=this.cv.getContext('2d');this._size();window.addEventListener('resize',()=>{this._size();this.map.invalidateSize();});
     GEO.subs.push(f=>this.onFix(f));
     const loop=now=>{requestAnimationFrame(loop);this.frame(now);};requestAnimationFrame(loop);
@@ -413,9 +412,9 @@ const RADAR={map:null,tile:null,line:null,glow:null,cv:null,cx:null,dirty:true,h
   onFix(f){const z=this.zoom();this.map.setView([f.lat,f.lng],z,{animate:false});this.dirty=true;},
   drawRoute(){
     [this.glow,this.line].forEach(l=>{if(l)this.map.removeLayer(l);});this.glow=this.line=null;
-    if(NAV.on&&NAV.route){const c=NAV.mode==='foot'?'#22d3ee':'#ff3d9a';
-      this.glow=L.polyline(NAV.route.pts,{color:'#0b0f1e',weight:15,opacity:.9,lineCap:'round',lineJoin:'round',interactive:false}).addTo(this.map);
-      this.line=L.polyline(NAV.route.pts,{color:c,weight:8,opacity:1,lineCap:'round',lineJoin:'round',interactive:false}).addTo(this.map);}
+    if(NAV.on&&NAV.route){const c=NAV.mode==='foot'?'#22d3ee':'#FFD60A';
+      this.glow=L.polyline(NAV.route.pts,{color:'#1a1205',weight:14,opacity:.6,lineCap:'round',lineJoin:'round',interactive:false}).addTo(this.map);
+      this.line=L.polyline(NAV.route.pts,{color:c,weight:7,opacity:.97,lineCap:'round',lineJoin:'round',interactive:false}).addTo(this.map);}
     this.dirty=true;
   },
   frame(now){
@@ -434,35 +433,48 @@ const RADAR={map:null,tile:null,line:null,glow:null,cv:null,cx:null,dirty:true,h
   draw(now){
     const c=this.cx,k=this._k,W=this.cv.width,Hh=this.cv.height;c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,W,Hh);
     c.setTransform(k,0,0,k,W/2,Hh/2);
-    const rr=W/k/2-14-7,edge=rr-16;   // радиус кольца (с учётом рамки) и кромка для указателей
-    // стороны света по кольцу (крутятся вместе с картой), N — красный жетон
-    [['N',0],['E',90],['S',180],['W',270]].forEach(([l,a])=>{const an=(a-this.hd)*U.R,x=Math.sin(an)*(rr+12),y=-Math.cos(an)*(rr+12);
-      c.beginPath();c.arc(x,y,l==='N'?13:10,0,7);c.fillStyle=l==='N'?'#ff2d55':'#0b0f1e';c.fill();c.lineWidth=3;c.strokeStyle='#0b0f1e';c.stroke();
-      c.fillStyle='#fff';c.font=(l==='N'?'15':'11')+"px 'Russo One',system-ui,sans-serif";c.textAlign='center';c.textBaseline='middle';c.fillText(l,x,y+1);});
+    const rr=W/k/2-14-2,edge=rr-18;   // радиус кольца и кромка для указателей
+    // кольца дальности и перекрестие — неоново-зелёные, как у радара полной версии
+    c.lineWidth=1;[.33,.66].forEach((f,i)=>{c.beginPath();c.arc(0,0,rr*f,0,7);c.strokeStyle='rgba(0,255,80,'+(.10+i*.06)+')';c.stroke();});
+    // вращающаяся шкала компаса: штрих каждые 5°, крупный — на сторонах света
+    c.save();c.rotate(-this.hd*U.R);
+    for(let d=0;d<360;d+=5){const r=d*U.R,ic=d%90===0,is=d%45===0,tl=ic?13:is?8:4;
+      c.beginPath();c.moveTo(Math.sin(r)*(rr-tl),-Math.cos(r)*(rr-tl));c.lineTo(Math.sin(r)*rr,-Math.cos(r)*rr);
+      c.strokeStyle='rgba(0,255,80,'+(ic?.9:is?.55:.25)+')';c.lineWidth=ic?2.5:1;c.stroke();}
+    c.font="900 15px 'Orbitron',ui-monospace,monospace";c.textAlign='center';c.textBaseline='middle';
+    ['N','E','S','W'].forEach((l,i)=>{const r=i*Math.PI/2,x=Math.sin(r)*(rr-26),y=-Math.cos(r)*(rr-26);
+      c.save();c.translate(x,y);c.rotate(this.hd*U.R);   // буквы стоят ровно при любом повороте
+      c.fillStyle=l==='N'?'rgba(255,55,55,.98)':'rgba(0,255,80,.92)';c.shadowColor=l==='N'?'rgba(255,50,50,.8)':'rgba(0,255,80,.5)';c.shadowBlur=10;
+      c.fillText(l,0,1);c.restore();});
+    c.restore();
     const me=GEO.last;
     // камеры
     if(CAMS.on&&me){const al=CAMS.alert&&CAMS.alert.c.id,route=NAV.on&&NAV.route?new Set(NAV.route.cams.map(x=>x.id)):null;
       CAMS.list.forEach(cm=>{if(U.dist(me,cm)>3000&&cm.id!==al)return;const s=this._scr(cm.lat,cm.lng),r=Math.hypot(s.x,s.y);
         if(r<=edge)this._cam(s.x,s.y,cm.id===al,route&&route.has(cm.id),now);
-        else if(cm.id===al)this._ptr(s,edge,'#ffd60a','📸',U.fmtD(CAMS.alert.d));});}
+        else if(cm.id===al)this._ptr(s,edge,'#fbbf24','📸',U.fmtD(CAMS.alert.d));});}
     // финиш
     if(NAV.on&&NAV.dest){const s=this._scr(NAV.dest.lat,NAV.dest.lng),r=Math.hypot(s.x,s.y);
-      if(r<=edge){c.font='26px serif';c.textAlign='center';c.textBaseline='bottom';c.fillText('🏁',s.x+6,s.y+4);}
-      else this._ptr(s,edge,NAV.mode==='foot'?'#22d3ee':'#ff3d9a','🏁',U.fmtD(Math.max(0,NAV.route.total-NAV.along)));}
-    // игрок: белая стрелка с толстым контуром (курс неизвестен — стрелка по северу)
-    c.save();if(APP.heading()==null)c.rotate(0);c.beginPath();c.moveTo(0,-17);c.lineTo(13,13);c.lineTo(0,6);c.lineTo(-13,13);c.closePath();
-    c.lineJoin='round';c.lineWidth=7;c.strokeStyle='#0b0f1e';c.stroke();c.fillStyle=NAV.on?'#ffd60a':'#fff';c.fill();c.restore();
+      if(r<=edge){c.font='24px serif';c.textAlign='center';c.textBaseline='bottom';c.shadowColor='rgba(255,214,10,.9)';c.shadowBlur=10;
+        c.fillText('📍',s.x,s.y+3);c.shadowBlur=0;}
+      else this._ptr(s,edge,NAV.mode==='foot'?'#22d3ee':'#ec4899','📍',U.fmtD(Math.max(0,NAV.route.total-NAV.along)));}
+    // ты: красная стрелка с подсветкой, как стрелка пользователя в полной версии
+    c.beginPath();c.moveTo(0,-16);c.lineTo(12,12);c.lineTo(0,5);c.lineTo(-12,12);c.closePath();c.lineJoin='round';
+    c.shadowColor='rgba(255,0,51,.9)';c.shadowBlur=14;c.fillStyle='#ff0033';c.fill();c.shadowBlur=0;
+    c.lineWidth=1.5;c.strokeStyle='#ff6680';c.stroke();
   },
   _cam(x,y,hot,onRoute,now){const c=this.cx,s=hot?1+.12*Math.sin(now/90):1;
-    c.save();c.translate(x,y);c.scale(s,s);c.beginPath();if(c.roundRect)c.roundRect(-13,-13,26,26,7);else c.rect(-13,-13,26,26);
-    c.fillStyle=hot?'#ff2d55':onRoute?'#ff8a00':'#ffd60a';c.fill();c.lineWidth=3.5;c.strokeStyle='#0b0f1e';c.stroke();
-    c.font='15px serif';c.textAlign='center';c.textBaseline='middle';c.fillText('📸',0,1);c.restore();},
+    c.save();c.translate(x,y);c.scale(s,s);c.beginPath();c.arc(0,0,12,0,7);
+    c.fillStyle=hot?'rgba(244,63,94,.85)':'rgba(10,15,30,.9)';c.fill();
+    c.shadowColor=hot?'rgba(244,63,94,1)':onRoute?'rgba(251,191,36,.9)':'rgba(244,63,94,.7)';c.shadowBlur=10;
+    c.lineWidth=1.8;c.strokeStyle=onRoute&&!hot?'#fbbf24':'rgba(244,63,94,.9)';c.stroke();c.shadowBlur=0;
+    c.font='13px serif';c.textAlign='center';c.textBaseline='middle';c.fillText('📸',0,1);c.restore();},
   _ptr(s,edge,col,ico,label){const c=this.cx,a=Math.atan2(s.y,s.x),x=Math.cos(a)*edge,y=Math.sin(a)*edge;
-    c.save();c.translate(x,y);c.rotate(a);c.beginPath();c.moveTo(16,0);c.lineTo(-6,-13);c.lineTo(-6,13);c.closePath();
-    c.fillStyle=col;c.fill();c.lineWidth=4;c.strokeStyle='#0b0f1e';c.stroke();c.restore();
-    const lx=Math.cos(a)*(edge-32),ly=Math.sin(a)*(edge-32);
-    c.font="12px 'Russo One',system-ui,sans-serif";c.textAlign='center';c.textBaseline='middle';c.lineWidth=4;c.strokeStyle='#0b0f1e';
-    c.strokeText(ico+' '+label,lx,ly);c.fillStyle='#fff';c.fillText(ico+' '+label,lx,ly);}
+    c.save();c.translate(x,y);c.rotate(a);c.beginPath();c.moveTo(14,0);c.lineTo(-6,-11);c.lineTo(-6,11);c.closePath();
+    c.shadowColor=col;c.shadowBlur=12;c.fillStyle=col;c.fill();c.restore();
+    const lx=Math.cos(a)*(edge-30),ly=Math.sin(a)*(edge-30);
+    c.font="700 11px 'Orbitron',ui-monospace,monospace";c.textAlign='center';c.textBaseline='middle';
+    c.shadowColor='rgba(0,0,0,.9)';c.shadowBlur=6;c.fillStyle=col;c.fillText(ico+' '+label,lx,ly);c.shadowBlur=0;}
 };
 
 /* ═══ КАРТА: тап — точка, поиск, «ехать / идти», предпросмотр маршрута и камер на нём ═══ */
@@ -474,7 +486,7 @@ const MAPV={map:null,tile:null,me:null,dest:null,destMk:null,ringMk:null,route:n
     this.map.on('click',e=>{if(NAV.on){U.toast('Сначала останови маршрут');return;}
       this.setDest({lat:e.latlng.lat,lng:e.latlng.lng,name:'Точка на карте'},true);});
     this.me=L.marker([ROVINJ.lat,ROVINJ.lng],{interactive:false,zIndexOffset:1000,icon:L.divIcon({className:'',iconSize:[38,38],iconAnchor:[19,19],
-      html:'<div class="mk-me"><svg viewBox="-20 -20 40 40"><path d="M0 -15L12 12L0 5L-12 12Z" fill="#fff" stroke="#0b0f1e" stroke-width="5" stroke-linejoin="round"/></svg></div>'})}).addTo(this.map);
+      html:'<div class="mk-me"><svg viewBox="-20 -20 40 40"><path d="M0 -15L12 12L0 5L-12 12Z" fill="#ff0033" stroke="#ff5577" stroke-width="1.5" stroke-linejoin="round"/></svg></div>'})}).addTo(this.map);
     GEO.subs.push(f=>{this.me.setLatLng([f.lat,f.lng]);const h=APP.heading(),el=this.me.getElement();
       if(el){const s=el.querySelector('svg');if(s)s.style.transform='rotate('+(h||0)+'deg)';}});
     this._search();this.ui();
@@ -508,9 +520,9 @@ const MAPV={map:null,tile:null,me:null,dest:null,destMk:null,ringMk:null,route:n
   },
   drawRoute(fit){
     [this.glow,this.line].forEach(l=>{if(l)this.map.removeLayer(l);});this.glow=this.line=null;
-    const r=NAV.on?NAV.route:this.route;if(!r)return;const c=r.mode==='foot'?'#22d3ee':'#ff3d9a';
-    this.glow=L.polyline(r.pts,{color:'#0b0f1e',weight:13,opacity:.9,lineCap:'round',lineJoin:'round',interactive:false}).addTo(this.map);
-    this.line=L.polyline(r.pts,{color:c,weight:7,opacity:1,lineCap:'round',lineJoin:'round',dashArray:r.approx?'4 14':null,interactive:false}).addTo(this.map);
+    const r=NAV.on?NAV.route:this.route;if(!r)return;const c=r.mode==='foot'?'#22d3ee':'#FFD60A';
+    this.glow=L.polyline(r.pts,{color:'#1a1205',weight:11,opacity:.55,lineCap:'round',lineJoin:'round',interactive:false}).addTo(this.map);
+    this.line=L.polyline(r.pts,{color:c,weight:5.5,opacity:.95,lineCap:'round',lineJoin:'round',dashArray:r.approx?'4 12':null,interactive:false}).addTo(this.map);
     if(fit)this.map.fitBounds(this.line.getBounds(),{paddingTopLeft:[30,90],paddingBottomRight:[30,250]});
     this.drawCams();
   },
@@ -528,7 +540,7 @@ const MAPV={map:null,tile:null,me:null,dest:null,destMk:null,ringMk:null,route:n
     const near=[...CAMS.list.values()].map(c=>({c,d:U.dist(me,c)})).filter(x=>x.d<=CAMS.R||onR.has(x.c.id))
       .sort((a,b)=>a.d-b.d).slice(0,400);
     this.camLayer=L.layerGroup(near.map(({c})=>L.marker([c.lat,c.lng],{interactive:false,icon:L.divIcon({className:'',iconSize:[30,30],iconAnchor:[15,15],
-      html:'<div class="mk-cam'+(onR.has(c.id)?' route':'')+'">📸'+(c.lim?'<i class="sign sm" style="position:absolute;top:-14px;right:-16px;width:24px;height:24px;font-size:.55rem;border-width:3px;outline-width:2px">'+c.lim+'</i>':'')+'</div>'})}))).addTo(this.map);
+      html:'<div class="mk-cam'+(onR.has(c.id)?' route':'')+'">📸'+(c.lim?'<i class="sign sm" style="position:absolute;top:-12px;right:-14px;width:20px;height:20px;font-size:.5rem;border-width:2.5px;font-style:normal">'+c.lim+'</i>':'')+'</div>'})}))).addTo(this.map);
   },
   ui(){
     const plan=$('plan'),hint=$('map-hint');if(!plan)return;
@@ -596,35 +608,36 @@ const APP={started:false,
   ui(){const b=$('b-go');if(!b)return;
     if(NAV.on){b.className='gbtn red';b.innerHTML='<span class="e">✕</span>СТОП';b.onclick=()=>NAV.stop();}
     else{b.className='gbtn yel';b.innerHTML='<span class="e">🗺️</span>КУДА?';b.onclick=()=>APP.openMap();}
-    const h=$('radar-hint');if(h)h.textContent=NAV.on?'ТАПНИ — КАРТА МАРШРУТА':'ТАПНИ — КАРТА';},
+    const h=$('radar-hint');if(h)h.textContent=NAV.on?'нажми · карта маршрута':'нажми · открыть карту';},
   // спидометр: дуга до 160 км/ч (пешком — до 20), цвет по лимиту
   dash(f){
     const kmh=Math.round(GEO.spd*3.6),e=$('spd');if(e)e.textContent=f.fake?'–':kmh;
     const max=NAV.on&&NAV.mode==='foot'?20:160,arc=$('sp-arc');
     if(arc){arc.setAttribute('stroke-dasharray',U.clamp(kmh/max*100,0,100).toFixed(1)+' 100');
-      const L=LIMIT.val;arc.setAttribute('stroke',!L||kmh<=L?'#7cff4f':kmh<=L+10?'#ff8a00':'#ff2d55');}
+      const L=LIMIT.val,col=!L||kmh<=L?'#34d399':kmh<=L+10?'#fbbf24':'#f43f5e';arc.setAttribute('stroke',col);arc.setAttribute('color',col);}
   },
   // иконка манёвра: стрелка, повёрнутая по типу поворота; круг; финиш
   arrow(st){
     const A={straight:0,'slight right':45,right:90,'sharp right':135,uturn:200,'slight left':-45,left:-90,'sharp left':-135};
     if(st.type==='arrive')return '<text x="0" y="16" font-size="54" text-anchor="middle">🏁</text>';
     if(/roundabout|rotary/.test(st.type)&&st.type.indexOf('exit')<0)
-      return '<circle r="22" fill="none" stroke="#0b0f1e" stroke-width="16"/><circle r="22" fill="none" stroke="#fff" stroke-width="8"/>'
-        +'<text x="0" y="10" font-size="26" font-family="Russo One" text-anchor="middle" fill="#0b0f1e">'+(st.exit||'')+'</text>';
+      return '<circle r="24" fill="none" stroke="currentColor" stroke-width="7" style="color:var(--nm)"/>'
+        +'<text x="0" y="10" font-size="26" font-family="Orbitron,monospace" font-weight="900" text-anchor="middle" fill="#e2e8f0">'+(st.exit||'')+'</text>';
     let a=A[st.mod];if(a==null)a=/fork|ramp|merge/.test(st.type)?(st.mod&&st.mod.indexOf('left')>=0?-30:30):0;
-    return '<g transform="rotate('+a+')"><path d="M0 -40L26 -8H10V38H-10V-8H-26Z" fill="#fff" stroke="#0b0f1e" stroke-width="7" stroke-linejoin="round"/></g>';
+    const col=NAV.mode==='foot'?'#22d3ee':'#34d399';
+    return '<g transform="rotate('+a+')"><path d="M0 -40L26 -8H10V38H-10V-8H-26Z" fill="'+col+'" stroke="#0a0f1e" stroke-width="3" stroke-linejoin="round"/></g>';
   },
   showFinish(s,mode){
-    $('f-title').textContent=mode==='foot'?'ПРИШЁЛ!':'ФИНИШ!';
+    $('f-title').textContent=mode==='foot'?'НА МЕСТЕ':'ФИНИШ';
     $('f-stars').innerHTML=[1,2,3].map(i=>'<span'+(i>s.stars?' class="dim"':'')+'>⭐</span>').join('');
     $('f-note').textContent=s.stars===3?'Чистый заезд — ни одного превышения!':s.stars===2?'Почти идеально':'Камеры видели превышение';
     const st=[['Путь',U.fmtD(s.dist)],['Время',U.fmtT(s.time)],['Средняя',Math.round(s.avg)+' км/ч'],['Макс',Math.round(s.max)+' км/ч']];
     if(mode!=='foot')st.push(['Камер',s.cams],['Превышений',s.over]);
     $('f-stats').innerHTML=st.map(x=>'<div><b>'+U.esc(x[1])+'</b><span>'+x[0]+'</span></div>').join('');
     $('finish').classList.remove('hidden');
-    const cols=['#ffd60a','#ff3d9a','#22d3ee','#7cff4f','#ff8a00'];
+    const cols=['#a855f7','#ec4899','#22d3ee','#34d399','#fbbf24'];
     for(let i=0;i<36;i++){const c=document.createElement('div');c.className='confetti';
-      c.style.cssText='left:'+Math.random()*100+'vw;background:'+cols[i%5]+';animation-duration:'+(1.8+Math.random()*1.6)+'s;animation-delay:'+Math.random()*.5+'s';
+      c.style.cssText='left:'+Math.random()*100+'vw;background:'+cols[i%5]+';color:'+cols[i%5]+';animation-duration:'+(1.8+Math.random()*1.6)+'s;animation-delay:'+Math.random()*.5+'s';
       document.body.appendChild(c);setTimeout(()=>c.remove(),4200);}
   },
   closeFinish(){$('finish').classList.add('hidden');SND.play('ui');}
