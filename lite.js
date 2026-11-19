@@ -4,7 +4,7 @@
    U (утилиты) · OVP (Overpass) · SND (звук и голос) · GEO (GPS) · COMP (компас)
    SUN (день/ночь) · WAKE (экран не гаснет) · ROUTER (маршрут) · CAMS (камеры)
    LIMIT (знак ограничения) · TRIP (итоги) · NAV (ведение) · RADAR · MAPV · APP
-   Все внешние сервисы бесплатные и без ключей: OSM-тайлы CARTO, OSRM,
+   Все внешние сервисы бесплатные и без ключей: тайлы OpenStreetMap, OSRM,
    FOSSGIS-маршрутизатор (пешком), Overpass (камеры, лимиты), Nominatim/Photon.
    ═══════════════════════════════════════════════════════════════════ */
 const $=id=>document.getElementById(id);
@@ -157,7 +157,8 @@ const SUN={night:null,
     return Math.asin(Math.sin(lR)*sD+Math.cos(lR)*Math.sqrt(1-sD*sD)*Math.cos(ha))/U.R;},
   update(){const p=GEO.last||ROVINJ,n=this.alt(new Date(),p.lat,p.lng)<-4;
     if(n===this.night)return;this.night=n;document.body.dataset.night=n?'1':'0';RADAR.setTiles();MAPV.setTiles();},
-  tiles(){return 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';}  // фирменная тёмная карта
+  // OpenStreetMap (без ключа; CARTO теперь требует ключ). Тёмной её делает CSS-фильтр в index.html
+  tiles(){return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';}
 };
 
 /* ═══ Экран не гаснет, пока ведём по маршруту ═══ */
@@ -405,7 +406,7 @@ const RADAR={map:null,tile:null,line:null,glow:null,cv:null,cx:null,dirty:true,h
     const loop=now=>{requestAnimationFrame(loop);this.frame(now);};requestAnimationFrame(loop);
   },
   setTiles(){if(!this.map)return;if(this.tile)this.map.removeLayer(this.tile);
-    this.tile=L.tileLayer(SUN.tiles(),{subdomains:'abcd',maxZoom:20,keepBuffer:1}).addTo(this.map);},
+    this.tile=L.tileLayer(SUN.tiles(),{maxZoom:19,keepBuffer:1}).addTo(this.map);},
   _size(){const r=this.cv.getBoundingClientRect(),k=Math.min(2,window.devicePixelRatio||1);
     this.cv.width=Math.round(r.width*k);this.cv.height=Math.round(r.height*k);this._k=k;this.dirty=true;},
   zoom(){const v=GEO.spd;if(NAV.on&&NAV.mode==='foot')return 17.5;return v<4?17:v<12?16:v<22?15.5:15;},
@@ -492,8 +493,8 @@ const MAPV={map:null,tile:null,me:null,dest:null,destMk:null,ringMk:null,route:n
     this._search();this.ui();
   },
   setTiles(){if(!this.map)return;if(this.tile)this.map.removeLayer(this.tile);
-    this.tile=L.tileLayer(SUN.tiles(),{subdomains:'abcd',maxZoom:20,
-      attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>'}).addTo(this.map);},
+    this.tile=L.tileLayer(SUN.tiles(),{maxZoom:19,
+      attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(this.map);},
   open(){setTimeout(()=>{this.map.invalidateSize();
     if(!this._opened){this._opened=true;const p=GEO.last||ROVINJ;this.map.setView([p.lat,p.lng],15);}
     if(NAV.on&&this.route)this.drawRoute();this.drawCams();this.ui();},30);},

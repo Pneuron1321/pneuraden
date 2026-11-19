@@ -62,6 +62,8 @@ input,select,textarea{font-family:inherit}
 
 #app{width:100vw;height:100vh;height:100dvh;position:relative;overflow:hidden}
 
+/* Тайлы OSM светлые: в тёмной теме (и на миникарте радара всегда) делаем их тёмными фильтром */
+[data-theme="dark"] .leaflet-tile-pane,#radar-minimap .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.95) contrast(.9) saturate(.55)}
 #depth-tunnel{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none}
 /* Стрелка-ядро в центре туннеля. Размеры в vh — те же, что были в шейдере (1 ед. = 1,3 % высоты). */
 #core-arrow{position:fixed;left:50%;top:50%;width:0;height:0;z-index:0;pointer-events:none}
@@ -408,12 +410,11 @@ body.rainbow-arrows .user-arrow{ animation:uaRainbow 3s linear infinite !importa
 .ldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 /* Leaflet */
 .leaflet-container{font-family:'Rajdhani',sans-serif;background:#0a0a14}
-/* Radar minimap: always dark_all tiles — theme-independent filter */
-#radar-minimap .leaflet-tile-pane{filter:brightness(4.5) contrast(1.15)}
-/* Full map — dark theme */
-[data-theme="dark"] #map-container .leaflet-tile-pane{filter:brightness(3.8) contrast(1.1)}
-/* Full map — light theme: CSS-only (no SVG ref), expressive details */
-[data-theme="light"] #map-container .leaflet-tile-pane{filter:brightness(0.82) contrast(1.85) saturate(2.6)}
+/* Тайлы — OpenStreetMap (CARTO теперь требует ключ). OSM светлый, поэтому тёмный вид — инверсией.
+   Миникарта радара тёмная всегда; полная карта — по теме. */
+#radar-minimap .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(1.08) contrast(.95) saturate(.6)}
+[data-theme="dark"] #map-container .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(1.02) contrast(.92) saturate(.6)}
+[data-theme="light"] #map-container .leaflet-tile-pane{filter:saturate(1.15) contrast(1.05)}
 .leaflet-popup-content-wrapper{background:transparent;border:none;box-shadow:none;padding:0}
 .leaflet-popup-content{margin:0}
 .leaflet-popup-tip{display:none}
@@ -1615,8 +1616,8 @@ function toggleTheme(){
   document.documentElement.setAttribute('data-theme',S.theme);
   localStorage.setItem('pnd-t',S.theme);
   const tileUrl=S.theme==='dark'
-    ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-    :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    ?'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+    :'https://tile.openstreetmap.org/{z}/{x}/{y}.png';  // CARTO теперь требует ключ — берём OSM; тёмный вид даёт CSS-фильтр (data-theme)
   if(S.mapInit && window._ml) window._ml.setUrl(tileUrl);
   // Radar minimap always stays dark_all — its CSS filter is theme-independent
 }
@@ -1839,14 +1840,14 @@ function initMap(){
     toast(window._pinMode?'Тапни на карту — поставлю метку цели':'Режим метки выключен');
   };
   const turl=S.theme==='dark'
-    ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-    :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    ?'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+    :'https://tile.openstreetmap.org/{z}/{x}/{y}.png';  // CARTO теперь требует ключ — берём OSM; тёмный вид даёт CSS-фильтр (data-theme)
   window._ml=L.tileLayer(turl,{maxZoom:19,subdomains:'abcd'}).addTo(map);
   // invalidateSize so Leaflet loads tiles for the oversized (141.5%) container
   setTimeout(()=>map.invalidateSize(),200);
   L.control.zoom({position:'bottomright'}).addTo(map);
   L.control.attribution({position:'bottomleft',prefix:false})
-    .addAttribution('© CartoDB · © OSM').addTo(map);
+    .addAttribution('© OpenStreetMap').addTo(map);
   addEvMarkers(map);
   if(typeof TR!=='undefined')TR.draw(); // следы города
   setTimeout(()=>{if(typeof ED!=='undefined')ED._renderMap();},400);
@@ -2447,7 +2448,7 @@ let _minimap=null;
       doubleClickZoom:false,boxZoom:false,keyboard:false,
       fadeAnimation:false,zoomAnimation:false,tap:false
     });
-    window._minimapTL=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    window._minimapTL=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       {maxZoom:19,subdomains:'abcd'}).addTo(_minimap);
     // Multiple invalidateSize calls — circular container sometimes needs extra nudge
     setTimeout(()=>_minimap.invalidateSize(),100);
@@ -4476,8 +4477,8 @@ const NAV={
   },
   _tileUrl(){
     return S.theme==='dark'
-      ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      :'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+      ?'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+      :'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   },
   _theme(){
     if(typeof toggleTheme==='function')toggleTheme(); // меняет S.theme + всё приложение

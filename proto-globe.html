@@ -114,8 +114,8 @@ const W={
         glyphs:'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
         sources:{
           base:{type:'raster',tileSize:256,maxzoom:19,
-            attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
-            tiles:['a','b','c','d'].map(s=>'https://'+s+'.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png')},
+            attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png']},
           night:{type:'geojson',data:this._night()},
           ev:{type:'geojson',data:this._events()},
           air:{type:'geojson',data:{type:'FeatureCollection',features:[]}},
@@ -123,7 +123,7 @@ const W={
         },
         layers:[
           {id:'bg',type:'background',paint:{'background-color':'#04050b'}},
-          {id:'base',type:'raster',source:'base',paint:{'raster-contrast':.12,'raster-saturation':.25,'raster-brightness-max':.92}},
+          {id:'base',type:'raster',source:'base',paint:{'raster-brightness-min':.95,'raster-brightness-max':.05,'raster-hue-rotate':180,'raster-saturation':-.45,'raster-contrast':.05}},  // светлый OSM → тёмный (инверсия)
           {id:'night',type:'fill',source:'night',paint:{'fill-color':'#020314','fill-opacity':.55}},
           {id:'link',type:'line',source:'link',paint:{'line-color':'#22d3ee','line-width':1.4,'line-dasharray':[2,2],'line-opacity':.7}},
           {id:'air',type:'circle',source:'air',minzoom:5,maxzoom:12.5,
