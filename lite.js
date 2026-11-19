@@ -439,16 +439,17 @@ const RADAR={map:null,tile:null,line:null,glow:null,cv:null,cx:null,dirty:true,h
     c.setTransform(k,0,0,k,W/2,Hh/2);
     const rr=W/k/2-14-2,edge=rr-18;   // радиус кольца и кромка для указателей
     // кольца дальности и перекрестие — неоново-зелёные, как у радара полной версии
-    c.lineWidth=1;[.33,.66].forEach((f,i)=>{c.beginPath();c.arc(0,0,rr*f,0,7);c.strokeStyle='rgba(0,255,80,'+(.10+i*.06)+')';c.stroke();});
+    const G=document.documentElement.dataset.theme==='light'?'4,140,90':'0,255,80';   // зелёный радара: на светлом — темнее
+    c.lineWidth=1;[.33,.66].forEach((f,i)=>{c.beginPath();c.arc(0,0,rr*f,0,7);c.strokeStyle='rgba('+G+','+(.18+i*.08)+')';c.stroke();});
     // вращающаяся шкала компаса: штрих каждые 5°, крупный — на сторонах света
     c.save();c.rotate(-this.hd*U.R);
     for(let d=0;d<360;d+=5){const r=d*U.R,ic=d%90===0,is=d%45===0,tl=ic?13:is?8:4;
       c.beginPath();c.moveTo(Math.sin(r)*(rr-tl),-Math.cos(r)*(rr-tl));c.lineTo(Math.sin(r)*rr,-Math.cos(r)*rr);
-      c.strokeStyle='rgba(0,255,80,'+(ic?.9:is?.55:.25)+')';c.lineWidth=ic?2.5:1;c.stroke();}
+      c.strokeStyle='rgba('+G+','+(ic?.9:is?.55:.3)+')';c.lineWidth=ic?2.5:1;c.stroke();}
     c.font="900 15px 'Orbitron',ui-monospace,monospace";c.textAlign='center';c.textBaseline='middle';
     ['N','E','S','W'].forEach((l,i)=>{const r=i*Math.PI/2,x=Math.sin(r)*(rr-26),y=-Math.cos(r)*(rr-26);
       c.save();c.translate(x,y);c.rotate(this.hd*U.R);   // буквы стоят ровно при любом повороте
-      c.fillStyle=l==='N'?'rgba(255,55,55,.98)':'rgba(0,255,80,.92)';c.shadowColor=l==='N'?'rgba(255,50,50,.8)':'rgba(0,255,80,.5)';c.shadowBlur=10;
+      c.fillStyle=l==='N'?'rgba(230,30,40,.98)':'rgba('+G+',.95)';c.shadowColor=l==='N'?'rgba(255,50,50,.6)':'rgba('+G+',.4)';c.shadowBlur=10;
       c.fillText(l,0,1);c.restore();});
     c.restore();
     const me=GEO.last;
@@ -605,6 +606,9 @@ const APP={started:false,
       if(GEO.last)go();else{const once=()=>{GEO.subs.splice(GEO.subs.indexOf(once),1);go();};GEO.subs.push(once);}
     }
   },
+  theme(){const l=document.documentElement.dataset.theme!=='light';document.documentElement.dataset.theme=l?'light':'dark';
+    U.set('lite-theme',l?'light':'dark');RADAR.dirty=true;SND.play('ui');
+    const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=l?'#eef2ff':'#030508';},
   heading(){return GEO.spd>2.5&&GEO.head!=null?GEO.head:(COMP.head!=null?COMP.head:GEO.head);},
   openMap(){document.body.dataset.view='map';MAPV.open();SND.play('ui');},
   closeMap(){document.body.dataset.view='radar';$('sres').classList.add('hidden');

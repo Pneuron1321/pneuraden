@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('lite-theme')==='"light"'?'light':'dark';}catch(e){}</script>
 <link rel="apple-touch-icon" href="assets/icon-192.png">
 <link rel="icon" href="assets/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
@@ -243,6 +244,31 @@ body.over::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9
   font-size:.82rem;letter-spacing:.05em;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 4px 16px rgba(0,0,0,.3);
   animation:tin .3s ease;max-width:88vw;text-align:center}
 @keyframes tin{from{opacity:0;transform:translateY(-10px)}}
+
+/* ═══ СВЕТЛАЯ ТЕМА — палитра светлой темы полной версии ═══ */
+html[data-theme="light"]{--bg:#eef2ff;--surface:#fff;--surface2:#f0f4ff;--surface3:#e4ecff;--glass:rgba(255,255,255,.92);
+  --border:rgba(79,70,229,.14);--border2:rgba(79,70,229,.28);--np:#7c3aed;--npi:#db2777;--nc:#0284c7;--nm:#059669;--ns:#0369a1;
+  --nl:#4f46e5;--ng:#d97706;--dng:#dc2626;--txt:#0f172a;--td:rgba(15,23,42,.62);--tm:rgba(15,23,42,.38)}
+html[data-theme="light"] .vbg{background:
+  radial-gradient(ellipse 70% 50% at 15% 85%,rgba(79,70,229,.07) 0%,transparent 70%),
+  radial-gradient(ellipse 50% 35% at 85% 15%,rgba(14,165,233,.06) 0%,transparent 70%),
+  linear-gradient(rgba(79,70,229,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(79,70,229,.06) 1px,transparent 1px);
+  background-size:auto,auto,48px 48px,48px 48px}
+html[data-theme="light"] #map .leaflet-tile-pane,html[data-theme="light"] .mini .leaflet-tile-pane{filter:saturate(1.1) contrast(1.03)}
+html[data-theme="light"] #map,html[data-theme="light"] .mini,html[data-theme="light"] .ring{background:#e9eef8}
+html[data-theme="light"] .ring{border-color:rgba(5,150,105,.7);box-shadow:0 0 14px rgba(5,150,105,.25)}
+html[data-theme="light"] .radar-box{box-shadow:0 10px 40px rgba(79,70,229,.18)}
+html[data-theme="light"] .gbtn.yel,html[data-theme="light"] .gbtn.cya,html[data-theme="light"] .modes .gbtn.on{--c:2,132,199}
+html[data-theme="light"] .gbtn.mag{--c:124,58,237} html[data-theme="light"] .gbtn.red{--c:220,38,38}
+html[data-theme="light"] #b-cam{--c:217,119,6} html[data-theme="light"] #b-snd,html[data-theme="light"] #b-theme{--c:5,150,105}
+html[data-theme="light"] .gbtn{background:rgba(var(--c),.07);box-shadow:0 4px 14px rgba(var(--c),.15)}
+html[data-theme="light"] .sres{background:rgba(255,255,255,.98)} html[data-theme="light"] .sres div{color:#0f172a;border-bottom-color:rgba(15,23,42,.08)}
+html[data-theme="light"] .sres div small{color:#64748b}
+html[data-theme="light"] .spd{text-shadow:0 0 14px rgba(2,132,199,.25)}
+html[data-theme="light"] .screen{background:radial-gradient(ellipse 70% 50% at 50% 40%,rgba(124,58,237,.12),transparent 70%),
+  linear-gradient(rgba(79,70,229,.06) 1px,transparent 1px) 0 0/48px 48px,linear-gradient(90deg,rgba(79,70,229,.06) 1px,transparent 1px) 0 0/48px 48px,#eef2ff}
+html[data-theme="light"] .leaflet-control-attribution{background:rgba(255,255,255,.75)!important}
+#b-theme{--c:52,211,153;width:34px;height:34px;flex:none;border-radius:50%;flex-direction:row;font-size:1rem;box-shadow:none}
 </style>
 </head>
 <body data-view="radar">
@@ -272,6 +298,7 @@ body.over::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9
   <div class="top">
     <div class="brand">PNEURADEN<b>LITE</b></div>
     <div id="gps" class="pill">GPS…</div>
+    <button id="b-theme" class="gbtn" onclick="APP.theme()" aria-label="Светлая или тёмная тема">🌓</button>
   </div>
 
   <div id="maneuver" class="maneuver hidden" onclick="NAV.repeat()">
@@ -316,7 +343,8 @@ body.over::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9
     <div class="search"><input id="q" type="search" placeholder="Куда едем? Город, улица, место" autocomplete="off" enterkeyhint="search">
       <div id="sres" class="sres hidden"></div></div>
   </div>
-  <div class="map-side"><button class="gbtn cya" onclick="MAPV.recenter()" aria-label="Ко мне"><span class="e">◎</span></button></div>
+  <div class="map-side"><button class="gbtn cya" onclick="MAPV.recenter()" aria-label="Ко мне"><span class="e">◎</span></button>
+    <button class="gbtn" onclick="APP.theme()" aria-label="Светлая или тёмная тема"><span class="e">🌓</span></button></div>
   <div id="map-hint" class="map-hint">Коснись карты — поставлю точку</div>
   <div id="plan" class="plan hidden">
     <div class="name" id="p-name">—</div>
