@@ -268,6 +268,8 @@ html[data-theme="light"] .spd{text-shadow:0 0 14px rgba(2,132,199,.25)}
 html[data-theme="light"] .screen{background:radial-gradient(ellipse 70% 50% at 50% 40%,rgba(124,58,237,.12),transparent 70%),
   linear-gradient(rgba(79,70,229,.06) 1px,transparent 1px) 0 0/48px 48px,linear-gradient(90deg,rgba(79,70,229,.06) 1px,transparent 1px) 0 0/48px 48px,#eef2ff}
 html[data-theme="light"] .leaflet-control-attribution{background:rgba(255,255,255,.75)!important}
+#b-lang{--c:56,189,248;width:40px;height:34px;flex:none;border-radius:var(--r-p);font:900 .62rem var(--fo);letter-spacing:.06em;box-shadow:none}
+html[data-theme="light"] #b-lang{--c:3,105,161}
 #b-theme{--c:52,211,153;width:34px;height:34px;flex:none;border-radius:50%;flex-direction:row;font-size:1rem;box-shadow:none}
 </style>
 </head>
@@ -298,6 +300,7 @@ html[data-theme="light"] .leaflet-control-attribution{background:rgba(255,255,25
   <div class="top">
     <div class="brand">PNEURADEN<b>LITE</b></div>
     <div id="gps" class="pill">GPS…</div>
+    <button id="b-lang" class="gbtn" onclick="SND.toggleLang()" aria-label="Язык голоса: английский или русский">EN</button>
     <button id="b-theme" class="gbtn" onclick="APP.theme()" aria-label="Светлая или тёмная тема">🌓</button>
   </div>
 

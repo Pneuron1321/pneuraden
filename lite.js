@@ -30,10 +30,15 @@ const U={
   toast(msg,ms){const box=$('toast');if(!box)return;const d=document.createElement('div');d.textContent=msg;box.appendChild(d);
     while(box.children.length>3)box.firstChild.remove();setTimeout(()=>d.remove(),ms||2600);},
   // для голоса: «300 метров», «1,5 километра», «12 километров»
-  sayD(m){if(m<1000){const r=m<100?Math.max(10,Math.round(m/10)*10):Math.round(m/50)*50;return r+' метров';}
+  // голос: английский по умолчанию, русский — кнопкой EN/RU
+  en(){return SND.lang==='en';},
+  sayD(m){if(U.en()){if(m<1000){const r=m<100?Math.max(10,Math.round(m/10)*10):Math.round(m/50)*50;return r+' meters';}
+    const k=m/1000;return (k<10&&Math.abs(k-Math.round(k))>0.05?k.toFixed(1):Math.round(k))+(Math.round(k*10)===10?' kilometer':' kilometers');}
+    if(m<1000){const r=m<100?Math.max(10,Math.round(m/10)*10):Math.round(m/50)*50;return r+' метров';}
     const k=m/1000;if(k<10&&Math.abs(k-Math.round(k))>0.05)return k.toFixed(1).replace('.',',')+' километра';
     const n=Math.round(k),a=n%10,b=n%100;return n+' '+(a===1&&b!==11?'километр':a>=2&&a<=4&&(b<12||b>14)?'километра':'километров');},
-  sayT(s){const m=Math.max(1,Math.round(s/60));if(m<60)return m+' '+U._pl(m,'минута','минуты','минут');
+  sayT(s){const m=Math.max(1,Math.round(s/60));
+    if(U.en()){if(m<60)return m+(m===1?' minute':' minutes');const h=Math.floor(m/60),mm=m%60;return h+(h===1?' hour':' hours')+(mm?' '+mm+' minutes':'');}if(m<60)return m+' '+U._pl(m,'минута','минуты','минут');
     const h=Math.floor(m/60),mm=m%60;return h+' '+U._pl(h,'час','часа','часов')+(mm?' '+mm+' '+U._pl(mm,'минута','минуты','минут'):'');},
   _pl(n,one,few,many){const a=n%10,b=n%100;return a===1&&b!==11?one:a>=2&&a<=4&&(b<12||b>14)?few:many;},
   // проекция точки на ломаную маршрута: {d — до линии, along — пройдено вдоль, i — сегмент}
@@ -57,7 +62,9 @@ const OVP={EPS:['https://overpass-api.de/api/interpreter','https://overpass.kumi
 };
 
 /* ═══ ЗВУК: аркадные сигналы (синтез WebAudio, без файлов) + голос по-русски ═══ */
-const SND={on:U.get('lite-snd',true),ctx:null,_bus:null,_voice:null,
+const SND={on:U.get('lite-snd',true),lang:U.get('lite-lang','en'),
+  toggleLang(){this.lang=this.lang==='en'?'ru':'en';U.set('lite-lang',this.lang);this.ui();this.unlock();
+    this.say(this.lang==='en'?'Voice: English':'Голос: русский',true);},ctx:null,_bus:null,_voice:null,
   unlock(){
     if(!this.ctx){const A=window.AudioContext||window.webkitAudioContext;if(A)try{this.ctx=new A();}catch(e){}}
     if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();
@@ -72,7 +79,7 @@ const SND={on:U.get('lite-snd',true),ctx:null,_bus:null,_voice:null,
   toggle(){this.on=!this.on;U.set('lite-snd',this.on);this.ui();
     if(this.on){this.unlock();this.play('ui');U.toast('🔊 Звук включён');}
     else{try{speechSynthesis.cancel();}catch(e){}U.toast('🔇 Звук выключен');}},
-  ui(){const e=$('snd-e');if(e)e.textContent=this.on?'🔊':'🔇';const b=$('b-snd');if(b)b.classList.toggle('off',!this.on);},
+  ui(){const lb=$('b-lang');if(lb)lb.textContent=this.lang.toUpperCase();const e=$('snd-e');if(e)e.textContent=this.on?'🔊':'🔇';const b=$('b-snd');if(b)b.classList.toggle('off',!this.on);},
   _out(){if(!this._bus){this._bus=this.ctx.createDynamicsCompressor();this._bus.connect(this.ctx.destination);}return this._bus;},
   _t(o){const c=this.ctx,t0=c.currentTime+(o.at||0),os=c.createOscillator(),g=c.createGain();
     os.type=o.w||'square';os.frequency.setValueAtTime(o.f,t0);if(o.to)os.frequency.exponentialRampToValueAtTime(o.to,t0+o.d);
@@ -94,8 +101,10 @@ const SND={on:U.get('lite-snd',true),ctx:null,_bus:null,_voice:null,
   },
   say(text,urgent){
     if(!this.on||!window.speechSynthesis||!text)return;
-    try{if(urgent)speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='ru-RU';
-      if(this._voice){u.voice=this._voice;if(/seraphina/i.test(this._voice.name))u.lang=this._voice.lang;}u.rate=1.05;speechSynthesis.speak(u);}catch(e){}
+    try{if(urgent)speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);
+      u.lang=this.lang==='en'?'en-US':'ru-RU';   // голос языка берётся из настроек телефона
+      if(this._voice&&/seraphina/i.test(this._voice.name)){u.voice=this._voice;u.lang=this._voice.lang;}
+      u.rate=1.05;speechSynthesis.speak(u);}catch(e){}
   },
   vib(p){try{if(navigator.vibrate)navigator.vibrate(p);}catch(e){}}
 };
@@ -195,14 +204,30 @@ const ROUTER={
     const raw=(r.legs&&r.legs[0]&&r.legs[0].steps)||[];const sum=raw.reduce((s,x)=>s+x.distance,0)||1,k=total/sum;
     let acc=0;const steps=raw.map((st,i)=>{const m=st.maneuver||{};
       const s={k:i,type:m.type,mod:m.modifier,exit:m.exit,name:st.name||st.ref||'',along:acc*k};acc+=st.distance;
-      s.text=this.text(s);s.silent=s.type==='depart'||((s.type==='new name'||s.type==='continue'||s.type==='notification')&&(!s.mod||s.mod==='straight'));
+      s.text=this.text(s);s.en=this.textEn(s);s.silent=s.type==='depart'||((s.type==='new name'||s.type==='continue'||s.type==='notification')&&(!s.mod||s.mod==='straight'));
       return s;});
-    if(!steps.length||steps[steps.length-1].type!=='arrive')steps.push({k:steps.length,type:'arrive',along:total,text:'Финиш',name:''});
+    if(!steps.length||steps[steps.length-1].type!=='arrive')steps.push({k:steps.length,type:'arrive',along:total,text:'Финиш',en:'You have arrived',name:''});
     return{mode,pts,cum,total,dur:r.duration,steps,cams:[],approx:false};
   },
   straight(mode,a,b){const pts=[[a.lat,a.lng],[b.lat,b.lng]],cum=this._cum(pts);
     return{mode,pts,cum,total:cum[1],dur:cum[1]/(mode==='foot'?1.3:12),approx:true,cams:[],
-      steps:[{k:0,type:'arrive',along:cum[1],text:'По прямой к цели',name:''}]};},
+      steps:[{k:0,type:'arrive',along:cum[1],text:'По прямой к цели',en:'Head straight to the destination',name:''}]};},
+  textEn(s){const on=s.name?' onto '+s.name:'',E={left:'left','slight left':'slightly left','sharp left':'sharp left',right:'right',
+      'slight right':'slightly right','sharp right':'sharp right',straight:'straight',uturn:'around'},M=E[s.mod]||'',
+      side=s.mod&&s.mod.indexOf('left')>=0?'left':'right',n=s.exit||0,ord=n?n+(n%10===1&&n!==11?'st':n%10===2&&n!==12?'nd':n%10===3&&n!==13?'rd':'th'):'';
+    switch(s.type){
+      case 'depart':return 'Head out'+(s.name?' on '+s.name:'');
+      case 'arrive':return 'You have arrived';
+      case 'roundabout':case 'rotary':case 'roundabout turn':return 'At the roundabout, take the '+(ord?ord+' ':'')+'exit'+on;
+      case 'exit roundabout':case 'exit rotary':return 'Exit the roundabout'+on;
+      case 'fork':return 'Keep '+side+on;
+      case 'merge':return 'Merge '+side+on;
+      case 'on ramp':return 'Take the ramp'+on;
+      case 'off ramp':return 'Take the exit on the '+side+on;
+      case 'end of road':return 'At the end of the road, turn '+(M||side)+on;
+      case 'continue':case 'new name':return (s.mod&&s.mod!=='straight'?'Bear '+M:'Continue straight')+on;
+      default:return (s.mod==='straight'?'Continue straight':s.mod==='uturn'?'Make a U-turn':'Turn '+M)+on;}
+  },
   text(s){const on=s.name?' на '+s.name:'',M=this.MODS[s.mod]||'',side=s.mod&&s.mod.indexOf('left')>=0?'левее':'правее';
     switch(s.type){
       case 'depart':return 'Начинаем'+(s.name?' по '+s.name:'');
@@ -290,8 +315,9 @@ const CAMS={on:U.get('lite-cam',true),list:new Map(),anchor:null,_busy:false,ale
     document.body.classList.toggle('over',!!over);
     // голос: на входе в зону и на 250 м
     const say=(key,txt)=>{if(this._said[key])return;this._said[key]=1;SND.play('cam');SND.vib([60,60,60]);SND.say(txt,true);};
-    if(tg.d<=600)say(c.id+'@600','Камера через '+U.sayD(Math.round(tg.d/50)*50)+(c.lim?', ограничение '+c.lim:''));
-    if(tg.d<=250)say(c.id+'@250',over?'Сбавь скорость! Ограничение '+c.lim:'Камера через '+U.sayD(tg.d));
+    const en=U.en();
+    if(tg.d<=600)say(c.id+'@600',en?'Speed camera in '+U.sayD(Math.round(tg.d/50)*50)+(c.lim?', limit '+c.lim:''):'Камера через '+U.sayD(Math.round(tg.d/50)*50)+(c.lim?', ограничение '+c.lim:''));
+    if(tg.d<=250)say(c.id+'@250',over?(en?'Slow down! Limit '+c.lim:'Сбавь скорость! Ограничение '+c.lim):(en?'Speed camera in ':'Камера через ')+U.sayD(tg.d));
     // парктроник: чаще и выше по мере приближения; превышение — тревога
     const now=Date.now();
     if(v>2&&tg.d<=400&&now>=this._next){const k=1-tg.d/400;
@@ -344,7 +370,7 @@ const NAV={on:false,mode:'car',dest:null,route:null,along:0,_i:0,_off:0,_lastRe:
     Object.assign(this,{on:true,dest:d,mode:r.mode,route:r,along:0,_i:0,_off:0,_said:{}});
     U.set('lite-nav',{dest:d,mode:r.mode,t:Date.now()});
     document.body.classList.add('nav');APP.closeMap();WAKE.on();TRIP.start();
-    SND.play('start');SND.say((r.mode==='foot'?'Идём! ':'Поехали! ')+U.sayD(r.total)+', примерно '+U.sayT(r.dur),true);
+    SND.play('start');SND.say(U.en()?(r.mode==='foot'?"Let's go! ":"Let's go! ")+U.sayD(r.total)+', about '+U.sayT(r.dur):(r.mode==='foot'?'Идём! ':'Поехали! ')+U.sayD(r.total)+', примерно '+U.sayT(r.dur),true);
     if(r.mode==='car'&&!r.cams.length)CAMS.forRoute(r);
     RADAR.drawRoute();APP.ui();if(GEO.last)this.update(GEO.last);
   },
@@ -379,19 +405,22 @@ const NAV={on:false,mode:'car',dest:null,route:null,along:0,_i:0,_off:0,_lastRe:
     for(const t of th){const key=st.k+'@'+t;
       if(d<=t&&d>t*.35&&!this._said[key]){this._said[key]=1;
         th.forEach(x=>{if(x>t)this._said[st.k+'@'+x]=1;});   // дальние пороги уже не нужны
-        const txt=t===th[th.length-1]?U.cap(st.text):'Через '+U.sayD(d)+' '+U.low(st.text);
+        const txt=NAV.phrase(st,d,t===th[th.length-1]);
         SND.play('turn');SND.vib(30);SND.say(txt);break;}}
   },
-  repeat(){if(!this.on)return;const st=this.next();SND.say('Через '+U.sayD(st.along-this.along)+' '+U.low(st.text),true);},
+  phrase(st,d,now){const en=U.en(),tx=en?(st.en||st.text):st.text;
+    if(st.type==='arrive'&&!now)return en?'In '+U.sayD(d)+', you will reach your destination':'Через '+U.sayD(d)+' финиш';
+    return now?U.cap(tx):(en?'In '+U.sayD(d)+', '+U.low(tx):'Через '+U.sayD(d)+' '+U.low(tx));},
+  repeat(){if(!this.on)return;const st=this.next();SND.say(this.phrase(st,st.along-this.along,false),true);},
   reroute(f){
     this._lastRe=Date.now();this._off=0;SND.play('reroute');U.toast('🔄 Перестраиваю маршрут');
     ROUTER.get(this.mode,f,this.dest).then(r=>{if(!this.on)return;
       Object.assign(this,{route:r,along:0,_i:0,_said:{}});MAPV.route=r;
-      if(r.mode==='car')CAMS.forRoute(r);RADAR.drawRoute();MAPV.drawRoute();SND.say('Маршрут перестроен');});
+      if(r.mode==='car')CAMS.forRoute(r);RADAR.drawRoute();MAPV.drawRoute();SND.say(U.en()?'Route recalculated':'Маршрут перестроен');});
   },
   arrive(){
     const s=TRIP.finish(),mode=this.mode;this.stop(true);
-    SND.play('arrive');SND.vib([80,60,80,60,160]);SND.say(mode==='foot'?'Вы пришли!':'Вы на месте!',true);
+    SND.play('arrive');SND.vib([80,60,80,60,160]);SND.say(U.en()?'You have arrived!':(mode==='foot'?'Вы пришли!':'Вы на месте!'),true);
     APP.showFinish(s,mode);
   }
 };
