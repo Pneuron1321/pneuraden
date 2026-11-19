@@ -62,7 +62,10 @@ const SND={on:U.get('lite-snd',true),ctx:null,_bus:null,_voice:null,
     if(!this.ctx){const A=window.AudioContext||window.webkitAudioContext;if(A)try{this.ctx=new A();}catch(e){}}
     if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();
     if(window.speechSynthesis){const pick=()=>{const v=speechSynthesis.getVoices();
-        this._voice=v.find(x=>/^ru/i.test(x.lang)&&/female|milena|irina|google/i.test(x.name))||v.find(x=>/^ru/i.test(x.lang))||null;};
+        // Серафина (de-DE-SeraphinaMultilingualNeural) — многоязычный нейроголос Microsoft: есть в Edge
+        // («Microsoft Seraphina Online (Natural)»); где его нет — лучший русский голос системы
+        this._voice=v.find(x=>/seraphina/i.test(x.name))
+          ||v.find(x=>/^ru/i.test(x.lang)&&/female|milena|irina|google/i.test(x.name))||v.find(x=>/^ru/i.test(x.lang))||null;};
       pick();speechSynthesis.onvoiceschanged=pick;
       try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);}catch(e){} } // iOS: «разбудить» речь касанием
   },
@@ -92,7 +95,7 @@ const SND={on:U.get('lite-snd',true),ctx:null,_bus:null,_voice:null,
   say(text,urgent){
     if(!this.on||!window.speechSynthesis||!text)return;
     try{if(urgent)speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='ru-RU';
-      if(this._voice)u.voice=this._voice;u.rate=1.05;speechSynthesis.speak(u);}catch(e){}
+      if(this._voice){u.voice=this._voice;if(/seraphina/i.test(this._voice.name))u.lang=this._voice.lang;}u.rate=1.05;speechSynthesis.speak(u);}catch(e){}
   },
   vib(p){try{if(navigator.vibrate)navigator.vibrate(p);}catch(e){}}
 };
