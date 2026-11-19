@@ -591,27 +591,47 @@ const MAPV={map:null,tile:null,me:null,dest:null,destMk:null,ringMk:null,route:n
       .then(r=>r.json()).then(j=>{if(this.dest!==d||!j)return;const a=j.address||{};
         d.name=j.name||[a.road,a.house_number].filter(Boolean).join(', ')||a.suburb||a.town||a.city||d.name;this.ui();}).catch(()=>{});
   },
-  // поиск: Nominatim (сначала рядом с тобой), запасной — Photon
+  // поиск: Nominatim и Photon ПАРАЛЛЕЛЬНО (Photon лучше находит номера домов), результаты сливаются.
+  // С номером в запросе — сначала точные дома; если дома нет в OSM, честно говорим и даём улицу.
+  // Можно вписать и координаты: «45.08, 13.64».
   _search(){
-    const q=$('q'),box=$('sres');let tm=null;
-    const run=s=>{if(s.length<2){box.classList.add('hidden');return;}
-      const c=GEO.last||ROVINJ,dLat=1.1,dLng=1.1/Math.max(.2,Math.cos(c.lat*U.R));
+    const q=$('q'),box=$('sres');let tm=null,seq=0;
+    const pick=r=>{box.classList.add('hidden');q.value=r.name;q.blur();
+      if(NAV.on){U.toast('Сначала останови маршрут');return;}
+      this.setDest({lat:r.lat,lng:r.lng,name:r.name},false);this.map.setView([r.lat,r.lng],Math.max(16,this.map.getZoom()));};
+    const show=(arr,c,note)=>{
+      if(!arr.length){box.innerHTML='<div>Ничего не нашлось<small>Попробуй «улица номер, город» или тапни точку на карте</small></div>';box.classList.remove('hidden');return;}
+      box.innerHTML=(note?'<div style="cursor:default;color:var(--ng)">'+U.esc(note)+'</div>':'')
+        +arr.slice(0,8).map((r,i)=>'<div data-i="'+i+'">'+(r.house?'🏠 ':'')+U.esc(r.name)+'<small>'+U.esc(r.sub)+' · '+U.fmtD(U.dist(c,r))+'</small></div>').join('');
+      box.classList.remove('hidden');
+      box.querySelectorAll('[data-i]').forEach(el=>el.onclick=()=>pick(arr[+el.dataset.i]));};
+    const run=s=>{
+      if(s.length<2){box.classList.add('hidden');return;}
+      const c=GEO.last||ROVINJ,id=++seq;
+      const ll=s.match(/^\s*(-?\d{1,2}\.\d+)\s*[,; ]\s*(-?\d{1,3}\.\d+)\s*$/);
+      if(ll){show([{lat:+ll[1],lng:+ll[2],name:'Точка '+ll[1]+', '+ll[2],sub:'координаты'}],c);return;}
+      const dLat=1.1,dLng=1.1/Math.max(.2,Math.cos(c.lat*U.R));
       const vb=(c.lng-dLng).toFixed(3)+','+(c.lat+dLat).toFixed(3)+','+(c.lng+dLng).toFixed(3)+','+(c.lat-dLat).toFixed(3);
-      const show=arr=>{if(!arr.length){box.innerHTML='<div>Ничего не нашлось<small>Попробуй город, улицу или ориентир</small></div>';box.classList.remove('hidden');return;}
-        arr.sort((a,b)=>U.dist(c,a)-U.dist(c,b));
-        box.innerHTML=arr.slice(0,7).map((r,i)=>'<div data-i="'+i+'">'+U.esc(r.name)+'<small>'+U.esc(r.sub)+' · '+U.fmtD(U.dist(c,r))+'</small></div>').join('');
-        box.classList.remove('hidden');
-        box.querySelectorAll('[data-i]').forEach(el=>el.onclick=()=>{const r=arr[+el.dataset.i];box.classList.add('hidden');q.value=r.name;q.blur();
-          if(NAV.on){U.toast('Сначала останови маршрут');return;}
-          this.setDest({lat:r.lat,lng:r.lng,name:r.name},false);});};
-      fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&accept-language=ru&limit=10&viewbox='+vb+'&bounded=0&q='+encodeURIComponent(s))
-        .then(r=>r.json()).then(a=>{if(!Array.isArray(a)||!a.length)throw 0;
-          show(a.map(o=>{const p=(o.display_name||'').split(', ');return{lat:+o.lat,lng:+o.lon,name:o.name||p[0],sub:p.slice(1,3).join(', ')};}));})
-        .catch(()=>fetch('https://photon.komoot.io/api/?limit=8&lang=default&lat='+c.lat.toFixed(3)+'&lon='+c.lng.toFixed(3)+'&q='+encodeURIComponent(s))
-          .then(r=>r.json()).then(d=>show((d.features||[]).map(f=>{const p=f.properties||{};
-            return{lat:f.geometry.coordinates[1],lng:f.geometry.coordinates[0],name:p.name||p.street||'—',sub:[p.city,p.country].filter(Boolean).join(', ')};})))
-          .catch(()=>show([])));};
-    q.addEventListener('input',()=>{clearTimeout(tm);tm=setTimeout(()=>run(q.value.trim()),400);});
+      const tmo=ms=>{const ac=new AbortController();setTimeout(()=>ac.abort(),ms);return ac.signal;};
+      const nom=fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&accept-language=ru&limit=8&viewbox='+vb+'&bounded=0&q='+encodeURIComponent(s),{signal:tmo(8000)})
+        .then(r=>r.json()).then(a=>(Array.isArray(a)?a:[]).map(o=>{const ad=o.address||{},p=(o.display_name||'').split(', ');
+          const road=ad.road||ad.pedestrian||ad.footway||ad.path||ad.square||'',hn=ad.house_number;
+          return{lat:+o.lat,lng:+o.lon,house:!!hn,name:hn?(road+' '+hn).trim():(o.name||p[0]),
+            sub:[ad.city||ad.town||ad.village||ad.suburb||ad.county,ad.country].filter(Boolean).join(', ')||p.slice(1,3).join(', ')};})).catch(()=>[]);
+      const pho=fetch('https://photon.komoot.io/api/?limit=8&lat='+c.lat.toFixed(3)+'&lon='+c.lng.toFixed(3)+'&q='+encodeURIComponent(s),{signal:tmo(8000)})
+        .then(r=>r.json()).then(d=>(d.features||[]).map(f=>{const p=f.properties||{},hn=p.housenumber;
+          return{lat:f.geometry.coordinates[1],lng:f.geometry.coordinates[0],house:!!hn,
+            name:hn?((p.street||p.name||'')+' '+hn).trim():(p.name||p.street||'—'),
+            sub:[p.city||p.town||p.village||p.district||p.county,p.country].filter(Boolean).join(', ')};})).catch(()=>[]);
+      Promise.all([nom,pho]).then(([a,b])=>{
+        if(id!==seq)return;
+        const all=[];[...a,...b].forEach(r=>{if(isFinite(r.lat)&&!all.some(x=>U.dist(x,r)<25&&x.house===r.house))all.push(r);});
+        const wantHouse=/\d/.test(s);
+        all.sort((x,y)=>wantHouse&&x.house!==y.house?(x.house?-1:1):U.dist(c,x)-U.dist(c,y));
+        const note=wantHouse&&all.length&&!all.some(r=>r.house)?'Номера дома нет в OSM — выбери улицу, потом уточни точку тапом':'';
+        show(all,c,note);});
+    };
+    q.addEventListener('input',()=>{clearTimeout(tm);tm=setTimeout(()=>run(q.value.trim()),450);});
     q.addEventListener('keydown',e=>{if(e.key==='Enter'){clearTimeout(tm);run(q.value.trim());}});
   }
 };
