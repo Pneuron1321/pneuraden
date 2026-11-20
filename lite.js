@@ -51,14 +51,22 @@ const U={
     return best;}
 };
 
-/* ── Overpass: три зеркала по очереди (основное часто перегружено) ── */
-const OVP={EPS:['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter'],
-  q(query,ms){return new Promise((res,rej)=>{const go=k=>{if(k>=this.EPS.length){rej(new Error('overpass'));return;}
-    const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),ms||25000);
-    fetch(this.EPS[k],{method:'POST',body:new URLSearchParams({data:query}),signal:ac.signal})  // форма, как ждёт Overpass
-      .then(r=>{if(!r.ok)throw 0;return r.json();}).then(d=>{clearTimeout(tm);res(d);})
-      .catch(()=>{clearTimeout(tm);go(k+1);});};go(0);});}
+/* ── Overpass: публичные зеркала часто перегружены (504, тишина по 45 с).
+   Запускаем первое; если молчит 4 с — подключаем следующее, и так далее; побеждает первый
+   нормальный ответ, остальные отменяются. Ответ 200 с «remark» и без данных — это тайм-аут, не успех. ── */
+const OVP={EPS:['https://overpass-api.de/api/interpreter','https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter'],
+  q(query,ms){return new Promise((res,rej)=>{
+    const acs=[],timers=[];let done=false,fails=0,started=0;
+    const finish=(ok,v)=>{if(done)return;done=true;timers.forEach(clearTimeout);acs.forEach(a=>{try{a.abort();}catch(e){}});ok?res(v):rej(v);};
+    const launch=k=>{if(done||k>=this.EPS.length||k<started)return;started++;   // k<started — уже запущеноconst ac=new AbortController();acs.push(ac);
+      timers.push(setTimeout(()=>ac.abort(),ms||25000));
+      timers.push(setTimeout(()=>launch(k+1),4000));                      // подстраховка
+      fetch(this.EPS[k],{method:'POST',body:new URLSearchParams({data:query}),signal:ac.signal})
+        .then(r=>{if(!r.ok)throw 0;return r.json();})
+        .then(d=>{if(d&&d.remark&&/runtime|timeout|error/i.test(d.remark)&&!(d.elements||[]).length)throw 0;finish(true,d);})
+        .catch(()=>{fails++;if(fails>=this.EPS.length)finish(false,new Error('overpass'));else if(fails===started)launch(started);});};
+    launch(0);});}
 };
 
 /* ═══ ЗВУК: аркадные сигналы (синтез WebAudio, без файлов) + голос по-русски ═══ */
@@ -251,9 +259,11 @@ const ROUTER={
 const CAMS={on:U.get('lite-cam',true),list:new Map(),anchor:null,_busy:false,_failT:0,failed:false,alert:null,n21:0,_said:{},_next:0,passed:new Set(),
   R:21000,
   init(){
-    const c=U.get('lite-cams',null);
+    const c=U.get('lite-cams2',null);
     if(c&&Date.now()-c.t<7*864e5){(c.cams||[]).forEach(a=>this.list.set(a[0],{id:a[0],lat:a[1],lng:a[2],lim:a[3]||null}));this.anchor=c.a;}
     this.ui();
+    fetch('assets/cams-base.json').then(r=>r.json()).then(b=>{(b.cams||[]).forEach(a=>{if(!this.list.has(a[0]))this.list.set(a[0],{id:a[0],lat:a[1],lng:a[2],lim:a[3]||null});});
+      if(GEO.last)this.onFix(GEO.last,true);MAPV.drawCams();RADAR.dirty=true;}).catch(()=>{});
   },
   toggle(){this.on=!this.on;U.set('lite-cam',this.on);this.ui();SND.play('ui');
     if(this.on){U.toast('📸 Камеры: предупреждаю за 600 м');if(GEO.last)this.ensure(GEO.last);}
@@ -266,16 +276,20 @@ const CAMS={on:U.get('lite-cam',true),list:new Map(),anchor:null,_busy:false,_fa
     if(la==null)return;if(!this.list.has(e.id))n++;this.list.set(e.id,{id:e.id,lat:la,lng:lo,lim:this._lim(e.tags)});});return n;},
   _save(){const a=this.anchor||GEO.last||ROVINJ;
     const arr=[...this.list.values()].sort((x,y)=>U.dist(a,x)-U.dist(a,y)).slice(0,3000).map(c=>[c.id,+c.lat.toFixed(6),+c.lng.toFixed(6),c.lim]);
-    U.set('lite-cams',{t:Date.now(),a:this.anchor,cams:arr});},
+    U.set('lite-cams2',{t:Date.now(),a:this.anchor,cams:arr});},
   ensure(f){
     if(!this.on||this._busy||f.fake)return;
     if(this.anchor&&U.dist(this.anchor,f)<7000)return;     // зона уже покрыта — Overpass не дёргаем
     if(Date.now()-this._failT<60000)return;               // сервер не ответил — повтор через минуту
     this._busy=true;
     OVP.q('[out:json][timeout:25];nwr["highway"="speed_camera"](around:'+this.R+','+f.lat.toFixed(5)+','+f.lng.toFixed(5)+');out center 900;')
-      .then(d=>{this.failed=false;this._add(d.elements);this.anchor={lat:f.lat,lng:f.lng};this._save();this.onFix(f,true);MAPV.drawCams();RADAR.dirty=true;
+      .then(d=>{if(d&&d.remark&&!(d.elements||[]).length)throw new Error(d.remark); // тайм-аут сервера внутри ответа 200
+        this.failed=false;this._add(d.elements);
+        // зону помечаем проверенной только при непустом ответе; пустой — перепроверим через 10 минут
+        if((d.elements||[]).length)this.anchor={lat:f.lat,lng:f.lng};else this._failT=Date.now()+540000; // пусто — повтор через 10 минthis._save();this.onFix(f,true);MAPV.drawCams();RADAR.dirty=true;
         if(!this.n21)U.toast('📸 В радиусе 21 км камер в OSM нет');})
-      .catch(()=>{this.failed=true;this._failT=Date.now();U.toast('📸 Сервер камер не ответил — повторю через минуту');})
+      .catch(()=>{this.failed=true;this._failT=Date.now();
+        U.toast(this.n21?'📸 Сервер камер не ответил — показываю встроенную базу':'📸 Сервер камер не ответил — повторю через минуту');})
       .finally(()=>{this._busy=false;});
   },
   // камеры вдоль всего маршрута (даже дальше 21 км): запрос «вокруг ломаной», потом точный отбор ≤ 45 м
@@ -489,7 +503,9 @@ const RADAR={map:null,tile:null,line:null,glow:null,cv:null,cx:null,dirty:true,h
     if(CAMS.on&&me){const al=CAMS.alert&&CAMS.alert.c.id,route=NAV.on&&NAV.route?new Set(NAV.route.cams.map(x=>x.id)):null;
       CAMS.list.forEach(cm=>{if(U.dist(me,cm)>3000&&cm.id!==al)return;const s=this._scr(cm.lat,cm.lng),r=Math.hypot(s.x,s.y);
         if(r<=edge)this._cam(s.x,s.y,cm.id===al,route&&route.has(cm.id),now);
-        else if(cm.id===al)this._ptr(s,edge,'#fbbf24','📸',U.fmtD(CAMS.alert.d));});}
+        else if(cm.id===al)this._ptr(s,edge,'#fbbf24','📸',U.fmtD(CAMS.alert.d));});
+      if(!al){let nb=null,nd=1e9;CAMS.list.forEach(cm=>{const d=U.dist(me,cm);if(d<nd){nd=d;nb=cm;}});
+        if(nb&&nd<=CAMS.R){const s=this._scr(nb.lat,nb.lng);if(Math.hypot(s.x,s.y)>edge)this._ptr(s,edge,'rgba(251,191,36,.75)','📸',U.fmtD(nd));}}}
     // финиш
     if(NAV.on&&NAV.dest){const s=this._scr(NAV.dest.lat,NAV.dest.lng),r=Math.hypot(s.x,s.y);
       if(r<=edge){c.font='24px serif';c.textAlign='center';c.textBaseline='bottom';c.shadowColor='rgba(255,214,10,.9)';c.shadowBlur=10;
@@ -552,7 +568,7 @@ const MAPV={map:null,tile:null,me:null,dest:null,destMk:null,ringMk:null,route:n
       const arr=U.hm(Date.now()+r.dur*1000);
       const base=(r.approx?'≈ по прямой · ':'')+'<b>'+U.fmtD(r.total)+'</b> · '+U.fmtT(r.dur)+' · прибытие '+arr;
       $('p-sum').innerHTML=base+(r.mode==='car'?' · 📸 …':'');$('b-start').disabled=false;
-      if(r.mode==='car')CAMS.forRoute(r).then(n=>{if(id===this._rid)$('p-sum').innerHTML=base+(r.camsOk===false?' · 📸 сервер камер не ответил':' · 📸 <b>'+n+'</b> на пути');});
+      if(r.mode==='car')CAMS.forRoute(r).then(n=>{if(id===this._rid)$('p-sum').innerHTML=base+(r.camsOk===false&&!n?' · 📸 сервер камер не ответил':' · 📸 <b>'+n+'</b> на пути');});
       if(after)after();});
   },
   drawRoute(fit){
