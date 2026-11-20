@@ -1,0 +1,87 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['lat', 'lng', 'ts'])",
+        "lat": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+        "lng": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+        "ts": { ".validate": "newData.isNumber() && newData.val() <= now + 60000" },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "admins": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "profiles": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous'",
+        "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40" },
+        "colorId": { ".validate": "newData.isString() && newData.val().matches(/^[a-z]{2,12}$/)" },
+        "statusMsg": { ".validate": "newData.isString() && newData.val().length <= 200" },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "events": {
+      ".read": "auth != null",
+      "$id": {
+        ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || (!data.exists() && newData.exists() && auth.token.firebase.sign_in_provider !== 'anonymous' && newData.child('owner').val() === auth.uid && newData.child('verified').val() === false) || (data.exists() && !newData.exists() && data.child('owner').val() === auth.uid && data.child('verified').val() === false))",
+        ".validate": "newData.hasChildren(['title', 'type', 'lat', 'lng', 'owner', 'verified', 'createdAt'])",
+        "title": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 80" },
+        "type": { ".validate": "newData.isString() && newData.val().matches(/^(training|concert|market|meetup|sport|other)$/)" },
+        "date": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "loc": { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "desc": { ".validate": "newData.isString() && newData.val().length <= 600" },
+        "lat": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+        "lng": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+        "owner": { ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())" },
+        "ownerName": { ".validate": "newData.isString() && newData.val().length <= 40" },
+        "verified": { ".validate": "newData.isBoolean()" },
+        "createdAt": { ".validate": "newData.isNumber() && newData.val() <= now + 60000" },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "eventMsgs": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
+      "$id": {
+        ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || (!data.exists() && root.child('events').child($id).child('owner').val() === auth.uid))",
+        ".validate": "newData.isString() && newData.val().length <= 500"
+      }
+    },
+
+    "club": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true",
+      "active": { ".validate": "newData.isBoolean()" },
+      "lat": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+      "lng": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+      "ts": { ".validate": "newData.isNumber()" },
+      "$other": { ".validate": false }
+    },
+
+    "trails": {
+      ".read": "auth != null",
+      "$day": {
+        ".write": "auth != null && root.child('admins').child(auth.uid).val() === true",
+        "$cell": {
+          "$h": {
+            ".write": "auth != null && auth.token.firebase.sign_in_provider !== 'anonymous' && !data.exists()",
+            ".validate": "newData.val() === true && $day.matches(/^\\d{4}-\\d{2}-\\d{2}$/) && $cell.matches(/^-?\\d{1,6}_-?\\d{1,6}$/) && $h.matches(/^[0-9a-f]{16}$/)"
+          }
+        }
+      }
+    }
+  }
+}
