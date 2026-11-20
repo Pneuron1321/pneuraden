@@ -3280,7 +3280,7 @@ const PO={
                'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
     const tryEp=(k)=>{
       if(k>=EPS.length)return; // все зеркала молчат — тихо выходим, попробуем при следующем move
-      fetch(EPS[k],{method:'POST',body:'data='+encodeURIComponent(q)})
+      fetch(EPS[k],{method:'POST',body:new URLSearchParams({data:q})})
         .then(r=>{if(!r.ok)throw 0;return r.json();}).then(d=>{
           let add=0;
           (d.elements||[]).forEach(e=>{
@@ -3322,7 +3322,7 @@ const PO={
                'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
     const tryEp=(k)=>{
       if(k>=EPS.length){this._busy=false;return;}
-      fetch(EPS[k],{method:'POST',body:'data='+encodeURIComponent(q)})
+      fetch(EPS[k],{method:'POST',body:new URLSearchParams({data:q})})
       .then(r2=>{if(!r2.ok)throw 0;return r2.json();}).then(d=>{
         const els=(d.elements||[]).map(e=>({
           lat:e.lat??(e.center&&e.center.lat),lng:e.lon??(e.center&&e.center.lon),
@@ -4761,7 +4761,7 @@ const NAV={
                'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
     const tryEp=(k)=>{
       if(k>=EPS.length){this._setRoadLimit('?');return;}
-      fetch(EPS[k],{method:'POST',body:'data='+encodeURIComponent(q)})
+      fetch(EPS[k],{method:'POST',body:new URLSearchParams({data:q})})
         .then(r=>{if(!r.ok)throw 0;return r.json();}).then(d=>{
           const w=(d.elements||[]).find(e=>e.tags&&e.tags.maxspeed);
           if(w){const v=String(w.tags.maxspeed).replace(/[^0-9]/g,'');this._setRoadLimit(v||'?');}
@@ -4848,20 +4848,25 @@ const SR={
       const ref=(typeof PM!=='undefined'&&PM.last)||c;
       return fs.sort((a,b)=>TP._dist(ref.lat,ref.lng,a.lat,a.lng)-TP._dist(ref.lat,ref.lng,b.lat,b.lng));
     };
-    fetch(nom)
-      .then(r=>r.json()).then(arr=>{
-        if(!Array.isArray(arr)||!arr.length)throw 0;
-        this._show(sortByNear(toFs(arr)).slice(0,7));
-      }).catch(()=>{
-        // резерв: Photon
-        fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(q)
-          +'&limit=6&lang=ru&lat='+(+c.lat).toFixed(3)+'&lon='+(+c.lng).toFixed(3))
-          .then(r=>r.json()).then(d=>{
-            const f=d.features||[];
-            if(f.length)this._show(f);else this._empty();
-          })
-          .catch(()=>this._empty());
-      });
+    // Nominatim и Photon параллельно (Photon лучше знает номера домов); с цифрой в запросе — сначала дома
+    const ref=(typeof PM!=='undefined'&&PM.last)||c;
+    const nomQ=fetch(base.replace('addressdetails=1','addressdetails=1')+'&viewbox='+vb+'&bounded=0').then(r=>r.json()).then(arr=>(Array.isArray(arr)?arr:[]).map(o=>{
+        const ad=o.address||{},dn=(o.display_name||'').split(', '),road=ad.road||ad.pedestrian||ad.footway||ad.square||'',hn=ad.house_number;
+        return{lat:+o.lat,lng:+o.lon,_h:!!hn,geometry:{coordinates:[+o.lon,+o.lat]},
+          properties:{name:hn?(road+' '+hn).trim():(o.name||dn[0]),city:ad.city||ad.town||ad.village||(dn.length>2?dn[1]:''),
+            country:ad.country||dn[dn.length-1]||'',osm_key:o.category,osm_value:hn?'house':o.type}};})).catch(()=>[]);
+    const phoQ=fetch('https://photon.komoot.io/api/?q='+encodeURIComponent(q)+'&limit=8&lat='+(+c.lat).toFixed(3)+'&lon='+(+c.lng).toFixed(3))
+      .then(r=>r.json()).then(d=>(d.features||[]).map(f=>{const p=f.properties||{},hn=p.housenumber;
+        return{lat:f.geometry.coordinates[1],lng:f.geometry.coordinates[0],_h:!!hn,geometry:f.geometry,
+          properties:{...p,name:hn?((p.street||p.name||'')+' '+hn).trim():(p.name||p.street),osm_value:hn?'house':p.osm_value}};})).catch(()=>[]);
+    Promise.all([nomQ,phoQ]).then(([a,b])=>{
+      const all=[];[...a,...b].forEach(r=>{if(isFinite(r.lat)&&!all.some(x=>x._h===r._h&&TP._dist(x.lat,x.lng,r.lat,r.lng)<25))all.push(r);});
+      if(!all.length){this._empty();return;}
+      const wantHouse=/\d/.test(q);
+      all.sort((x,y)=>wantHouse&&x._h!==y._h?(x._h?-1:1):TP._dist(ref.lat,ref.lng,x.lat,x.lng)-TP._dist(ref.lat,ref.lng,y.lat,y.lng));
+      this._show(all.slice(0,8));
+      if(wantHouse&&!all.some(r=>r._h))toast('Номера дома нет в OSM — выбери улицу и уточни точку на карте');
+    });
   },
   _empty(){
     const box=document.getElementById('srch-res');if(!box)return;

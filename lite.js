@@ -56,7 +56,7 @@ const OVP={EPS:['https://overpass-api.de/api/interpreter','https://overpass.kumi
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter'],
   q(query,ms){return new Promise((res,rej)=>{const go=k=>{if(k>=this.EPS.length){rej(new Error('overpass'));return;}
     const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),ms||25000);
-    fetch(this.EPS[k],{method:'POST',body:'data='+encodeURIComponent(query),signal:ac.signal})
+    fetch(this.EPS[k],{method:'POST',body:new URLSearchParams({data:query}),signal:ac.signal})  // форма, как ждёт Overpass
       .then(r=>{if(!r.ok)throw 0;return r.json();}).then(d=>{clearTimeout(tm);res(d);})
       .catch(()=>{clearTimeout(tm);go(k+1);});};go(0);});}
 };
@@ -248,7 +248,7 @@ const ROUTER={
    Данные OSM (highway=speed_camera). Кэш на телефоне 7 дней: камеры не бегают.
    Тревога: впереди по маршруту (или по курсу ±35° без маршрута), с 600 м;
    «парктроник» с 400 м; превышение — красная тревога; пройдена честно — монетка. */
-const CAMS={on:U.get('lite-cam',true),list:new Map(),anchor:null,_busy:false,alert:null,n21:0,_said:{},_next:0,passed:new Set(),
+const CAMS={on:U.get('lite-cam',true),list:new Map(),anchor:null,_busy:false,_failT:0,failed:false,alert:null,n21:0,_said:{},_next:0,passed:new Set(),
   R:21000,
   init(){
     const c=U.get('lite-cams',null);
@@ -270,21 +270,24 @@ const CAMS={on:U.get('lite-cam',true),list:new Map(),anchor:null,_busy:false,ale
   ensure(f){
     if(!this.on||this._busy||f.fake)return;
     if(this.anchor&&U.dist(this.anchor,f)<7000)return;     // зона уже покрыта — Overpass не дёргаем
+    if(Date.now()-this._failT<60000)return;               // сервер не ответил — повтор через минуту
     this._busy=true;
     OVP.q('[out:json][timeout:25];nwr["highway"="speed_camera"](around:'+this.R+','+f.lat.toFixed(5)+','+f.lng.toFixed(5)+');out center 900;')
-      .then(d=>{this._add(d.elements);this.anchor={lat:f.lat,lng:f.lng};this._save();this.onFix(f,true);MAPV.drawCams();RADAR.dirty=true;})
-      .catch(()=>{}).finally(()=>{this._busy=false;});
+      .then(d=>{this.failed=false;this._add(d.elements);this.anchor={lat:f.lat,lng:f.lng};this._save();this.onFix(f,true);MAPV.drawCams();RADAR.dirty=true;
+        if(!this.n21)U.toast('📸 В радиусе 21 км камер в OSM нет');})
+      .catch(()=>{this.failed=true;this._failT=Date.now();U.toast('📸 Сервер камер не ответил — повторю через минуту');})
+      .finally(()=>{this._busy=false;});
   },
   // камеры вдоль всего маршрута (даже дальше 21 км): запрос «вокруг ломаной», потом точный отбор ≤ 45 м
   forRoute(route){
     if(!route||route.approx||route.mode!=='car')return Promise.resolve(0);
     const step=Math.max(150,route.total/220),rad=Math.round(U.clamp(step*.35,60,600)),pts=[];let last=-1e9;
     route.pts.forEach((p,i)=>{if(route.cum[i]-last>=step||i===route.pts.length-1){pts.push(p[0].toFixed(5)+','+p[1].toFixed(5));last=route.cum[i];}});
-    const tag=()=>{route.cams=[];this.list.forEach(c=>{const pr=U.proj(route,c);if(pr.d<=45)route.cams.push({...c,along:pr.along});});
+    const tag=()=>{route.cams=[];this.list.forEach(c=>{const pr=U.proj(route,c);if(pr.d<=70)route.cams.push({...c,along:pr.along});});
       route.cams.sort((a,b)=>a.along-b.along);RADAR.dirty=true;MAPV.drawCams();return route.cams.length;};
     tag();
     return OVP.q('[out:json][timeout:25];nwr["highway"="speed_camera"](around:'+rad+','+pts.join(',')+');out center 900;')
-      .then(d=>{this._add(d.elements);this._save();return tag();}).catch(()=>tag());
+      .then(d=>{this._add(d.elements);this._save();route.camsOk=true;return tag();}).catch(()=>{route.camsOk=false;return tag();});
   },
   onFix(f,quiet){
     if(!quiet)this.ensure(f);
@@ -549,7 +552,7 @@ const MAPV={map:null,tile:null,me:null,dest:null,destMk:null,ringMk:null,route:n
       const arr=U.hm(Date.now()+r.dur*1000);
       const base=(r.approx?'≈ по прямой · ':'')+'<b>'+U.fmtD(r.total)+'</b> · '+U.fmtT(r.dur)+' · прибытие '+arr;
       $('p-sum').innerHTML=base+(r.mode==='car'?' · 📸 …':'');$('b-start').disabled=false;
-      if(r.mode==='car')CAMS.forRoute(r).then(n=>{if(id===this._rid)$('p-sum').innerHTML=base+' · 📸 <b>'+n+'</b> на пути';});
+      if(r.mode==='car')CAMS.forRoute(r).then(n=>{if(id===this._rid)$('p-sum').innerHTML=base+(r.camsOk===false?' · 📸 сервер камер не ответил':' · 📸 <b>'+n+'</b> на пути');});
       if(after)after();});
   },
   drawRoute(fit){
