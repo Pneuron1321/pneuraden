@@ -59,7 +59,8 @@ const OVP={EPS:['https://overpass-api.de/api/interpreter','https://maps.mail.ru/
   q(query,ms){return new Promise((res,rej)=>{
     const acs=[],timers=[];let done=false,fails=0,started=0;
     const finish=(ok,v)=>{if(done)return;done=true;timers.forEach(clearTimeout);acs.forEach(a=>{try{a.abort();}catch(e){}});ok?res(v):rej(v);};
-    const launch=k=>{if(done||k>=this.EPS.length||k<started)return;started++;   // k<started — уже запущеноconst ac=new AbortController();acs.push(ac);
+    const launch=k=>{if(done||k>=this.EPS.length||k<started)return;started++;   // k<started — уже запущено
+      const ac=new AbortController();acs.push(ac);
       timers.push(setTimeout(()=>ac.abort(),ms||25000));
       timers.push(setTimeout(()=>launch(k+1),4000));                      // подстраховка
       fetch(this.EPS[k],{method:'POST',body:new URLSearchParams({data:query}),signal:ac.signal})
