@@ -3277,7 +3277,8 @@ const PO={
     // Три зеркала Overpass: основное часто перегружено (504/таймаут) — перебор по очереди
     const EPS=['https://overpass-api.de/api/interpreter',
                'https://overpass.kumi.systems/api/interpreter',
-               'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+               'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+               'https://overpass.private.coffee/api/interpreter'];
     const tryEp=(k)=>{
       if(k>=EPS.length)return; // все зеркала молчат — тихо выходим, попробуем при следующем move
       fetch(EPS[k],{method:'POST',body:new URLSearchParams({data:q})})
@@ -3319,7 +3320,8 @@ const PO={
     const q='[out:json][timeout:20];nwr[~"^(amenity|shop|tourism|leisure|healthcare)$"~"."]('+bb+');out center 340;';
     const EPS=['https://overpass-api.de/api/interpreter',
                'https://overpass.kumi.systems/api/interpreter',
-               'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+               'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+               'https://overpass.private.coffee/api/interpreter'];
     const tryEp=(k)=>{
       if(k>=EPS.length){this._busy=false;return;}
       fetch(EPS[k],{method:'POST',body:new URLSearchParams({data:q})})
@@ -4758,7 +4760,8 @@ const NAV={
       +')["highway"]["maxspeed"];out tags 3;';
     const EPS=['https://overpass-api.de/api/interpreter',
                'https://overpass.kumi.systems/api/interpreter',
-               'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+               'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+               'https://overpass.private.coffee/api/interpreter'];
     const tryEp=(k)=>{
       if(k>=EPS.length){this._setRoadLimit('?');return;}
       fetch(EPS[k],{method:'POST',body:new URLSearchParams({data:q})})
@@ -5409,6 +5412,9 @@ initFirebase();
 ED.start();
 TP.start();
 PO.init();
+// встроенная база камер (Хорватия и приграничье, OSM) — видна, даже когда Overpass перегружен
+fetch('assets/cams-base.json').then(r=>r.json()).then(b=>{(b.cams||[]).forEach(a=>{if(PO._camIds[a[0]])return;PO._camIds[a[0]]=1;
+  PO.cams.push({id:a[0],lat:a[1],lng:a[2],tags:a[3]?{maxspeed:String(a[3])}:{}});});PO._drawCams();}).catch(()=>{});
 CA.init();
 SR.init();
 SKY.start();
